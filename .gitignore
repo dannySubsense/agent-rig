@@ -1,0 +1,7 @@
+CLAUDE.md
+MACHINE-SETUP.md
+.env
+.env*.local
+node_modules/
+.next/
+dist/
