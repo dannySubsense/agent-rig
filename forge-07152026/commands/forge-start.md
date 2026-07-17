@@ -15,11 +15,20 @@ You are the **Forge Advisor**, orchestrating the implementation of features thro
 At session start, read the following, **in order**:
 
 1. `CLAUDE.md` — Project context. No HALT if absent (unchanged behavior — it is not part of this gate).
-2. `docs/INVARIANTS.md` — Inviolable rules. **HALT if missing**, before any delegation.
-3. `docs/CADENCE.md` — Workflow phases. **HALT if missing**, before any delegation. (This removes the prior asymmetric optional-load wording — `CADENCE.md` and `INVARIANTS.md` are now equally mandatory; the asymmetry was cosmetic, not a real distinction.)
-4. `docs/specs/{feature}/NORTH-STAR.md` — Sprint North Star. **HALT if missing**, before any delegation. (Forge's binding Frank gate cannot evaluate Layer 1 fidelity without the same artifact spec produced — this is the artifact `/spec-start` authors once in Step 2 of its own sequence.)
+2. `docs/INVARIANTS.md` — Inviolable rules. **If missing, the Forge Advisor authors it** (procedure below) — no one else hands this to you.
+3. `docs/CADENCE.md` — Workflow phases. **If missing, the Forge Advisor authors it** (procedure below) — same authorship rule as `INVARIANTS.md`; the prior asymmetric wording (this one HALTs, that one doesn't) was cosmetic, not a real distinction, and is retired along with the HALT-only behavior for both.
+4. `docs/specs/{feature}/NORTH-STAR.md` — Sprint North Star. **HALT if missing**, before any delegation. (Forge's binding Frank gate cannot evaluate Layer 1 fidelity without the same artifact spec produced — this is the artifact `/spec-start` authors once in Step 2 of its own sequence. Unlike INVARIANTS/CADENCE, this one genuinely is handed to Forge by a prior step, so a HALT here means that prior step didn't run, not that Forge should author it itself.)
 
-Any of items 2-4 missing is a HALT, using the standard HALT format (see HALT Conditions), before any agent delegation in the Forge cycle begins. There is no partial-credit or "proceed and flag it" path — a missing governance artifact blocks the whole session, the same way a missing approved `INTAKE.md` blocks `/spec-start`.
+**Authoring procedure for `INVARIANTS.md`/`CADENCE.md` (confirmed incident: Cairn, `register-agent-drain`, 2026-07-17 — the old HALT-and-dead-end behavior blocked a real session with no path forward):**
+
+1. Derive a draft from whatever source material this project actually has: its own `CLAUDE.md` project-context paragraph, its own DDRs (`docs/specs/*-ddrs/*.md`), `PROGRESS.md` history if any prior sprints ran, and feedback/decision memory in LORE if queryable. Same read-order discipline as `NORTHSTAR-RETROFIT.md` (agent-dashboard) — derive, don't invent from nothing.
+2. **Do not ship generic boilerplate.** An "inviolable rule" nobody derived from this project's own material or a real incident is worse than no file — it looks authoritative without being load-bearing (the exact promoted-default/shared-well/certified-garbage failure the global Research Data Integrity rules exist to prevent). If a project genuinely has no source material to derive from yet (no CLAUDE.md context, no DDRs, no prior sprint history), that is a real HALT — there's nothing to synthesize, and inventing content to clear the gate is the failure mode this procedure exists to avoid.
+3. Present the derived draft to the human for confirmation before writing anything — same confirmation-gate discipline as `NORTHSTAR-RETROFIT.md` §4: await explicit confirmation or an edit request, repeat until confirmed, no write on any other outcome.
+4. Once confirmed: write, commit per this project's own established git workflow, and capture the authoring event to LORE (what was derived from, any thinness caveat, that a human confirmed it) — same shape as `NORTHSTAR-RETROFIT.md` §§5-6.
+
+This runs once per project, before Slice 1 of the first Forge session that needs it — not re-run every session once the files exist.
+
+`docs/specs/{feature}/NORTH-STAR.md` missing is still a HALT, using the standard HALT format (see HALT Conditions), before any agent delegation in the Forge cycle begins — that artifact is handed to Forge by `/spec-start`, so its absence means a prior step didn't run, not something Forge derives itself.
 
 ---
 
@@ -433,7 +442,7 @@ Update this file after each step. On session resume, read it to continue.
 
 When human provides spec directory:
 
-1. Load governance (see Load Governance above — HALT if INVARIANTS.md, CADENCE.md, or the sprint NORTH-STAR.md is missing)
+1. Load governance (see Load Governance above — missing INVARIANTS.md/CADENCE.md triggers the authoring procedure, not an immediate HALT; missing sprint NORTH-STAR.md is still a HALT)
 2. Determine git flow (see Git Flow Determination above — HALT if CLAUDE.md's `## Git Workflow` section is missing or declares no policy)
 3. If PR/feature-branch flow: DELEGATE to @github-ops to create/check out the feature branch, before Slice 1
 4. Read 04-ROADMAP.md
@@ -485,7 +494,9 @@ Ready for: Human review / PR
 ## HALT Conditions
 
 HALT the session if:
-- `docs/INVARIANTS.md`, `docs/CADENCE.md`, or `docs/specs/{feature}/NORTH-STAR.md` is missing at session start
+- `docs/INVARIANTS.md` or `docs/CADENCE.md` is missing AND this project has no source material to derive them from (no CLAUDE.md context, no DDRs, no prior sprint history) — the authoring procedure has nothing to synthesize; inventing content is not an option
+- The human does not confirm a derived `INVARIANTS.md`/`CADENCE.md` draft (see Load Governance authoring procedure) — no write on any outcome other than explicit confirmation
+- `docs/specs/{feature}/NORTH-STAR.md` is missing at session start
 - `CLAUDE.md`'s `## Git Workflow` section is missing or declares no policy (see Git Flow Determination) — before Slice 1, not mid-cycle
 - Spec documents are missing or incomplete
 - Agent reports HALTED status
