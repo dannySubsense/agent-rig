@@ -3,6 +3,7 @@
 | # | Title | Status |
 |---|-------|--------|
 | 001 | Ask-vs-Act Decision Flow | ACCEPTED |
+| 002 | Orchestration Gate-Bypass Prevention | DRAFT |
 
 ---
 
