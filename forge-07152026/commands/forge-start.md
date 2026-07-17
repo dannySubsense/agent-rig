@@ -23,6 +23,35 @@ Any of items 2-4 missing is a HALT, using the standard HALT format (see HALT Con
 
 ---
 
+## Git Flow Determination
+
+Before Slice 1 is dispatched, the Forge Advisor determines how this session commits, by reading
+the project's own `## Git Workflow` section in `CLAUDE.md` (loaded in Load Governance step 1) —
+the same section `/lore-close`'s push gate already reads at session end. This runs once, at
+Session Start, not per-slice.
+
+- **Declares PR / feature-branch flow** → DELEGATE to @github-ops to create (or check out, if it
+  already exists) a feature branch — `feature/{feature-name}`, per the git-operations skill's
+  naming convention — before Slice 1 begins. Every per-slice commit in the Forge Cycle below lands
+  on this branch, never on the mainline. The PR (End-of-Feature Tasks, step 4) opens from this
+  branch after Frank's binding forge-gate reaches PASS.
+- **Declares push-at-close / direct-to-main** → no branch is created. Per-slice commits land
+  directly on the mainline, as today. End-of-Feature Tasks step 4 (PR creation) is skipped for
+  this repo — there is nothing to open a PR against, and none is wanted. Pushing to `origin` is
+  `/lore-close`'s job at session end, not Forge's.
+- **`## Git Workflow` section missing, or present but declaring no policy** → HALT before Slice 1.
+  Do not guess or default to either mode. Ask Danny which mode applies, or wait for the section to
+  be added — same degrade-safely principle `/lore-close` Step 7 already applies when this section
+  is absent.
+
+This determination is why a feature branch must exist before the first `@github-ops` commit
+delegation in the Forge Cycle below — skipping it is exactly the incident this section exists to
+prevent: slices committed straight to `main` in a PR-flow repo, leaving nothing to open a PR
+against at feature completion. (Confirmed incident: agent-dashboard, project-bootstrap-v2,
+2026-07-15 — see LORE doc a79081a1.)
+
+---
+
 ## Your Role
 
 You:
@@ -101,10 +130,18 @@ For each slice in 04-ROADMAP.md:
    ├── Verify: PROGRESS.md updated ✅
    └── STAMP: APPROVED → proceed to next slice
 
-6. Update PROGRESS.md with slice completion
+6. DELEGATE to @github-ops
+   ├── Contract: commit this slice's changes; target branch is fixed by
+   │   Git Flow Determination (Session Start) — the feature branch for
+   │   PR-flow repos, mainline for direct-to-main repos. Never main in a
+   │   PR-flow repo.
+   ├── Message: `Refs: Slice N from 04-ROADMAP.md`
+   └── VERIFY: commit exists on the correct branch
+
+7. Update PROGRESS.md with slice completion
 ```
 
-Frank's binding forge-gate does **not** run per-slice — it runs once, after all slices above are complete, as part of End-of-Feature Tasks below. Per-slice commits (if any) may still go through @github-ops per slice; the binding gate is a feature-completion checkpoint, not a per-slice one.
+Frank's binding forge-gate does **not** run per-slice — it runs once, after all slices above are complete, as part of End-of-Feature Tasks below. Per-slice commits go through @github-ops per slice (step 6 above), targeting the branch fixed at Session Start by Git Flow Determination; the binding gate itself remains a feature-completion checkpoint either way, not a per-slice one.
 
 ---
 
@@ -152,7 +189,10 @@ After ALL slices complete:
    └── VERIFY: docs exist
 3. Full test suite run (all slices together)
 4. DELEGATE to @github-ops
-   └── Create PR for the complete feature
+   ├── PR-flow repos: create PR for the complete feature, from the
+   │   feature branch created at Session Start, targeting mainline
+   └── Direct-to-main repos: skipped — no branch exists, nothing to PR;
+       slices are already on mainline; pushing is /lore-close's job
 ```
 
 @doc-writer and the full-suite run happen after the Frank binding forge-gate reaches PASS — a FAIL/HALT verdict blocks docs and the PR the same way Step 8 of `/spec-start` blocks human approval.
@@ -170,7 +210,7 @@ ATTEMPT: {N} of 3
 ARTIFACTS: [paths to all changed implementation files across every slice
            this feature — not doc paths, the implementation itself]
 SPRINT_NORTH_STAR: docs/specs/{feature}/NORTH-STAR.md
-PROJECT_NORTH_STAR: docs/NORTH-STAR.md  ← Frank reads this himself; the
+PROJECT_NORTH_STAR: docs/NORTHSTAR.md  ← Frank reads this himself; the
                      orchestrator passes the PATH, never paraphrases its
                      content into the contract (checking a document's
                      claim about itself via a summary is a SHARED WELL)
@@ -195,7 +235,7 @@ Fix/Next-step).
 **Layer 1 and Layer 2 are both evaluated on EVERY attempt — attempt 1, attempt 2, and attempt 3 alike.** Neither layer is ever deferred to the final attempt; a Layer 1-only or Layer 2-only check on an early attempt is a malformed verdict, not a valid partial result.
 
 **DRAFT-project-North-Star → PROVISIONAL-Layer-2-pass rule (concrete procedure, not a summary):**
-1. Frank opens `docs/NORTH-STAR.md` (the path given above) directly.
+1. Frank opens `docs/NORTHSTAR.md` (the path given above) directly.
 2. If the file does not exist at all: Frank's verdict is `HALT` — Layer 2 is not evaluated as a pass under any circumstance, and a Layer 1 PASS never substitutes for it.
 3. If the file exists and its `Status` line reads `DRAFT`: Layer 2 may still PASS on its merits, but the Verdict's Layer 2 line is stamped `PROVISIONAL` in the verdict text itself (e.g. "Layer 2: pass — PROVISIONAL, project North Star Status is DRAFT"). The feature is not blocked on the project North Star leaving DRAFT — it proceeds — but the PROVISIONAL tag is written into the verdict and is never omitted.
 4. If the file exists and its `Status` line is non-`DRAFT`: Layer 2 is a normal binding PASS/FAIL, no PROVISIONAL tag.
@@ -394,10 +434,12 @@ Update this file after each step. On session resume, read it to continue.
 When human provides spec directory:
 
 1. Load governance (see Load Governance above — HALT if INVARIANTS.md, CADENCE.md, or the sprint NORTH-STAR.md is missing)
-2. Read 04-ROADMAP.md
-3. **Check for PROGRESS.md** — resume from last state if exists
-4. If no progress file, start at Slice 1 and create it
-5. Begin Forge cycle
+2. Determine git flow (see Git Flow Determination above — HALT if CLAUDE.md's `## Git Workflow` section is missing or declares no policy)
+3. If PR/feature-branch flow: DELEGATE to @github-ops to create/check out the feature branch, before Slice 1
+4. Read 04-ROADMAP.md
+5. **Check for PROGRESS.md** — resume from last state if exists
+6. If no progress file, start at Slice 1 and create it
+7. Begin Forge cycle
 
 ```
 Starting Forge for: docs/specs/model-viewer/
@@ -444,6 +486,7 @@ Ready for: Human review / PR
 
 HALT the session if:
 - `docs/INVARIANTS.md`, `docs/CADENCE.md`, or `docs/specs/{feature}/NORTH-STAR.md` is missing at session start
+- `CLAUDE.md`'s `## Git Workflow` section is missing or declares no policy (see Git Flow Determination) — before Slice 1, not mid-cycle
 - Spec documents are missing or incomplete
 - Agent reports HALTED status
 - Circular failure (same fix attempted 3+ times)

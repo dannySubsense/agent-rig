@@ -160,7 +160,7 @@ Author `docs/specs/{feature}/NORTH-STAR.md` once, using `~/.claude/templates/NOR
 - Set `Status: Locked` at the moment of authoring — this is the single authoring point for this artifact.
 - **`NORTH-STAR.md` is not re-edited mid-sequence.** If a later step (Steps 3-8) surfaces a need to change the sprint's declared intent, scope, or success criteria, this is a HALT to Danny, not a silent re-edit: a sprint that needs to change its own North Star mid-flight escalates, it does not silently redefine its target.
 - The `Declared Intent` section must trace to Intake's Problem Statement.
-- The `Traceability` section cites the exact Project North Star Mission/In-Scope line(s) this sprint serves from `docs/NORTH-STAR.md`, and records that file's `Status` at authoring time (`DRAFT` or non-`DRAFT`) — this field is an input for Frank's Layer 2 check in Step 8, not something the orchestrator verifies against itself.
+- The `Traceability` section cites the exact Project North Star Mission/In-Scope line(s) this sprint serves from `docs/NORTHSTAR.md`, and records that file's `Status` at authoring time (`DRAFT` or non-`DRAFT`) — this field is an input for Frank's Layer 2 check in Step 8, not something the orchestrator verifies against itself.
 
 Verify the file exists before proceeding to Step 3.
 
@@ -367,7 +367,7 @@ ARTIFACTS: docs/specs/{feature}/INTAKE.md, INTERVIEW.md, NORTH-STAR.md,
            01-REQUIREMENTS.md, 02-ARCHITECTURE.md, 03-UI-SPEC.md,
            04-ROADMAP.md, 05-REVIEW.md
 SPRINT_NORTH_STAR: docs/specs/{feature}/NORTH-STAR.md
-PROJECT_NORTH_STAR: docs/NORTH-STAR.md  ← Frank reads this himself; the
+PROJECT_NORTH_STAR: docs/NORTHSTAR.md  ← Frank reads this himself; the
                      orchestrator passes the PATH, never paraphrases its
                      content into the contract (checking a document's
                      claim about itself via a summary is a SHARED WELL)
@@ -392,7 +392,7 @@ Fix/Next-step).
 **Layer 1 and Layer 2 are both evaluated on EVERY attempt — attempt 1, attempt 2, and attempt 3 alike.** Neither layer is ever deferred to the final attempt; a Layer 1-only or Layer 2-only check on an early attempt is a malformed verdict, not a valid partial result.
 
 **DRAFT-project-North-Star → PROVISIONAL-Layer-2-pass rule (concrete procedure, not a summary):**
-1. Frank opens `docs/NORTH-STAR.md` (the path given above) directly.
+1. Frank opens `docs/NORTHSTAR.md` (the path given above) directly.
 2. If the file does not exist at all: Frank's verdict is `HALT` — Layer 2 is not evaluated as a pass under any circumstance, and a Layer 1 PASS never substitutes for it.
 3. If the file exists and its `Status` line reads `DRAFT`: Layer 2 may still PASS on its merits, but the Verdict's Layer 2 line is stamped `PROVISIONAL` in the verdict text itself (e.g. "Layer 2: pass — PROVISIONAL, project North Star Status is DRAFT"). The sprint is not blocked on the project North Star leaving DRAFT — it proceeds — but the PROVISIONAL tag is written into the verdict and is never omitted.
 4. If the file exists and its `Status` line is non-`DRAFT`: Layer 2 is a normal binding PASS/FAIL, no PROVISIONAL tag.

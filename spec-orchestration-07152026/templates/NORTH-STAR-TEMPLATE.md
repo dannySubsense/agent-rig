@@ -12,5 +12,5 @@
 [What "did the sprint do what it declared, faithfully" looks like, concretely.]
 
 ## Traceability (Layer 2 input — Frank verifies independently, does not trust this field)
-Project North Star bullet(s) this sprint serves: [cite exact Mission/In-Scope line(s) from docs/NORTH-STAR.md]
+Project North Star bullet(s) this sprint serves: [cite exact Mission/In-Scope line(s) from docs/NORTHSTAR.md]
 Project North Star status at gate time: [DRAFT → Layer 2 verdict is PROVISIONAL PASS, re-run once the project North Star reaches non-DRAFT status | non-DRAFT → normal binding PASS/FAIL, no PROVISIONAL tag]

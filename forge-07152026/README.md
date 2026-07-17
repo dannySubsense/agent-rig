@@ -145,7 +145,7 @@ feature/implementation completion, not per-slice:
 - **Layer 1** (sprint North Star fidelity) and **Layer 2** (project North Star relevance) are
   both evaluated on **every** attempt (1, 2, and 3 alike) — neither is ever deferred to the
   final attempt.
-- Missing `docs/NORTH-STAR.md` (the project North Star) is a HALT outright; a Layer 1 PASS
+- Missing `docs/NORTHSTAR.md` (the project North Star) is a HALT outright; a Layer 1 PASS
   never substitutes for a missing Layer 2 check.
 - If the project North Star exists but its `Status` is `DRAFT`, Layer 2 may still PASS, but the
   verdict is stamped `PROVISIONAL` and that tag carries unmodified through `GATE-LOG.md`, the

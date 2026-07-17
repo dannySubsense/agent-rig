@@ -133,7 +133,7 @@ HALT and escalate to the orchestrating agent/human if:
 Both layers are evaluated on **every** gate attempt (1, 2, and 3 alike) — never deferred to the final attempt.
 
 - **Layer 1 (sprint North Star — fidelity):** did the sprint/implementation do what it declared it would do, faithfully, against `docs/specs/{feature}/NORTH-STAR.md`?
-- **Layer 2 (project North Star — relevance):** is this in service of the project? Checked directly against `docs/NORTH-STAR.md` itself — never against the sprint North Star's self-claim about project relevance; that would be a shared well.
+- **Layer 2 (project North Star — relevance):** is this in service of the project? Checked directly against `docs/NORTHSTAR.md` itself — never against the sprint North Star's self-claim about project relevance; that would be a shared well.
 
 Rule: if the project North Star document exists but its `Status` is `DRAFT`, Layer 2 may still PASS, but is stamped **PROVISIONAL** — say so explicitly in the verdict, don't drop the tag silently. If the project North Star document does not exist at all: **HALT outright** — Layer 2 is never evaluated as a pass under any circumstance in that case, and a Layer 1 PASS does not stand in for it.
 
