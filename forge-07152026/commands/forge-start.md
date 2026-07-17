@@ -255,11 +255,21 @@ Fix/Next-step).
 Before the first Frank forge-gate invocation, if `docs/specs/{feature}/GATE-LOG.md` does not yet exist, create it from `~/.claude/templates/GATE-LOG-TEMPLATE.md` (the installed location; `spec-orchestration-07152026/templates/GATE-LOG-TEMPLATE.md` if developing inside this repo directly, before install) — every "append to GATE-LOG.md" instruction below assumes the file already exists; this is the one-time step that makes that true. (If `/spec-start` already ran for this feature, `GATE-LOG.md` exists with its `## Spec Gate` section populated — the `## Forge Gate` section is the one this gate writes to.)
 
 ```
-PASS  → append to GATE-LOG.md, proceed to @doc-writer / full test suite /
-        @github-ops PR. A PROVISIONAL Layer 2 pass still counts as PASS —
-        not blocking — but the PROVISIONAL tag carries through to the
-        Session End summary and PR description, it is never silently
-        dropped.
+PASS  → the orchestrator performs its own full review of the artifact —
+        genuine critical analysis with the same cautious skepticism Frank
+        applies, not a perfunctory "artifact read" checkbox. The
+        orchestrator must be able to independently produce a FAIL here
+        even after Frank's PASS, or this step is theater, not a second
+        reviewer. This is also how the orchestrator builds its own working
+        mental model of what shipped — a pillar it carries forward, not a
+        signpost it glances at — which is the second reason this step
+        exists, not just redundancy for its own sake. Then append to
+        GATE-LOG.md: Frank's verdict verbatim, plus the orchestrator's own
+        review findings — not Frank's verdict alone. Proceed to
+        @doc-writer / full test suite / @github-ops PR. A PROVISIONAL
+        Layer 2 pass still counts as PASS — not blocking — but the
+        PROVISIONAL tag carries through to the Session End summary and PR
+        description, it is never silently dropped.
 FAIL  → snapshot current artifacts to docs/specs/{feature}/.gate-snapshots/forge/attempt-{N}/,
         append to GATE-LOG.md, route Fix/Next-step items to the named
         agent(s) (@code-executor / @test-writer / @test-runner / @qc-agent
