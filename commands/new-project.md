@@ -21,7 +21,7 @@ These values are locked. Never ask Danny about them.
 | SSH remote alias | `github.com-danny` |
 | git config scope | per-repo (global and system flags prohibited) |
 | LORE DB | `<lore-db-host>:5432/lore` |
-| Template source dir | `~/runtime/agent-lore/` |
+| Template source dir | `~/.claude/templates/` (runtime read location; source-of-record is the agent-rig repo, deployed here — DDR-014) |
 | HOMELAB-CLAUDE.md template filename | `HOMELAB-CLAUDE.md.template` |
 | MACHINE-SETUP.md template filename | `MACHINE-SETUP.md.template` |
 | Bootstrap commit message | `chore: project bootstrap` |
@@ -363,9 +363,9 @@ Read the HOMELAB-CLAUDE.md.template, resolve placeholders, and write CLAUDE.md t
 
 ### Substep 4.1 — Read template
 
-Read `~/runtime/agent-lore/HOMELAB-CLAUDE.md.template` using the Read tool.
+Read `~/.claude/templates/HOMELAB-CLAUDE.md.template` using the Read tool.
 
-- **HALT if not found:** `Template not found at ~/runtime/agent-lore/HOMELAB-CLAUDE.md.template. Verify agent-lore runtime.`
+- **HALT if not found:** `Template not found at ~/.claude/templates/HOMELAB-CLAUDE.md.template. Verify the template deploy at ~/.claude/templates/ (source-of-record: agent-rig repo).`
 
 ### Substep 4.2 — Resolve placeholders
 
@@ -394,7 +394,7 @@ Write the resolved content to `CLAUDE.md` in the project root using the Write to
 
 ### Substep 4.5 — Copy reference template
 
-Copy `~/runtime/agent-lore/HOMELAB-CLAUDE.md.template` to `HOMELAB-CLAUDE.md.template` in the project root. This reference copy is staged and committed in Step 12. Note: `CLAUDE.md` is gitignored by Step 7 and excluded from all commits.
+Copy `~/.claude/templates/HOMELAB-CLAUDE.md.template` to `HOMELAB-CLAUDE.md.template` in the project root. This reference copy is staged and committed in Step 12. Note: `CLAUDE.md` is gitignored by Step 7 and excluded from all commits.
 
 ---
 
@@ -465,9 +465,9 @@ Read the MACHINE-SETUP.md.template, resolve placeholders, and write MACHINE-SETU
 
 ### Substep 6.1 — Read template
 
-Read `~/runtime/agent-lore/MACHINE-SETUP.md.template` using the Read tool.
+Read `~/.claude/templates/MACHINE-SETUP.md.template` using the Read tool.
 
-- **HALT if not found:** `Template not found at ~/runtime/agent-lore/MACHINE-SETUP.md.template. Verify agent-lore runtime.`
+- **HALT if not found:** `Template not found at ~/.claude/templates/MACHINE-SETUP.md.template. Verify the template deploy at ~/.claude/templates/ (source-of-record: agent-rig repo).`
 
 ### Substep 6.2 — Resolve placeholders
 
@@ -652,9 +652,9 @@ Record the pending action.
 | Pre-flight | git not found | `git --version` returned non-zero. Install git before running /new-project. |
 | Pre-flight | gh CLI not authenticated or wrong account | `gh auth status` failed or shows account other than dannySubsense. Run `gh auth login` as dannySubsense. |
 | Pre-flight | LORE gateway unreachable | `check_health` failed. Verify lore-gateway MCP is registered and LORE DB is reachable over Tailscale. |
-| Step 4 | HOMELAB-CLAUDE.md.template missing | Template not found at `~/runtime/agent-lore/HOMELAB-CLAUDE.md.template`. Verify agent-lore runtime. |
+| Step 4 | HOMELAB-CLAUDE.md.template missing | Template not found at `~/.claude/templates/HOMELAB-CLAUDE.md.template`. Verify the template deploy at ~/.claude/templates/ (source-of-record: agent-rig repo). |
 | Step 5 | `docs/NORTHSTAR.md` not found before Step 5 begins | `docs/NORTHSTAR.md not found. Step 4.5 did not complete successfully. Resolve Step 4.5 before proceeding.` |
-| Step 6 | MACHINE-SETUP.md.template missing | Template not found at `~/runtime/agent-lore/MACHINE-SETUP.md.template`. Verify agent-lore runtime. |
+| Step 6 | MACHINE-SETUP.md.template missing | Template not found at `~/.claude/templates/MACHINE-SETUP.md.template`. Verify the template deploy at ~/.claude/templates/ (source-of-record: agent-rig repo). |
 | Step 9 | gh repo create fails | Exact gh CLI error surfaced. If name conflict: accept alternate name from Danny and retry. All other errors: HALT. |
 | Step 10 | git remote add fails | Exact git error surfaced. |
 | Step 12 | DDR index file not found before git add | `DDR index file not found at docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md. Step 11 did not complete successfully. Resolve Step 11 before proceeding.` |

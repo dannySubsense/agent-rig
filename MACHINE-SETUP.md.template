@@ -1,0 +1,151 @@
+# Machine Setup Guide — <REPO-NAME>
+
+Reference for working on this shared machine. Keep this updated as the project evolves.
+
+---
+
+## This machine is shared
+
+`~/.gitconfig` belongs to another user (Major Tom). Never run `git config --global` — it changes his settings. Always set git identity per-repo using the `git-id` alias.
+
+---
+
+## Cloning a private GitHub repo
+
+The machine's git credential helper doesn't work reliably. Use the token-in-URL method:
+
+```bash
+TOKEN=$(gh auth token)
+git clone "https://${TOKEN}@github.com/OWNER/REPO.git" /path/to/destination
+```
+
+Then immediately set your identity:
+
+```bash
+cd /path/to/destination
+git-id
+```
+
+---
+
+## `git-id` alias
+
+Sets your commit authorship on the current repo.
+
+```bash
+git-id
+# Git identity set: dannySubsense <danny@subsense.art>
+```
+
+- Defined in `~/.bash_aliases`
+- Loads automatically on every new terminal
+- Run once inside any repo after clone or init
+- Verify anytime: `git config --list | grep user`
+
+---
+
+## Tokens — PAT vs `gh` OAuth token
+
+| | PAT (Personal Access Token) | `gh` OAuth token |
+|---|---|---|
+| What it is | Generated manually in GitHub Settings | Created automatically when you run `gh auth login` |
+| Stability | Stable until you revoke it or it expires | Can rotate when `gh` refreshes its session |
+| Get it | GitHub → Settings → Developer Settings → Personal Access Tokens → Tokens (classic) | `gh auth token` |
+| Best used for | `.env` files, URL overrides, anywhere stable auth is needed | One-off `gh` CLI commands |
+
+**Always use a PAT for `.env` files and URL overrides.** Using the `gh` OAuth token will silently break when the session rotates.
+
+Generate a PAT at: `https://github.com/settings/tokens`
+- Token type: **Tokens (classic)**
+- Scope: **repo** (full repo access is sufficient)
+- Expiry: 90 days is a reasonable default
+
+---
+
+## Installing a project with a private GitHub dependency
+
+If any dependency is hosted on a private GitHub repo, add a URL override once per dependency owner using your **PAT**:
+
+```bash
+PAT=your_personal_access_token_here
+git config --global url."https://${PAT}@github.com/OWNER/".insteadOf "https://github.com/OWNER/"
+```
+
+**If `uv sync` / `npm install` breaks again with "Repository not found":** your PAT expired or was revoked. Generate a new one, then re-run:
+
+```bash
+# Remove old entry first
+git config --global --unset url."https://OLD_PAT@github.com/OWNER/".insteadOf
+# Add new entry
+PAT=your_new_pat_here
+git config --global url."https://${PAT}@github.com/OWNER/".insteadOf "https://github.com/OWNER/"
+```
+
+Remove this section if the project has no private GitHub dependencies.
+
+---
+
+## Git identities
+
+| Context | Email | Name |
+|---|---|---|
+| Personal homelab repos | `danny@subsense.art` | `dannySubsense` |
+| Work repo (`agent-lore` only) | `dclarke@islandef.com` | `Danny Clarke` |
+
+Never use the `islandef` org for homelab projects.
+
+---
+
+## Environment variables
+
+Copy `.env.example` to `.env` and fill in values before running:
+
+```bash
+cp .env.example .env
+```
+
+Required variables (see `.env.example` for full list):
+- `<VAR_NAME>` — <description>
+
+---
+
+## Running the project
+
+```bash
+cd ~/projects/<REPO-NAME>
+<install command>
+<run command>
+```
+
+---
+
+## Your repos
+
+| Repo | Path | Purpose | Push access |
+|---|---|---|---|
+| `<REPO-NAME>` | `~/projects/<REPO-NAME>` | <purpose> | Yes |
+
+---
+
+## Checklist for this repo
+
+- [ ] Clone using token-in-URL method (or `git init` for new repos)
+- [ ] Run `git-id` inside the repo
+- [ ] Remote set to `git@github.com-danny:dannySubsense/<REPO-NAME>.git`
+- [ ] Create `.env` from `.env.example` if applicable
+
+---
+
+## Pushing to GitHub
+
+This repo uses the `github.com-danny` SSH alias. The remote must be:
+
+```
+git@github.com-danny:dannySubsense/<REPO-NAME>.git
+```
+
+If it gets set to `git@github.com:...` (the default alias, which resolves to majortom55), pushes will fail with "Repository not found". Fix with:
+
+```bash
+git remote set-url origin "git@github.com-danny:dannySubsense/<REPO-NAME>.git"
+```

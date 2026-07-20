@@ -5,10 +5,10 @@
 Copy this file to `CLAUDE.md` and fill in the placeholders.
 
 ```bash
-cp ~/runtime/agent-lore/HOMELAB-CLAUDE.md.template CLAUDE.md
+cp ~/.claude/templates/HOMELAB-CLAUDE.md.template CLAUDE.md
 ```
 
-`CLAUDE.md` is gitignored — your config stays local to this checkout. This master template lives at `~/runtime/agent-lore/HOMELAB-CLAUDE.md.template` — also gitignored, so upstream pulls never touch it and it never pushes to Island.
+`CLAUDE.md` is gitignored — your config stays local to this checkout. The runtime read copy lives at `~/.claude/templates/HOMELAB-CLAUDE.md.template` (what `/new-project` reads); the **source-of-record** is the `agent-rig` repo, which owns this template per DDR-014 — edit it there and redeploy to `~/.claude/templates/`, don't edit the installed copy directly.
 
 ---
 
@@ -66,7 +66,7 @@ Database URL and OpenAI key are loaded by the gateway from `~/runtime/agent-lore
 ## Database
 
 - Project ID: `<PROJECT-ID>`
-- Backend: VM 103 Postgres at `<LORE_DB_HOST>:5432/lore` over Tailscale.
+- Backend: VM 103 Postgres at `<LORE_DB_HOST>:5432/lore` over Tailscale. The real host is in `~/runtime/agent-lore/.env` (`DATABASE_URL`) — resolved at bootstrap, never hardcoded in this tracked (public) template.
 - Schema lifecycle is owned by `agent-lore`. Do not run migrations from this repo.
 
 ---
@@ -137,7 +137,7 @@ Optional in both cases — the Gateway MCP works independently. Run the dispatch
 
 ```bash
 RELAY_AGENT_ID=<AGENT-NAME> \
-DATABASE_URL=postgres://lore:<password>@<LORE_DB_HOST>:5432/lore?sslmode=disable \
+DATABASE_URL=postgres://lore:<password>@<LORE_DB_HOST>:5432/lore?sslmode=disable \  # host + password from ~/runtime/agent-lore/.env
 OPENAI_API_KEY=<key> \
 MCP_DEFAULT_PROJECT_ID=<PROJECT-ID> \
 npx tsx ~/runtime/agent-lore/src/relay/relay-dispatcher.ts
@@ -157,25 +157,25 @@ The dispatcher consumes only `capture_request` messages from the inbox — coord
 
 ## Project Workflow Pattern
 
-Standard DDR → spec → forge delivery loop used across all homelab projects.
+Intake → (Interview) → spec → forge delivery loop. **Intake is the only mandatory pre-spec
+gate**; DDR is optional. Frank's judgment gate is **binding** (PASS/FAIL/HALT, no manual
+override), not advisory.
 
 ### Roles
 
 | Role | Who | Responsibility |
 |---|---|---|
-| Composer | Danny | Vision, high-level architecture, final approval |
+| Composer | Danny | Vision, high-level architecture, final approval, personal sign-off on agent-persona edits and North Star docs |
 | Producer | The agent | Implementation decisions, production code, no hedging |
-| Frank | `/senior-qc` | Adversarial QC gate before each phase advance |
+| Frank | `subagent_type: frank` | Binding judgment gate — spec and forge — PASS/FAIL/HALT, no manual override |
 
-### DDR Loop
+### Loop
 
-1. **DDR** — write `docs/specs/<project-id>-ddrs/DDR-NN-slug.md`; update `00-DDR-INDEX.md`
-2. **GitHub issue** — one issue per DDR; link in DDR header
-3. **`/spec-start`** — produces 5 docs under `docs/specs/<sprint-slug>/`: `01-REQUIREMENTS`, `02-ARCHITECTURE`, `04-ROADMAP`, `05-REVIEW`, `PROGRESS.md`
-4. **Frank gate** — `/senior-qc` reviews the spec; block on any hard stop
-5. **`/forge-start`** — implements slice by slice; marks tasks complete in `PROGRESS.md`
-6. **Frank gate** — `/senior-qc` reviews the implementation; block on any hard stop
-7. **PR** — merge; update DDR status to `ACCEPTED (shipped, PR #N)`
+1. **Intake** (mandatory) — `docs/specs/<sprint-slug>/INTAKE.md`, `**Status**: APPROVED` required before spec. DDR optional (`docs/specs/<project-id>-ddrs/DDR-NN-slug.md` + `00-DDR-INDEX.md`).
+2. **Interview** — standalone stage, inline-in-session by default. Always produces `INTERVIEW.md`, even on zero gaps.
+3. **`/spec-start`** — Intake gate → Interview → sprint `NORTH-STAR.md` → `01-REQUIREMENTS` → `02-ARCHITECTURE` → `04-ROADMAP` → `05-REVIEW` → Frank's **binding** spec-gate → human approval.
+4. **`/forge-start`** — implements slice by slice; marks tasks complete in `PROGRESS.md`; Frank's binding forge-gate at completion.
+5. **PR / commit** — per this repo's push policy; update DDR status to `ACCEPTED (shipped, PR #N)` if a DDR was used.
 
 ### Directory Structure
 
@@ -186,6 +186,9 @@ docs/
       00-DDR-INDEX.md        ← living backlog + build-order rationale
       DDR-NN-slug.md
     <sprint-slug>/
+      INTAKE.md
+      INTERVIEW.md
+      NORTH-STAR.md
       01-REQUIREMENTS.md
       02-ARCHITECTURE.md
       04-ROADMAP.md
@@ -196,6 +199,38 @@ docs/
 ### Decision Discipline
 
 - Produce, don't hedge. Pick the risk-mitigating path and proceed.
-- One Frank gate per major phase — spec complete, then implementation complete.
+- One Frank gate per major phase — spec complete, then implementation complete. Frank's verdict is binding (PASS/FAIL/HALT, no conditional pass).
+- Every predetermined number in a spec/architecture doc needs a citable precedent, an explicit PROVISIONAL-tag-with-named-owner, or deletion — no fabricated constants. One unsourced number found → sweep the whole doc set, don't fix it in isolation.
+- Danny personally reviews identity-tier artifacts (agent-persona edits, North Star docs) in raw form before they are locked — never self-approved by the agent.
 - Capture every decision, deviation, and HALT to LORE immediately when it happens.
-- `PROGRESS.md` is the ground truth for sprint state — update it slice by slice, not at the end.
+- `PROGRESS.md` is the ground truth for sprint state — update it slice by slice, not at the end. Verify every stated Done-When against live files before marking a slice complete.
+
+---
+
+## Orchestration Discipline — Always Redispatch
+
+**Binding, every session — the obligation travels with the artifact, not the role or the entry
+point.** When a framework's component sub-agent could produce an artifact — code, a design sheet,
+a notebook, a spec doc — the agent orchestrating that framework does not author it directly, and
+does not report it done, staged, ready, or complete without routing it through the framework's
+mandatory judgment gates (mechanical QC, Frank). Running a framework's component skills
+individually (e.g. `notebook-design` alone, without `/notebook-start`) does not waive this — the
+obligation travels with the work, not with which entry point started it, and "I didn't go through
+the orchestrator" is not an exemption.
+
+**Why:** The failure mode is sole-author + sole-checker + one well — the
+promoted-default/shared-well/certified-garbage pattern in miniature. On 2026-07-17 an orchestrator
+ran component skills individually, personally authored both a design sheet and a notebook,
+self-checked structure only (valid JSON, valid Python), and reported "staged and ready." A Frank
+review — run only because Danny asked whether one had happened — returned FAIL: 5 real defects the
+structural checks could never catch, one with false-positive-PASS potential on a gate unblocking a
+~55-hour continuous production write lock.
+
+**How to apply:**
+- Delegate every design, code, or content-authoring step to the framework's named sub-agent —
+  even under time pressure, even when authoring it directly would be faster.
+- A completion claim about a gated artifact is an assertion, not evidence. Back it with the
+  framework's own gate record (e.g. its `GATE-LOG.md` entry) before reporting done — otherwise it
+  is unverified, not a lower-confidence pass.
+- If no sub-agent exists for an artifact a framework didn't anticipate, say so explicitly and seek
+  independent review before reporting it complete — never a silent exception.
