@@ -1,0 +1,17 @@
+name: scrub-gate
+# DDR-003 §3.2 — fail the build if internal infra / secrets reach a tracked file.
+# Runs the SAME engine the local pre-commit hook uses, so enforcement holds even
+# when a contributor hasn't enabled the local hook.
+on:
+  push:
+  pull_request:
+jobs:
+  scrub-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Scan all tracked files
+        run: python3 scripts/scrub_gate.py --all

@@ -63,6 +63,17 @@ This repo is public, and it is also the reference implementation of one private 
 
 If you adopt a framework, treat the homelab-specific paths, hosts, and agent names as *examples* — substitute your own.
 
+### Scrub gate
+
+A gate blocks internal infra (private/tailnet IPs) and secret shapes from reaching tracked files — the same detection engine runs as a local pre-commit hook and in CI, so it holds even if the local hook isn't enabled.
+
+```bash
+git config core.hooksPath .githooks   # one-time per clone, to run the hook locally
+python3 scripts/scrub_gate.py --all    # manual full sweep
+```
+
+Legitimate examples go in `scripts/scrub-gate-allow.txt` (exact token per line). See DDR-003 §3.2.
+
 ---
 
 ## Status & license

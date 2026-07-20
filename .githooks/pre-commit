@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# agent-rig scrub gate (DDR-003 §3.2) — blocks internal infra / secrets from being committed.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass in a true emergency:  git commit --no-verify   (then fix + re-run before pushing)
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+exec python3 "$ROOT/scripts/scrub_gate.py"

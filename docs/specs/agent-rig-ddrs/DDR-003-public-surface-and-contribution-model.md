@@ -37,6 +37,7 @@ Commit to a **public-surface model with three mechanisms**, spec'd rather than d
 
 ### 3.2 Scrub gate (prevents recurrence)
 - A pre-commit / CI check that blocks tracked files containing internal tailnet hosts (`100.64.0.0/10`), RFC-1918 addresses, known private paths, or roster names in template placeholders. Named owner: Wright. This is the enforcement surface that makes §3.1 hold under pressure rather than by discipline alone.
+- **Initial implementation shipped 2026-07-20** (following Frank's warning that the history rewrite is wasted motion without it): `scripts/scrub_gate.py` is a single detection engine (exact private/CGNAT range matching via `ipaddress`; secret shapes; DB-URL real-password detection; `scripts/scrub-gate-allow.txt` allowlist). Both `.githooks/pre-commit` and `.github/workflows/scrub-gate.yml` call the same script — no forked pattern list. Verified: current tree clean (198 files), catches CGNAT/RFC-1918/keys/real-DB-passwords, allowlists the `100.64.0.0/10` range notation, live pre-commit block confirmed. **Deferred to the full spec:** private-path and roster-name detection (fuzzier, false-positive-prone), and whether the local hook should be auto-enabled vs. the current `git config core.hooksPath .githooks` opt-in (CI is the always-on backstop regardless).
 
 ### 3.3 README + public/private demarcation
 - The README frames the repo as **the frameworks** (what a visitor is here for), with the homelab specifics clearly demarcated as "reference implementation for one private homelab," not the product.

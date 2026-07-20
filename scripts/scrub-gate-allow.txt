@@ -1,0 +1,7 @@
+# scrub-gate allowlist — one EXACT token per line; # starts a comment.
+# Only add a token here when it is a genuine, non-sensitive example or notation.
+# Everything else the gate flags must be removed, not allowlisted.
+
+# CGNAT range *notation* (100.64.0.0/10) — docs must be able to describe what to block.
+# This is the network address in the range description, not a real host.
+100.64.0.0
