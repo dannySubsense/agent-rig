@@ -5,7 +5,7 @@
 | 001 | Ask-vs-Act Decision Flow | ACCEPTED |
 | 002 | Orchestration Gate-Bypass Prevention | ACCEPTED (§3.5 shipped; §3.1–§3.4 → own sprint) |
 | 003 | Public Surface & Contribution Model | DRAFT |
-| 004 | Session-Start Signpost→Pillar Binding | DRAFT — rewritten against source; Frank PASS (attempt 3, both layers firm); → spec, gated on Slice-0 substrate proof |
+| 004 | Session-Start Signpost→Pillar Binding | DRAFT — rewritten against source; Frank PASS (attempt 3, both layers firm); substrate CONFIRMED on VM101; → `/spec-start` next session |
 
 ---
 
