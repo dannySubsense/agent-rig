@@ -1,0 +1,22 @@
+# Invariants: Agent Rig
+
+**Status**: Confirmed by Danny, 2026-08-09 — authoritative
+**Derived from**: `CLAUDE.md` (Decision Discipline, Git Workflow), `HOMELAB-CLAUDE.md.template:210-230` (Orchestration Discipline — Always Redispatch), `docs/specs/agent-rig-ddrs/00-DDR-INDEX.md` (DDR-001 Ask-vs-Act, DDR-002 Orchestration Gate-Bypass Prevention, backlog items `:17`/`:25`), `docs/NORTHSTAR.md`
+
+These are rules a Forge session in this repo may not violate, under any pressure, for any stated reason. Where a rule traces to a specific source, the source is cited so a future reader can re-verify it still holds rather than trusting this file's word alone.
+
+1. **Frank's verdict is binding.** PASS/FAIL/HALT with no conditional pass and no manual override, at any gate, at any attempt count. (Source: `CLAUDE.md` Decision Discipline — "Frank's verdict is binding... this is enforced by the orchestrator now, not just a norm.")
+
+2. **No fabricated constants.** Every predetermined number in a spec, architecture, or implementation artifact needs a citable precedent, an explicit `PROVISIONAL — unvalidated` tag with a named human owner, or deletion. One unsourced number found means sweeping the whole doc/code set for others, not fixing it in isolation. (Source: `CLAUDE.md` Decision Discipline; also global `~/.claude/CLAUDE.md` Research Data Integrity rule.)
+
+3. **The orchestrator never hand-authors a gated artifact.** When a framework's component agent could produce an artifact — code, a design doc, a test, a spec section — the orchestrating session delegates it, and never reports it done/staged/ready without routing it through the framework's mandatory judgment gates. Running component skills individually does not waive this — the obligation travels with the artifact, not the entry point. (Source: `HOMELAB-CLAUDE.md.template:210-230`, "Orchestration Discipline — Always Redispatch" — tracked in this repo, propagated to every project via `/new-project`; citing the 2026-07-17 sole-author-sole-checker incident it documents.)
+
+4. **Danny personally reviews identity-tier artifacts before they're locked.** Any edit to `agents/frank.md`, and any North Star document (project or sprint), is reviewed by Danny himself in raw form — never self-approved by the agent that authored or edited it. (Source: `CLAUDE.md` Decision Discipline.)
+
+5. **Manual-push-only.** No session auto-pushes to `origin`. Unpushed commits are surfaced and asked about, never silently pushed. (Source: `CLAUDE.md` Git Workflow.)
+
+6. **Every decision, deviation, and HALT is captured to LORE immediately when it happens** — not batched, not deferred to session end. (Source: `CLAUDE.md` Decision Discipline.)
+
+7. **A checker briefed with the author's own checklist is not an independent check.** When dispatching Frank or any other reviewer, the brief supplies objective, architecture, and what's claimed — never the author's own method, checklist, or suspicions. A method handed over is a lens handed over; it caps the checker's ceiling at the author's own. (Source: `docs/specs/agent-rig-ddrs/00-DDR-INDEX.md:17` backlog item "`/frank` — impromptu Frank-dispatch command" and `:25` "Prevention layer: gap-lens pre-checks at the DOER + DISPATCHER layer" — both name map-not-route as the mechanism. Proposed designs, not yet built as a shipped command; practiced ad hoc in this session's own Frank dispatches, not yet formalized.)
+
+8. **Recommend, don't hedge; a decision already held is made, not asked.** Before ending a turn with a question to Danny, state the answer you'd give if forced — if one exists, that is the decision; only ask when no answer exists or the cost of being wrong is high and hard to reverse. (Source: `CLAUDE.md` Decision Discipline, "Produce, don't hedge"; DDR-001 Ask-vs-Act; the checkable-gate wording is DDR-INDEX `:21`'s "no-hedge GATE" backlog item, still pending Danny's review of Lumen's draft wording — not yet independently confirmed, carried here as the working formulation until it is.)
