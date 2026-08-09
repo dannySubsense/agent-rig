@@ -1,0 +1,72 @@
+# Assert-Convention + Sentinel Pattern
+
+## Setup
+
+Use this template's two conventions when a project needs (1) a fail-closed check for a known,
+load-bearing coupling, or (2) a control that depends on a signal someone is expected to notice.
+Both are **practice-only conventions** — documented discipline, not installed mechanisms. No hook,
+gate, or automated enforcement checks that either convention is followed (see the caveat under each
+section below).
+
+Source-of-record for this file lives in the `agent-rig` repo (this repo), per DDR-014's
+author≠install-location pattern — edit it here, redeploy to `~/.claude/templates/` if/when this
+convention is propagated.
+
+---
+
+## 1. Assert-Convention (fail-closed exit-code contract)
+
+**Scope boundary — read first:** this convention applies **when a coupling is known** — i.e. when
+two components have a documented, load-bearing dependency on each other (a config value, a
+schedule, a file format) and you are writing a script to check that dependency holds. It is **not**
+a blanket mandate to add assert scripts to all code.
+
+**The contract, verbatim from this sprint's architecture (`02-ARCHITECTURE.md`, API Contracts
+section, `assert_*.py` fail-closed convention):**
+
+- Exit 0 **only** on a confirmed, determinate match.
+- Exit non-zero on mismatch, missing input, ambiguous result, or error.
+- **Never** default-pass on uncertainty — an indeterminate result is a failure, not a pass.
+
+**Worked example (reference by path, not copied here):**
+`/home/d-tuned/market_data/scripts/assert_gate_date_coupling.py` — Frank's independent review
+(`ALPHA-REPORT-REVIEW.md`, this sprint) verified this script's fail-closed behavior adversarially:
+a wrong target date, an unknown unit, and a retired unit name all exit non-zero rather than
+silently passing; running with no arguments also exits non-zero. Read the script directly for
+implementation details — this template documents the convention, not the code.
+
+**Enforcement caveat (Frank, `ALPHA-REPORT-REVIEW.md`, mandatory caveat 1):** DDR-0009
+(hook-based/automated enforcement) is confirmed `PROPOSED / QUEUED (not started)`. No hook,
+CI gate, or other automated mechanism enforces that a project's `assert_*.py` scripts follow this
+contract. Writing and running an assert script for a known coupling is a manual discipline
+practiced by the project's own resident agent — nothing currently checks or blocks a
+non-conforming or missing assert script.
+
+---
+
+## 2. Sentinel Pattern (observability)
+
+Two principles, stated explicitly, not paraphrased:
+
+- **Success and failure must produce different bytes.** A control that emits the same output (or
+  no output) on both success and failure cannot be distinguished from a silent failure by anyone
+  reading its output later.
+- **A signal nobody reads is not a control.** (Alpha's F3 lesson, per this sprint's source doctrine
+  — `HANDOFF-2026-08-07-verify-before-assert-what-actually-works.md` — reviewed and confirmed
+  `SAFE TO CITE` by Frank in `ALPHA-REPORT-REVIEW.md`.) Emitting a distinguishable signal is
+  necessary but not sufficient; if nothing consumes it, it does not function as a control.
+
+**Enforcement caveat (Frank, `ALPHA-REPORT-REVIEW.md`, mandatory caveat 1):** as with the
+assert-convention above, DDR-0009 (hook-based/automated enforcement) is confirmed
+`PROPOSED / QUEUED (not started)`. No hook or automated mechanism enforces that a control's
+success/failure output is actually distinguishable or actually consumed. This is a design
+discipline the agent building the control applies manually.
+
+This template does not cite the source doctrine's Section 2.5 ("repetition as a diagnostic
+instrument") — that section is out of scope for the sentinel pattern documented here.
+
+---
+
+**Structurally scoped by design:** this template documents two conventions to be followed by
+judgment, not two gates to be passed. If either section starts to be cited as an existing,
+automatically-enforced mechanism, that citation is wrong — see the enforcement caveats above.

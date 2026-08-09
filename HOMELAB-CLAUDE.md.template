@@ -260,6 +260,7 @@ docs/
 - Capture every decision, deviation, and HALT to LORE immediately when it happens.
 - `PROGRESS.md` is the ground truth for sprint state — update it slice by slice, not at the end. Verify every stated Done-When against live files before marking a slice complete.
 - When briefing a checker/reviewer (e.g. dispatching Frank), follow the map-not-route convention documented in `MAP-NOT-ROUTE-BRIEFING.md.template` (agent-rig repo root) — objective + architecture + what's-claimed only, structurally omitting your own checklist/method/suspicions. Practice-only; no automated enforcement exists (see that template's preamble).
+- When writing a fail-closed check for a known coupling, or designing a control that depends on a signal, follow the assert-convention and sentinel-pattern conventions documented in `ASSERT-CONVENTION.md.template` (agent-rig repo root). Practice-only; no automated enforcement exists (see that template's caveats).
 
 ---
 
