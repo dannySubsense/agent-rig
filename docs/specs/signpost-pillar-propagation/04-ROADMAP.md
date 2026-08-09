@@ -80,10 +80,13 @@ source doc, no independent scaffolding logic, avoids a near-empty fourth file). 
 from architecture's Component 6 row; the file's body covers both the assert convention and the
 sentinel/observability pattern as two sections.
 
-**Forge-closability**: this sprint's forge phase is closable when Slices 1-9 plus the retrofit pilot
-(Slice 10, `market_data`) reach PASS. Slices 11 and 12 (remaining 7-project roster) are explicitly
-**non-blocking** — tracked as ongoing, per-project work with no single sprint-wide completion gate
-(architecture's Retrofit Mechanism ordering + Requirements US-10's framing).
+**Forge-closability**: this sprint's own forge phase is closable when Slices 1-9 — the work fully
+within agent-rig's control — reach PASS. Slices 10, 11, and 12 (the retrofit pilot and the remaining
+7-project roster) are explicitly **non-blocking**, grouped together as ongoing, per-project retrofit
+work with no single sprint-wide completion gate: the retrofit is designed to be generic enough that
+this sprint's own closure does not carry a ceremonious dependency on another repo's (`market_data`'s)
+Frank gate (architecture's Retrofit Mechanism ordering + Requirements US-10's framing; Danny,
+2026-08-09).
 
 ---
 
@@ -556,6 +559,10 @@ an independent unbriefed Frank gate.
 - Frank gate for this cutover must be dispatched unbriefed (map-not-route) by `alpha`, from within
   `market_data`'s own session — not by Wright, and not substitutable by this sprint's own spec/forge
   Frank gates.
+- **Non-blocking for sprint forge-close** (per Danny, 2026-08-09): this sprint's own forge phase
+  closes on Slices 1-9 alone. Slice 10 is grouped with Slices 11/12 as ongoing, per-project retrofit
+  work — the retrofit design is generic enough that it does not need a ceremonious dependency on
+  another repo's Frank gate to let this sprint close.
 
 **Tests:**
 - [ ] Live tool-call trace (`--output-format stream-json`) confirms the canonical hook fires and
@@ -568,6 +575,8 @@ an independent unbriefed Frank gate.
 **Done When:**
 - [ ] `RetrofitAuditRecord` for `market_data` is captured to LORE with `cutoverComplete: true`,
       `priorVariantRemoved: true`, `frankGateVerdict: "PASS"`, `frankGateUnbriefed: true`.
+- [ ] Partial/pending status at sprint-forge-close is acceptable and expected — per the
+      Forge-Closability note in the Slice Overview above, this slice does not block sprint forge-close.
 
 ---
 
@@ -611,7 +620,11 @@ parallel with Slice 10).
 pilot (Slice 10) has passed its Frank gate.
 
 **Depends On:** Slice 10 (Frank-gate PASS specifically — architecture's ordering rule: probe-hook
-rollout is "piloted in exactly one retrofit-roster project before broader rollout").
+rollout is "piloted in exactly one retrofit-roster project before broader rollout"). This is a
+content/ordering dependency internal to the retrofit rollout itself, distinct from and unaffected by
+sprint forge-closability (Slice 10 does not need to reach PASS for this sprint's own forge-close —
+see Forge-Closability note above; it does need to reach PASS before Slice 12 specifically proceeds,
+whenever that occurs).
 
 **Files:** external, per-project, owned by each project's resident agent.
 
@@ -650,12 +663,16 @@ rollout is "piloted in exactly one retrofit-roster project before broader rollou
    same reason as Slice 8 — it copies final file state. Slice 9 may run in parallel with Slice 8
    (neither depends on the other), but Slice 10 (retrofit pilot) requires both 8 and 9 complete.
 5. Slice 10 (pilot) must reach a Frank-gate PASS before Slice 12 (probe-hook rollout to the rest of
-   the roster) starts. Slice 11 (practice-only rollout) does not wait on Slice 10.
+   the roster) starts. Slice 11 (practice-only rollout) does not wait on Slice 10. This ordering rule
+   governs when Slice 12 may proceed — it does not affect sprint forge-closability (Rule 7).
 6. No centralized agent-rig sweep across Slices 10-12 — each project's resident agent executes
    independently; agent-rig's role ends at handing off a finalized `RETROFIT-PROCEDURE.md` (Slice 8)
    and a diff-verified deploy (Slice 9).
-7. Sprint forge-close requires Slices 1-9 plus Slice 10 (pilot) at PASS. Slices 11-12 are non-blocking
-   and continue as ongoing state after forge-close.
+7. Sprint forge-close requires Slices 1-9 at PASS — the work fully within agent-rig's control. Slices
+   10, 11, and 12 (the retrofit pilot and remaining-roster rollout) are grouped together as
+   non-blocking and continue as ongoing state after forge-close (per Danny, 2026-08-09: the retrofit
+   is designed to be generic enough that this sprint's closure carries no ceremonious dependency on
+   another repo, `market_data`, reaching its own PASS).
 8. If blocked on any slice → HALT, do not skip ahead to a later slice.
 9. No new slices added without human approval.
 
