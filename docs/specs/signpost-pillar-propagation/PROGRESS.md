@@ -26,7 +26,7 @@ Slice: 8
 Step: not yet dispatched
 Last updated: 2026-08-09
 
-Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts), `2bf3068` (Slice 3), `15600b8` (Slice 4), `d284917` (Slice 5), `6510710` (Slice 6), `PENDING` (Slice 7) — all on `feature/signpost-pillar-propagation`, verified independently.
+Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts), `2bf3068` (Slice 3), `15600b8` (Slice 4), `d284917` (Slice 5), `6510710` (Slice 6), `e353f2b` (Slice 7) — all on `feature/signpost-pillar-propagation`, verified independently.
 
 ## Fix Attempts
 | Test/File | Attempts | Last Error |
