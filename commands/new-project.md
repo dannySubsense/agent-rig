@@ -25,7 +25,7 @@ These values are locked. Never ask Danny about them.
 | HOMELAB-CLAUDE.md template filename | `HOMELAB-CLAUDE.md.template` |
 | MACHINE-SETUP.md template filename | `MACHINE-SETUP.md.template` |
 | Bootstrap commit message | `chore: project bootstrap` |
-| Bootstrap staged files | `.gitignore`, `HOMELAB-CLAUDE.md.template`, `.claude/commands/relay.md`, `docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md`, `docs/NORTHSTAR.md` (path is variable — `<InputBundle.projectId>` is resolved at runtime) |
+| Bootstrap staged files | `.gitignore`, `HOMELAB-CLAUDE.md.template`, `.claude/commands/relay.md`, `docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md`, `docs/NORTHSTAR.md`, `scripts/session_probe.py`, `.claude/hooks/session-start-probe.sh`, `.claude/settings.json` (path is variable — `<InputBundle.projectId>` is resolved at runtime) |
 | LORE documentType (bootstrap) | `decision` |
 | LORE epistemicType (bootstrap) | `FACT` |
 | LORE status (bootstrap) | `locked` |
@@ -489,6 +489,195 @@ Note: `MACHINE-SETUP.md` is gitignored by Step 7 and must never appear in any co
 
 ---
 
+## Step 6.5 — Probe Hook + Session Start Wiring
+
+Write the generalized session-start probe script, its hook wrapper, and a fresh `.claude/settings.json` `SessionStart` wiring block into the project. Source-of-record for the probe script and hook wrapper is agent-rig's own `reference/session_probe.py` and `reference/session-start-probe.sh` — the content below must be written byte-identical to those files, not paraphrased.
+
+### Substep 6.5.1 — Write scripts/session_probe.py
+
+1. Create `scripts/` directory in the project root if it does not exist.
+2. Write the following content, verbatim, to `scripts/session_probe.py` using the Write tool:
+
+```python
+#!/usr/bin/env python3
+"""
+scripts/session_probe.py — Session-start ground-truth probe.
+
+Prints the LIVE state of the repo in a few seconds so a new session builds its
+mental model on ground truth, not on inherited narrative. Operational half of
+the "Signpost, not pillar" discipline (see this project's CLAUDE.md Session
+Start Behaviour section for the full doctrine): memory tells you where to
+look; THIS tells you what is actually true right now.
+
+Wired to run automatically via the SessionStart hook (.claude/settings.json) —
+not a manual "run this first" instruction. Read-only: never writes the repo.
+"""
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+
+
+def _run(cmd: list[str]) -> str:
+    # No inner timeout: the hook wrapper's outer `timeout 5` is the sole
+    # enforcement point (a longer inner cap could never fire under it).
+    try:
+        return subprocess.run(
+            cmd, cwd=REPO, capture_output=True, text=True
+        ).stdout.strip()
+    except Exception as exc:  # noqa: BLE001
+        return f"<error: {exc}>"
+
+
+def section(title: str) -> str:
+    return f"\n── {title} {'─' * max(0, 56 - len(title))}"
+
+
+def main() -> None:
+    out = []
+
+    out.append(section("Git"))
+    branch = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    ahead_behind = _run(["git", "status", "-sb", "--porcelain=2"])
+    local_head = _run(["git", "rev-parse", "HEAD"])[:12]
+    dirty = _run(["git", "status", "--porcelain"])
+    out.append(f"branch={branch} HEAD={local_head}")
+    out.append(f"dirty files: {len(dirty.splitlines()) if dirty else 0}")
+    if dirty:
+        out.append(dirty)
+    out.append(ahead_behind or "<no upstream tracking info>")
+
+    out.append(section("Recent commits"))
+    out.append(_run(["git", "log", "--oneline", "-8"]))
+
+    out.append(section("Uncommitted / untracked (git status -uno already above; full below)"))
+    out.append(_run(["git", "status"]))
+
+    out.append(section("Docs present"))
+    docs_dir = REPO / "docs"
+    if docs_dir.exists():
+        for p in sorted(docs_dir.rglob("*.md")):
+            out.append(str(p.relative_to(REPO)))
+    else:
+        out.append("<no docs/ directory>")
+
+    print("\n".join(out))
+
+
+if __name__ == "__main__":
+    main()
+```
+
+### Substep 6.5.2 — Write .claude/hooks/session-start-probe.sh
+
+1. Create `.claude/hooks/` directory in the project root if it does not exist.
+2. Write the following content, verbatim, to `.claude/hooks/session-start-probe.sh` using the Write tool:
+
+```bash
+#!/usr/bin/env bash
+# SessionStart hook — runs the ground-truth probe and injects its output as
+# additionalContext BEFORE any memory/LORE priming happens. "Signpost, not
+# pillar": this is the pillar half — see this project's CLAUDE.md and
+# agent-rig docs/specs/agent-rig-ddrs/DDR-004-session-start-pillar-binding.md.
+
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PROBE_OUTPUT="$(timeout 5 "$REPO_DIR/scripts/session_probe.py" 2>&1 || true)"
+
+python3 - "$PROBE_OUTPUT" <<'PYEOF'
+import json
+import sys
+
+probe_output = sys.argv[1]
+context = (
+    "GROUND-TRUTH PROBE OUTPUT (script-generated git/docs state only — this "
+    "is NOT memory priming and does NOT satisfy CLAUDE.md's Session Start "
+    "Behaviour step). It reflects what is verifiably true right now about "
+    "the repo; prior-session memory and docs are the signpost, this is the "
+    "pillar you verify them against — but it does not replace them.\n\n"
+    + probe_output
+    + "\n\n"
+    "ACTION REQUIRED BEFORE YOUR FIRST REPLY: call search_knowledge per "
+    "CLAUDE.md's Session Start Behaviour section now, if you have not "
+    "already done so this session. This probe output being present is not "
+    "evidence that step happened — it is a separate, still-pending step."
+)
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": context,
+    }
+}))
+PYEOF
+```
+
+3. Mark the file executable: `chmod +x .claude/hooks/session-start-probe.sh`.
+
+### Substep 6.5.3 — Write .claude/settings.json (create-only)
+
+**Precondition:** check whether `.claude/settings.json` already exists.
+
+```bash
+ls .claude/settings.json 2>/dev/null
+```
+
+- If the file does not exist, proceed to write it fresh (below) — there is no existing content to merge.
+- If the file already exists, inspect it for a `SessionStart` block (`hooks.SessionStart` key). If a `SessionStart` block is already present, do **not** overwrite it — this is a create-only write, never a clobber of hand-added settings. Surface to Danny: `.claude/settings.json already exists with a SessionStart block — leaving it unmodified. Verify manually that it wires the probe hook.` and skip the write below. If the file exists but has no `SessionStart` block, HALT rather than guess at a merge (see Error Reference) — the current 13-step sequence writes no `.claude/settings.json`, so any pre-existing file at this point in bootstrap is unexpected.
+
+Otherwise (file does not exist), create `.claude/` directory if it does not exist and write:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-probe.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Verify
+
+Confirm all three files exist on disk before Step 7 begins:
+
+```bash
+ls scripts/session_probe.py
+ls .claude/hooks/session-start-probe.sh
+ls .claude/settings.json
+```
+
+**HALT if any of the three files does not exist:** `Step 6.5 scaffold incomplete — one or more of scripts/session_probe.py, .claude/hooks/session-start-probe.sh, .claude/settings.json not found on disk. Resolve Step 6.5 before proceeding to Step 7.`
+
+### Rollback (fresh-bootstrap case)
+
+This procedure applies when Step 6.5 ran during a normal `/new-project` scaffold on a project that had no pre-existing `.claude/settings.json` — i.e. Substep 6.5.3 wrote that file wholesale (create-only branch), not merged into an existing one. This is **not** the retrofit rollback (the roster-of-8 scenario for adding the probe hook to an already-bootstrapped project), which is covered elsewhere in this sprint.
+
+Because `.claude/settings.json` was created from nothing by this step, the correct rollback deletes the whole file rather than stripping a block from it — a stripped-down `{"hooks":{}}` file would be an orphan that never existed before the scaffold ran. Full rollback:
+
+1. Delete `.claude/settings.json` in its entirety.
+2. Delete `.claude/hooks/session-start-probe.sh`.
+3. `scripts/session_probe.py` is optional to remove — with no `SessionStart` hook wiring it in, it is inert. Leaving it in place or deleting it alongside the other two files are both complete rollbacks.
+
+```bash
+rm .claude/settings.json
+rm .claude/hooks/session-start-probe.sh
+# optional — inert either way:
+rm scripts/session_probe.py
+```
+
+---
+
 ## Step 7 — .gitignore Creation
 
 Write `.gitignore` to the project root with exactly these 7 entries in this order, one per line:
@@ -590,10 +779,10 @@ ls docs/NORTHSTAR.md
 
 `<InputBundle.projectId>` in the command above is a documentation placeholder — the executing agent substitutes the confirmed `projectId` value before running this command.
 
-Stage exactly these five items — no others:
+Stage exactly these eight items — no others:
 
 ```bash
-git add .gitignore HOMELAB-CLAUDE.md.template .claude/commands/relay.md docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md docs/NORTHSTAR.md
+git add .gitignore HOMELAB-CLAUDE.md.template .claude/commands/relay.md docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md docs/NORTHSTAR.md scripts/session_probe.py .claude/hooks/session-start-probe.sh .claude/settings.json
 ```
 
 Run `git status` and verify that `CLAUDE.md` and `MACHINE-SETUP.md` appear as excluded (listed under gitignore-excluded files, not in the staged set). If either file appears in the staged set, do not commit — investigate and resolve before proceeding.
@@ -655,6 +844,8 @@ Record the pending action.
 | Step 4 | HOMELAB-CLAUDE.md.template missing | Template not found at `~/.claude/templates/HOMELAB-CLAUDE.md.template`. Verify the template deploy at ~/.claude/templates/ (source-of-record: agent-rig repo). |
 | Step 5 | `docs/NORTHSTAR.md` not found before Step 5 begins | `docs/NORTHSTAR.md not found. Step 4.5 did not complete successfully. Resolve Step 4.5 before proceeding.` |
 | Step 6 | MACHINE-SETUP.md.template missing | Template not found at `~/.claude/templates/MACHINE-SETUP.md.template`. Verify the template deploy at ~/.claude/templates/ (source-of-record: agent-rig repo). |
+| Step 6.5 | `.claude/settings.json` exists but has no `SessionStart` block | Do not guess at a merge — HALT and surface the existing file's contents to Danny for manual reconciliation. |
+| Step 6.5 | Any of `scripts/session_probe.py`, `.claude/hooks/session-start-probe.sh`, `.claude/settings.json` missing before Step 7 begins | `Step 6.5 scaffold incomplete — one or more of scripts/session_probe.py, .claude/hooks/session-start-probe.sh, .claude/settings.json not found on disk. Resolve Step 6.5 before proceeding to Step 7.` |
 | Step 9 | gh repo create fails | Exact gh CLI error surfaced. If name conflict: accept alternate name from Danny and retry. All other errors: HALT. |
 | Step 10 | git remote add fails | Exact git error surfaced. |
 | Step 12 | DDR index file not found before git add | `DDR index file not found at docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md. Step 11 did not complete successfully. Resolve Step 11 before proceeding.` |

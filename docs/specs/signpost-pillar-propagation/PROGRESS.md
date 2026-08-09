@@ -26,9 +26,13 @@ Slice: 3
 Step: not yet dispatched
 Last updated: 2026-08-09
 
+Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts) — both on `feature/signpost-pillar-propagation`, verified independently.
+
 ## Fix Attempts
 | Test/File | Attempts | Last Error |
 |-----------|----------|------------|
+| verify-slice3-new-project-scaffold.sh Check 2 | 1 | Test-script bug (not implementation): awk's "capture first \`\`\`bash block" guard grabbed the wrong block — an unrelated \`\`\`bash fence exists at commands/new-project.md:429, before the real hook block at :578. Manually re-verified implementation is byte-identical via precise line-range extraction. |
+| verify-slice3-new-project-scaffold.sh Check 6 | 1 | Test-script bug (not implementation): backtick-span count includes the Decision Table row's explanatory parenthetical \`<InputBundle.projectId>\`, inflating count to 9 vs. the real 8 files. Both git add and Decision Table row independently confirmed to list the same 8 items. |
 
 ## Notes
 - docs/INVARIANTS.md and docs/CADENCE.md authored this session (forge-start governance step), confirmed by Danny, committed to `main` (74c20ed) before this feature branch was cut.
