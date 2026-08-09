@@ -11,7 +11,7 @@
 - [x] Slice 3: `new-project.md` scaffolds Components 1-3 — COMPLETE (2026-08-09; QC round 1 FAIL caught missing live-trace evidence + undocumented/incorrect rollback wording; both fixed; QC round 2 ran its own independent scratch trace, PASS; commit `2bf3068`)
 - [x] Slice 4: Session Start Behaviour template (Signpost:/Pillar: + 3-check block) — COMPLETE
 - [x] Slice 5: Map-not-route briefing convention template — COMPLETE (Frank map-not-route QC gate PASS; commit `d284917`)
-- [x] Slice 6: Assert-convention + sentinel pattern combined doc — COMPLETE (Frank map-not-route QC gate PASS; test-script fix applied for §2.5 negation-detection bug in verify-slice6 Check 4; commit PENDING)
+- [x] Slice 6: Assert-convention + sentinel pattern combined doc — COMPLETE (Frank map-not-route QC gate PASS; test-script fix applied for §2.5 negation-detection bug in verify-slice6 Check 4; commit `6510710`)
 - [ ] Slice 7: Capture schema addition — PENDING
 - [ ] Slice 8: Retrofit procedure doc — PENDING
 - [ ] Slice 9: Deploy Mechanism (copy to `~/.claude/`) — PENDING
@@ -26,7 +26,7 @@ Slice: 7
 Step: not yet dispatched
 Last updated: 2026-08-09
 
-Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts), `2bf3068` (Slice 3), `15600b8` (Slice 4), `d284917` (Slice 5) — all on `feature/signpost-pillar-propagation`, verified independently.
+Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts), `2bf3068` (Slice 3), `15600b8` (Slice 4), `d284917` (Slice 5), `6510710` (Slice 6) — all on `feature/signpost-pillar-propagation`, verified independently.
 
 ## Fix Attempts
 | Test/File | Attempts | Last Error |
