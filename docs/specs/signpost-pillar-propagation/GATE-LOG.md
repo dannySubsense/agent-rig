@@ -12,13 +12,12 @@ Deep-diagnosis evidence: N/A
 Orchestrator independent re-derivation: AGREES — see Findings Summary above for the specific claims independently re-verified (slice numbering, timeout=15 resolution, Citation Constraints component scope).
 
 ## Forge Gate
-Counter: 0/3
-
-Not yet run — forge has not started. No attempts recorded.
+Counter: 1/3
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
 |---|---|---|---|---|
+| 1 | 2026-08-09 | FAIL | Not a content defect — Slices 1-9 artifacts independently verified sound (deploy diffs re-checked byte-identical, no unsourced constants, Layer 2 firm PASS on project NORTHSTAR). FAIL is on the sprint's own stated closability criterion (01-REQUIREMENTS.md:113): "Slices 1-9 done AND Slice 10 (market_data pilot) reaches its own PASS." Slice 10 was relayed to alpha via Switchboard (map, not route) this session but not yet executed/reported. Frank: "dispatched" is a signpost, "PASS" is the pillar — gate does not pass on signposts. No rework needed in agent-rig; hold gate open pending Slice 10. | .gate-snapshots/forge/attempt-1/ |
 
-Convergence judgment (attempt 3 only): (n/a — no attempts yet)
-Deep-diagnosis evidence: (n/a)
-Orchestrator independent re-derivation: (n/a)
+Convergence judgment (attempt 3 only): N/A — not a stuck-loop FAIL, a premature-invocation FAIL. Re-invoking is contingent on an external event (alpha's Slice 10 completion), not another fix-and-retry cycle in this repo.
+Deep-diagnosis evidence: N/A
+Orchestrator independent re-derivation: AGREES — re-read Requirements 01-REQUIREMENTS.md:113 and PROGRESS.md:18 myself; the closability criterion and Slice 10's PENDING status both confirmed directly, matching Frank's reasoning.

@@ -1,0 +1,68 @@
+# Map-Not-Route Briefing Convention
+
+## Setup
+
+Use this template's structure directly when briefing an auditor, reviewer, or dispatched checker
+(e.g. Frank). It is a **practice-only convention** — a discipline you follow when composing a
+briefing message — not an installed mechanism. No hook, gate, or automated enforcement checks
+that a briefing conforms to this shape (see Preamble below for the specific enforcement caveat).
+
+Source-of-record for this file lives in the `agent-rig` repo (this repo), per DDR-014's
+author≠install-location pattern — edit it here, redeploy to `~/.claude/templates/` if/when this
+convention is propagated.
+
+---
+
+## Preamble — scope and reconciliation
+
+**What this is:** a briefing-composition discipline for the agent *dispatching* a checker. Give
+the checker the **map** (objective, architecture, what's claimed) and withhold the **route** (your
+own method, checklist, or suspicions) — a method handed over is a lens handed over, and it caps
+the checker's ceiling at yours. This is the same principle stated in the global CLAUDE.md's
+Research Data Integrity rule 3 ("give the map, never the route").
+
+**Reconciliation against DDR-INDEX backlog item 25** (`docs/specs/agent-rig-ddrs/00-DDR-INDEX.md`,
+"Prevention layer: gap-lens pre-checks at the DOER + DISPATCHER layer, not just the checker"):
+this template and item 25 are **kept separate, not folded in** — they operate on different
+architectural surfaces. Item 25 is a **prevention-layer** proposal: embedding gap-lens pre-checks
+into doer/dispatcher agent prompts *before* a handoff happens, so a shared-well corruption never
+gets produced in the first place. This template is a **detection-layer** convention: it shapes
+what a briefing contains *at* the moment of dispatch to a checker, so the checker's independence is
+preserved once a handoff does happen. Item 25 remains its own backlog entry, unresolved and not
+started as of this writing — this template does not implement, supersede, or substitute for it.
+
+**Enforcement caveat (Frank, `ALPHA-REPORT-REVIEW.md`, per this sprint's Slice 5 mandatory note):**
+DDR-0009 (hook-based/automated enforcement of briefing discipline) is confirmed
+`PROPOSED / QUEUED (not started)`. No hook, PreToolUse gate, or other automated mechanism enforces
+that a briefing conforms to this template. Following this convention is a manual discipline
+practiced by the dispatching agent — nothing currently checks or blocks a non-conforming briefing.
+
+---
+
+## Objective
+
+State the checker's task in one or two sentences: what verdict or judgment is being asked for, and
+against what standard. Name the artifact(s) under review by path. Do not describe how you arrived
+at your own belief about the artifact's correctness — only what question the checker is being
+asked to answer.
+
+## Architecture
+
+Describe where the relevant things live: file paths, component boundaries, how pieces connect,
+what changed and what didn't. Give enough structural context that the checker can navigate the
+artifact independently — this is orientation, not verification guidance. Do not include your own
+checklist, test plan, or the specific sequence of checks you performed or would perform.
+
+## What's Claimed
+
+State plainly what is being asserted as true or complete, and by whom (e.g. "the producer claims
+Slice 5 is done-when-complete"). Distinguish claims from evidence already independently verified,
+if any. This section exists so the checker knows what to test against — not so the checker adopts
+the claimant's own confidence.
+
+---
+
+**Structurally omitted by design:** this template has no checklist, method, or suspicions section.
+If a briefing drafted from this template starts to include "things I already checked" or "things
+I'm worried about," move that content out before sending — a checker primed with the author's own
+suspicions is no longer verifying independently.
