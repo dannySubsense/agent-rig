@@ -14,7 +14,7 @@
 - [x] Slice 6: Assert-convention + sentinel pattern combined doc — COMPLETE (Frank map-not-route QC gate PASS; test-script fix applied for §2.5 negation-detection bug in verify-slice6 Check 4; commit `6510710`)
 - [x] Slice 7: Capture schema addition — COMPLETE (Frank map-not-route QC gate PASS; post-PASS test-strengthening fix applied to verify-slice7-capture-schema.sh Check on required-language detection)
 - [x] Slice 8: Retrofit procedure doc — COMPLETE (Frank map-not-route QC gate PASS; self-fixed line-wrap spot-check bug in verify-slice8-retrofit-procedure.sh Check 7)
-- [ ] Slice 9: Deploy Mechanism (copy to `~/.claude/`) — PENDING
+- [x] Slice 9: Deploy Mechanism (copy to `~/.claude/`) — COMPLETE (Frank map-not-route QC gate PASS; all four deploy targets independently diffed byte-identical by both Wright and Frank separately)
 - [ ] Slice 10: Retrofit pilot (`market_data`) — PENDING, non-blocking for sprint close
 - [ ] Slice 11: Retrofit rollout, practice-only items (remaining roster) — PENDING, non-blocking for sprint close
 - [ ] Slice 12: Retrofit rollout, probe-hook items (remaining roster) — PENDING, non-blocking for sprint close
@@ -22,9 +22,11 @@
 **Forge-closability**: Slices 1-9 + Slice 10 (pilot) PASS = sprint closable. Slices 11/12 track as ongoing, non-blocking.
 
 ## Current
-Slice: 9
+Slice: 10
 Step: not yet dispatched
 Last updated: 2026-08-09
+
+Note: Slice 10 (retrofit pilot) targets `market_data`, a different repo — this forge session's per-slice implementation work in agent-rig itself may be substantially complete after this commit.
 
 Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts), `2bf3068` (Slice 3), `15600b8` (Slice 4), `d284917` (Slice 5), `6510710` (Slice 6), `e353f2b` (Slice 7), `e813604` (Slice 8) — all on `feature/signpost-pillar-propagation`, verified independently.
 
