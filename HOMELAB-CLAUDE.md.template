@@ -90,7 +90,11 @@ the gate degrades safely — it will NOT auto-push, it surfaces unpushed commits
 
 ## Session Start Behaviour
 
-Before responding to the first user message of a new session, call `search_knowledge` to prime context:
+Before responding to the first user message of a new session, run all three checks below. None of
+them depend on each other — do them regardless of whether the user's first message seems to need
+them, since the point is to surface state that would otherwise sit silently unseen.
+
+### 1. Check LORE
 
 ```
 search_knowledge({
@@ -101,6 +105,57 @@ search_knowledge({
 ```
 
 This is the **interim priming mechanism**. It will be replaced by agent-lore's DDR-004 `PromptAssembler` when that ships. Until then, this manual search is how memories enter context.
+
+### 2. Check Switchboard
+
+```
+read_messages({ agent_id: "<AGENT-NAME>" })
+```
+
+Coordination messages (plain agent-to-agent text, as opposed to `capture_request`-typed messages)
+have **no live-push delivery mechanism** — the relay-dispatcher process only auto-processes
+`capture_request` payloads and explicitly ignores coordination messages. The only way a
+coordination message from another agent gets seen is a manual poll — this session-start check is
+that poll. **Fires once at cold start only** — do not repeat it on compaction or mid-session; a
+repeated poll mid-session does not surface anything new and risks re-processing state the agent
+already acted on.
+
+### 3. Check git
+
+```bash
+git fetch origin
+git status -uno
+```
+
+Report ahead/behind/diverged relative to upstream. **Fetch and report only — never auto-merge,
+auto-pull, or auto-push here.** This is a visibility check, not a git operation; reconciling
+divergence is a human decision.
+
+### Labeling the first-turn summary — Signpost: / Pillar:
+
+**Report the result labeled, not blended.** Your first-turn state summary must separate:
+
+- **Signpost:** what `search_knowledge` (and, if your repo runs one, a SessionStart probe script)
+  returned — prior-session claims and narrative, not yet independently checked this session.
+- **Pillar:** what you personally verified this session against a primary source (read the actual
+  file/doc, ran a query, checked live state) — and what that verification found, stated with its
+  verification method (e.g. "Pillar: `docs/PROGRESS.md` read directly — Slice 3 marked complete").
+  If nothing has been verified yet, say so explicitly (`Pillar: none yet — nothing independently
+  checked this session`) rather than omitting the label.
+
+Never state a status claim as settled fact without it falling under one of these two labels. If
+asked "is that your signpost or pillar?", the answer should already be visible in your prior
+message, not require you to check.
+
+**Note on the SessionStart probe:** some repos additionally run a `session-start-probe.sh` hook
+(generalized as `session_probe.py` / `session-start-probe.sh` in agent-rig's `reference/`) that
+mechanically gathers git/docs state at session start. Where that hook exists, its raw output is
+still a **Signpost** — a mechanically-gathered but not-yet-independently-verified input to your
+summary — not a **Pillar**. The hook is a distinct, separate mechanism from this labeling
+convention: it is optional infrastructure some repos run; the Signpost:/Pillar: labeling discipline
+above is agent-judgment/practice-only and applies whether or not any such hook is present. Do not
+present the hook's existence, or this labeling convention, as something enforced automatically —
+neither one is a gate; both rely on the agent actually doing it.
 
 ---
 

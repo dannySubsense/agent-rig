@@ -8,8 +8,8 @@
 ## Slices
 - [x] Slice 1: Independent review of alpha's handoff report (US-9 gate) — COMPLETE (already satisfied; `ALPHA-REPORT-REVIEW.md` produced by an independent Frank dispatch, verdict SAFE TO CITE, 2 mandatory caveats)
 - [x] Slice 2: Generalized probe script + hook wrapper (reference artifacts) — COMPLETE (`reference/session_probe.py`, `reference/session-start-probe.sh`, written directly in agent-rig 2026-08-08, verified standalone with zero department-os dependency, `timeout=15` dropped, no project-specific strings)
-- [ ] Slice 3: `new-project.md` scaffolds Components 1-3 — PENDING
-- [ ] Slice 4: Session Start Behaviour template (Signpost:/Pillar: + 3-check block) — PENDING
+- [x] Slice 3: `new-project.md` scaffolds Components 1-3 — COMPLETE (2026-08-09; QC round 1 FAIL caught missing live-trace evidence + undocumented/incorrect rollback wording; both fixed; QC round 2 ran its own independent scratch trace, PASS; commit `2bf3068`)
+- [x] Slice 4: Session Start Behaviour template (Signpost:/Pillar: + 3-check block) — COMPLETE
 - [ ] Slice 5: Map-not-route briefing convention template — PENDING
 - [ ] Slice 6: Assert-convention + sentinel pattern combined doc — PENDING
 - [ ] Slice 7: Capture schema addition — PENDING
@@ -22,11 +22,11 @@
 **Forge-closability**: Slices 1-9 + Slice 10 (pilot) PASS = sprint closable. Slices 11/12 track as ongoing, non-blocking.
 
 ## Current
-Slice: 3
+Slice: 5
 Step: not yet dispatched
 Last updated: 2026-08-09
 
-Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts) — both on `feature/signpost-pillar-propagation`, verified independently.
+Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts), `2bf3068` (Slice 3) — all on `feature/signpost-pillar-propagation`, verified independently.
 
 ## Fix Attempts
 | Test/File | Attempts | Last Error |
