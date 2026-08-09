@@ -26,7 +26,7 @@ forge-gate does not wait on `market_data`'s (Slice 10) own Frank gate to reach P
 
 ## Current
 Slice: 10
-Step: not yet dispatched
+Step: relayed to alpha via Switchboard 2026-08-09, awaiting execution/report (non-blocking for this sprint's own close)
 Last updated: 2026-08-09
 
 Note: Slice 10 (retrofit pilot) targets `market_data`, a different repo — this forge session's per-slice implementation work in agent-rig itself may be substantially complete after this commit.
