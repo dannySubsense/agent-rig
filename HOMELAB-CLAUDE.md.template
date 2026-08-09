@@ -177,6 +177,23 @@ After meaningful turns — a decision, discovery, deviation, or HALT — call `c
 - `status` (optional) ∈ {`draft`, `locked`, `archived`}
 - `supersedesId` (optional) — UUID of a prior capture this replaces; makes the new doc canonical
 
+Every durable capture's free-text content must also include two lines, as a documented convention
+this repo's agents follow when writing to `capture_memory` — not a schema field enforced by LORE
+or any hook:
+
+- `Verification:` — what was checked and by what method (e.g. "read the live file at
+  `path/to/file` and confirmed the section exists" or "ran `git log --oneline -5` and confirmed the
+  commit is present"). A capture that only restates a claim without saying how it was checked does
+  not satisfy this line.
+- `Re-verify with:` — the exact command or query a future session could run to re-confirm the claim
+  (e.g. a shell command, a `search_knowledge` query, a file path to re-read). It must be concrete
+  and runnable, not a vague pointer.
+
+This is a practice convention, not an automated gate — no hook or tool currently validates that
+these lines are present. Agents are expected to include them by discipline, the same way the
+existing `documentType`/`epistemicType` fields are filled in by discipline rather than enforced by
+LORE's API surface.
+
 Capture what a future session would need to pick up where this one left off. Do not capture trivial state, ephemeral debugging, or content that the code itself already documents.
 
 ---

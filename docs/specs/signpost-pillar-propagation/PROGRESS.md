@@ -12,7 +12,7 @@
 - [x] Slice 4: Session Start Behaviour template (Signpost:/Pillar: + 3-check block) — COMPLETE
 - [x] Slice 5: Map-not-route briefing convention template — COMPLETE (Frank map-not-route QC gate PASS; commit `d284917`)
 - [x] Slice 6: Assert-convention + sentinel pattern combined doc — COMPLETE (Frank map-not-route QC gate PASS; test-script fix applied for §2.5 negation-detection bug in verify-slice6 Check 4; commit `6510710`)
-- [ ] Slice 7: Capture schema addition — PENDING
+- [x] Slice 7: Capture schema addition — COMPLETE (Frank map-not-route QC gate PASS; post-PASS test-strengthening fix applied to verify-slice7-capture-schema.sh Check on required-language detection)
 - [ ] Slice 8: Retrofit procedure doc — PENDING
 - [ ] Slice 9: Deploy Mechanism (copy to `~/.claude/`) — PENDING
 - [ ] Slice 10: Retrofit pilot (`market_data`) — PENDING, non-blocking for sprint close
@@ -22,11 +22,11 @@
 **Forge-closability**: Slices 1-9 + Slice 10 (pilot) PASS = sprint closable. Slices 11/12 track as ongoing, non-blocking.
 
 ## Current
-Slice: 7
+Slice: 8
 Step: not yet dispatched
 Last updated: 2026-08-09
 
-Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts), `2bf3068` (Slice 3), `15600b8` (Slice 4), `d284917` (Slice 5), `6510710` (Slice 6) — all on `feature/signpost-pillar-propagation`, verified independently.
+Commits so far: `1727a6c` (spec doc set), `dc7aeb5` (Slices 1-2 artifacts), `2bf3068` (Slice 3), `15600b8` (Slice 4), `d284917` (Slice 5), `6510710` (Slice 6), `PENDING` (Slice 7) — all on `feature/signpost-pillar-propagation`, verified independently.
 
 ## Fix Attempts
 | Test/File | Attempts | Last Error |
