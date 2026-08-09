@@ -259,6 +259,7 @@ docs/
 - Danny personally reviews identity-tier artifacts (agent-persona edits, North Star docs) in raw form before they are locked — never self-approved by the agent.
 - Capture every decision, deviation, and HALT to LORE immediately when it happens.
 - `PROGRESS.md` is the ground truth for sprint state — update it slice by slice, not at the end. Verify every stated Done-When against live files before marking a slice complete.
+- When briefing a checker/reviewer (e.g. dispatching Frank), follow the map-not-route convention documented in `MAP-NOT-ROUTE-BRIEFING.md.template` (agent-rig repo root) — objective + architecture + what's-claimed only, structurally omitting your own checklist/method/suspicions. Practice-only; no automated enforcement exists (see that template's preamble).
 
 ---
 
