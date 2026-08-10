@@ -585,7 +585,19 @@ if __name__ == "__main__":
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROBE_OUTPUT="$(timeout 5 "$REPO_DIR/scripts/session_probe.py" 2>&1 || true)"
+
+PROBE_EXIT=0
+PROBE_OUTPUT="$(timeout 5 "$REPO_DIR/scripts/session_probe.py" 2>&1)" || PROBE_EXIT=$?
+
+if [ "$PROBE_EXIT" -eq 124 ]; then
+  PROBE_OUTPUT="$PROBE_OUTPUT
+
+PROBE OUTPUT INCOMPLETE — probe killed at 5s budget (exit 124); treat the above as partial, not ground truth."
+elif [ "$PROBE_EXIT" -ne 0 ]; then
+  PROBE_OUTPUT="$PROBE_OUTPUT
+
+PROBE OUTPUT INCOMPLETE — probe exited with error (exit $PROBE_EXIT); treat the above as partial, not ground truth."
+fi
 
 python3 - "$PROBE_OUTPUT" <<'PYEOF'
 import json

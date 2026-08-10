@@ -115,12 +115,14 @@ Interview Q2, informed by alpha's ~3s precedent").
   git operations on retrofit targets, since those repos are unmeasured. This is a PROVISIONAL
   buffer multiplier, not itself sourced — **flagged as such**, owner wright, to be replaced with a
   measured number after the first `/new-project` scaffold run and the first retrofit are
-  trace-verified (Component 3's hook always exits 0 regardless, so a budget miss degrades to slow
-  UX, not a blocking failure — this is what makes a PROVISIONAL tag acceptable here rather than a
-  hard requirement).
+  trace-verified (Component 3's hook always exits 0 regardless, so a budget miss degrades to a
+  clearly-marked partial result — the hook captures the probe's actual exit status and injects an
+  explicit "PROBE OUTPUT INCOMPLETE" marker into `additionalContext` on timeout or error, rather
+  than silently presenting truncated output as a complete ground-truth snapshot — not a blocking
+  failure, which is what makes a PROVISIONAL tag acceptable here rather than a hard requirement).
 - Enforcement mechanism: a single `timeout 5 python3 scripts/session_probe.py` wrap at the
-  hook-script level (Component 2) is sufficient and matches the existing `|| true`
-  fail-loud-but-non-blocking pattern already in the department-os reference hook. The department-os
+  hook-script level (Component 2) is sufficient and matches the existing exit-status-capture,
+  fail-loud-but-non-blocking pattern in the department-os reference hook. The department-os
   reference's inner `_run()` helper also carries a per-subprocess `timeout=15` argument; that value
   can never fire (the outer 5s wrap always kills the process first) and is dropped in the
   generalized version — `subprocess.run(cmd, ...)` with no `timeout` kwarg, since the outer wrap is
