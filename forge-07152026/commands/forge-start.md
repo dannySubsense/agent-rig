@@ -39,11 +39,46 @@ the project's own `## Git Workflow` section in `CLAUDE.md` (loaded in Load Gover
 the same section `/lore-close`'s push gate already reads at session end. This runs once, at
 Session Start, not per-slice.
 
-- **Declares PR / feature-branch flow** → DELEGATE to @github-ops to create (or check out, if it
+- **Declares PR / feature-branch flow** → before creating anything, ask Danny the one-time
+  consent prompt below. Only after explicit approval does @github-ops create (or check out, if it
   already exists) a feature branch — `feature/{feature-name}`, per the git-operations skill's
   naming convention — before Slice 1 begins. Every per-slice commit in the Forge Cycle below lands
-  on this branch, never on the mainline. The PR (End-of-Feature Tasks, step 4) opens from this
-  branch after Frank's binding forge-gate reaches PASS.
+  on this branch, never on the mainline. After branch creation and the first commit (the spec doc
+  set), @github-ops pushes the branch and opens a **draft PR** immediately — title = sprint slug,
+  body = links to NORTH-STAR/ROADMAP and a slice checklist. Before Slice 1, not after the gate.
+
+  **One-time consent prompt (ask before creating the branch or opening the draft PR) — two
+  variants, selected by whether the `docs/INVARIANTS.md` rule 5 rescope described below is
+  confirmed live:**
+
+  - **FALLBACK variant (current, live state — use this one unless the rescope has been
+    personally confirmed by Danny):**
+    > "PR-flow session: I'll create feature/{feature-name} and open a draft PR (pushed once now,
+    > and again when ready for review). Approve?"
+  - **RESCOPE-CONFIRMED variant (only once the rescope is actually confirmed live):**
+    > "PR-flow session: I'll create feature/{feature-name}, open a draft PR, and push slice commits
+    > to that branch as they land. Approve?"
+
+  **Approving this consent prompt (either variant) is a session-flow acknowledgment only — it does
+  NOT constitute confirming or signing off on the `docs/INVARIANTS.md` rule 5 rescope itself.**
+  That rescope is a separate, deliberate decision Danny makes elsewhere (e.g. reviewing the
+  PROPOSED block in `docs/INVARIANTS.md` rule 5 directly) — it is never inferred from a routine
+  session-start "Approve?" answer, even when that answer is given while the RESCOPE-CONFIRMED
+  variant's language is on screen.
+
+  **PROPOSED CHANGE — pending Danny's sign-off, not yet live:** the "push slice commits to that
+  branch as they land" part of the RESCOPE-CONFIRMED prompt variant above — i.e. pushing the
+  branch again after each slice's verified commit (the "record verified Slice N hash" commits in
+  the Forge Cycle below would be the natural push points) to keep the draft PR's diff live — is a
+  rescope of `docs/INVARIANTS.md` rule 5 that has not yet been personally confirmed by Danny. It is
+  one pending decision spanning `docs/INVARIANTS.md` rule 5, `docs/CADENCE.md` step 8, and this
+  section plus Forge Cycle step 6 and End-of-Feature Tasks step 4 below — not three or five
+  independent proposals. **Until confirmed, the fallback is the original blanket manual-push-only
+  policy**: after the consent prompt above (FALLBACK variant) is approved, only the initial
+  branch-creation + spec-doc push and the final ready-for-review push happen automatically;
+  per-slice pushes do not occur, and any unpushed slice commits are surfaced and asked about
+  individually instead. At End-of-Feature Tasks, step 4, once Frank's binding forge-gate reaches
+  PASS, @github-ops marks the existing draft PR ready-for-review — it does not create a new PR.
 - **Declares push-at-close / direct-to-main** → no branch is created. Per-slice commits land
   directly on the mainline, as today. End-of-Feature Tasks step 4 (PR creation) is skipped for
   this repo — there is nothing to open a PR against, and none is wanted. Pushing to `origin` is
@@ -145,7 +180,18 @@ For each slice in 04-ROADMAP.md:
    │   PR-flow repos, mainline for direct-to-main repos. Never main in a
    │   PR-flow repo.
    ├── Message: `Refs: Slice N from 04-ROADMAP.md`
-   └── VERIFY: commit exists on the correct branch
+   ├── PR-flow repos: **PROPOSED, pending Danny's sign-off on INVARIANTS.md
+   │   rule 5's PROPOSED rescope (see Git Flow Determination above) — not
+   │   yet live.** Once confirmed, after recording the verified Slice N
+   │   commit, push the feature branch — this is the natural push point
+   │   that keeps the already-open draft PR's diff live for the duration
+   │   of the feature, not just at the end. Until confirmed, the fallback
+   │   is the original blanket manual-push-only policy: do not push
+   │   per-slice; surface unpushed commits and ask instead.
+   └── VERIFY: commit exists on the correct branch; if (and only if) the
+       INVARIANTS.md rule 5 rescope is confirmed live, also verify pushed.
+       Under the fallback (rescope not yet confirmed), an unpushed slice
+       commit on the correct branch PASSES this VERIFY.
 
 7. Update PROGRESS.md with slice completion
 ```
@@ -198,8 +244,12 @@ After ALL slices complete:
    └── VERIFY: docs exist
 3. Full test suite run (all slices together)
 4. DELEGATE to @github-ops
-   ├── PR-flow repos: create PR for the complete feature, from the
-   │   feature branch created at Session Start, targeting mainline
+   ├── PR-flow repos: mark the existing draft PR (opened at Git Flow
+   │   Determination, before Slice 1) ready-for-review — do not create a
+   │   new PR; push any remaining slice commits first (this final push is
+   │   always in scope, per the standing consent from the Git Flow
+   │   Determination prompt — it is not gated by the per-slice-push
+   │   PROPOSED item above, which only affects intermediate pushes)
    └── Direct-to-main repos: skipped — no branch exists, nothing to PR;
        slices are already on mainline; pushing is /lore-close's job
 ```
