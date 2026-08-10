@@ -5,13 +5,21 @@
 | 001 | Ask-vs-Act Decision Flow | ACCEPTED |
 | 002 | Orchestration Gate-Bypass Prevention | ACCEPTED (§3.5 shipped; §3.1–§3.4 → own sprint) |
 | 003 | Public Surface & Contribution Model | DRAFT |
-| 004 | Session-Start Signpost→Pillar Binding | DRAFT — rewritten against source; Frank PASS (attempt 3, both layers firm); substrate CONFIRMED on VM101; → `/spec-start` next session |
+| 004 | Session-Start Signpost→Pillar Binding | **ACCEPTED (shipped, PR #4, merged 2026-08-10)** — full spec+forge cycle complete as sprint `signpost-pillar-propagation`: probe/hook mechanism, Signpost:/Pillar: labeling, map-not-route/assert-convention/sentinel/capture-schema conventions, retrofit procedure, all deployed live to `~/.claude/{templates,commands}/`. Frank forge-gate PASS (attempt 2/3) + independent blind full-package audit PASS (one real defect — silent probe-timeout truncation — found and fixed post-audit). Retrofit rollout to 8 external repos (Slices 10-12) tracked separately as ongoing, non-blocking — Slice 10 (`market_data` pilot) relayed to alpha 2026-08-09, no response yet. |
 
 ---
 
 ## Backlog (not yet a DDR)
 
 Ideas surfaced during other work, worth preserving but not yet written up as a DDR. Promote to a numbered DDR above before spec'ing.
+
+**Session queue, 2026-08-10 close-out — priority order for next session, none blocking:**
+1. **Slice 10 check-in** (`market_data` retrofit pilot) — quick poll of Switchboard/LORE for alpha's response; no action possible until they report back.
+2. **`ponytail` / `/frank` / Frank's-Lessons / no-hedge-gate / research-spec-start / LICENSE / senior-qc reference** (items below) — all dormant, no urgency signal since last touched; revisit only if Danny raises one directly.
+3. **Decision Discipline backfill to 8 older projects** — mechanical, low-risk, no dependency on anything else; good candidate for a standalone quick pass whenever there's a gap.
+4. **DDR-003 (Public Surface & Contribution Model)** — still DRAFT, no recent activity; the LICENSE backlog item depends on it.
+
+Nothing above requires a specific next-session entry point — genuinely idle backlog, re-validate relevance before acting on any of it (see Session Start Behaviour: signpost only until independently re-checked).
 
 - **Frank's-Lessons cross-project LORE initiative** — proposed 2026-07-15 (Danny), during spec-forge-cadence-refactor Intake discussion of Frank's prose trim. Idea: the "why" behind a Frank verdict (root-cause reasoning, especially on FAIL/HALT) is the most valuable part of his output and shouldn't live only inside one sprint's verdict doc — capture it as a standalone lesson-learned entry, likely under a shared `projectId` (e.g. `franks-lessons`) so any project's Frank dispatch can search and benefit from lessons learned in *any* other project, not just its own. Needs its own DDR: schema for a lesson entry, capture trigger (every FAIL/HALT? Danny's call?), how Frank/other agents query it, relationship to per-project LORE captures. Not in scope for spec-forge-cadence-refactor.
 - **`/frank` — impromptu Frank-dispatch command** — proposed 2026-07-20 (Danny), during the DDR-002 session. Gap: no canonical, memorable trigger for a human to ask an orchestrating agent to dispatch Frank for an ad-hoc review/verdict — today it relies on ad-hoc phrasing and the agent choosing to. Fix: a portable `/frank [target]` slash command (installs to `~/.claude/commands/frank.md`, same pattern as `/spec-start`/`/lore-close`), agent-rig-owned (it already stewards Frank per DDR-013 and command tooling per DDR-014; `commands/` now exists). **Scope confirmed minimal by Danny (YAGNI): dispatch + briefing discipline + verdict passthrough only — no config, no persistence.** The briefing discipline is the value over "just tell the agent" — map-not-route enforced (brief Frank with objective + where things live, withhold the orchestrator's own checklist so his ceiling isn't capped at the orchestrator's), verdict returned verbatim (not paraphrased), no self-certification. Reinforces DDR-002: an easy canonical Frank trigger makes "route through the gate" the path of least resistance. **Open input:** review the `ponytail` GitHub repo before building — Danny flagged it may contain relevant material. Needs its own small DDR or rides as a quick build.
