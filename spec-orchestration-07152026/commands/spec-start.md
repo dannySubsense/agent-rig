@@ -63,6 +63,115 @@ STEP 8: FRANK BINDING SPEC-GATE (LANE: spec-gate, up to 3 attempts)
 STEP 9: HUMAN APPROVAL
 ```
 
+For bounded internal tooling rather than a product feature, see **Lite Mode** below — it replaces this entire sequence with a single-document path, not a variation of it.
+
+---
+
+## Lite Mode (`--lite`)
+
+### When to use it
+
+Invoked explicitly: `/spec-start --lite <name>`. Reserved for **bounded internal tooling** —
+scripts, checkers, one-off local utilities — that is not a Department OS/project product vertical
+slice and has no independent product surface, no UI, and no multi-stakeholder scope. If there is
+any doubt whether something qualifies, it doesn't: run the full sequence above instead. The
+orchestrator, not the human, is responsible for pushing back if `--lite` is requested for
+something that is really a feature — this is a HALT-and-ask, not a silent downgrade.
+
+### What it skips, and why that's safe
+
+Lite mode skips Intake, Interview, `NORTH-STAR.md`, `01-REQUIREMENTS.md`, `03-UI-SPEC.md`, and
+`04-ROADMAP.md` entirely. This is safe only because the artifact being specced has no product
+scope for Intake to bound, no stakeholder ambiguity for Interview to surface, no UI, and a build
+small enough that one document can hold purpose, contract, and acceptance criteria without
+splitting into requirements/architecture/roadmap layers. None of Step 8's Frank binding gate, its
+attempt-counter/retry loop, its convergence-judgment procedure, or Step 9's human approval are
+skipped — those apply unchanged, scoped to the single document.
+
+### Lite sequence
+
+```
+LITE STEP 1: DELEGATE to @architect        → single spec document
+LITE STEP 2: FRANK BINDING SPEC-GATE (LANE: spec-gate, up to 3 attempts) — same
+              procedure as Step 8 above, scoped to the one document
+LITE STEP 3: HUMAN APPROVAL — same procedure as Step 9 above, scoped to the
+              one document; on approval, hand off to /forge-start
+```
+
+### Lite Step 1: Delegate to @architect
+
+```
+═══════════════════════════════════════════════════════════════════
+TASK: SPEC ORCHESTRATION (LITE) — Draft Tooling Spec
+═══════════════════════════════════════════════════════════════════
+
+ROLE
+Agent: @architect
+
+INPUTS
+- TOOL_NAME: [actual tool/utility name]
+- OUTPUT_PATH: docs/tooling/{tool-name}.md
+- CONTEXT: [the problem this tool solves, why it's needed, any known
+  defect history or precedent it's grounded in — the orchestrator's own
+  words, not a template]
+
+OBJECTIVE
+Write a single bounded tooling spec: purpose and non-goals, the concrete
+contract (CLI/config/interface as applicable), a complete v1 behavior for
+every rule/feature — no "configurable"/"illustrative"/"finalized at
+implementation time" deferrals on anything that determines behavior —
+acceptance criteria, and an explicit integration boundary (what this tool
+does NOT get authority over, e.g. CI/hooks, Frank, human judgment).
+Every predetermined constant needs a citable source, an explicit
+PROVISIONAL-tag-with-named-owner, or deletion — no fabricated numbers.
+
+CONSTRAINTS
+- Status: DRAFT at the top of the document — this step never self-locks
+- Write output to OUTPUT_PATH
+- HALT on ambiguity
+
+OUTPUT
+Write: docs/tooling/{tool-name}.md
+Report: Status + summary under 30 lines
+═══════════════════════════════════════════════════════════════════
+```
+
+VERIFY: `docs/tooling/{tool-name}.md` exists before proceeding.
+
+**Revision loop:** if Frank (Lite Step 2) or Danny's own review (Lite Step 3) finds the document
+not lock-ready, re-delegate to `@architect` with the specific findings as the map (not a
+checklist) — same non-negotiable rule as the full sequence: the orchestrator never hand-edits the
+artifact itself (see Orchestration Discipline in the project's `CLAUDE.md`). Re-run Lite Step 2
+after revision.
+
+### Lite Step 2: Frank Binding Spec-Gate
+
+Identical procedure to Step 8 above (attempt counter, snapshot-before-retry, convergence judgment
+at attempt 3, no manual override), with `ARTIFACTS` reduced to the single document and no
+sprint-level `NORTH-STAR.md` to check — Layer 1 becomes "is this document internally sound and
+lock-ready," Layer 2 (project North Star relevance) still applies unchanged, reading
+`docs/NORTHSTAR.md` directly per the same DRAFT/PROVISIONAL rule.
+
+Lite mode has no sprint directory (`docs/specs/{feature}/`), so Step 8's `GATE_LOG` and
+`SNAPSHOT_DIR` paths do not apply as written. Substitute, scoped to lite mode only:
+
+- `GATE_LOG: docs/tooling/{tool-name}-GATE-LOG.md` (this session's Frank spec-gate verdict is
+  written to a `## Spec Gate` section in this file; `/forge-start --lite`'s own Frank forge-gate
+  reuses the same file, adding a `## Forge Gate` section alongside it, per
+  `forge-07152026/commands/forge-start.md`'s Lite-mode section — this file is the shared handoff
+  point between the two, so its path must match exactly)
+- `SNAPSHOT_DIR: docs/tooling/.gate-snapshots/{tool-name}/spec/` (same snapshot-before-retry
+  procedure as Step 8: on each FAIL/HALT verdict, copy the current state of the single document
+  in `ARTIFACTS` into `SNAPSHOT_DIR/attempt-{N}/` before re-delegation)
+
+### Lite Step 3: Human Approval
+
+Present the single document plus Frank's verdict to Danny, exactly as Step 9 does for the full
+artifact set. On approval: mark the document's own `Status:` line `LOCKED` (the document is
+self-contained — there is no separate lock artifact) and note "Ready for implementation handoff"
+— `/forge-start` runs the build against it. Lite mode owns nothing past the lock; forge protocol
+is not duplicated or re-specified here.
+
 ---
 
 ## Step 0: Intake Gate
