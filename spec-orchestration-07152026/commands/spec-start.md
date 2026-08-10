@@ -152,6 +152,18 @@ sprint-level `NORTH-STAR.md` to check — Layer 1 becomes "is this document inte
 lock-ready," Layer 2 (project North Star relevance) still applies unchanged, reading
 `docs/NORTHSTAR.md` directly per the same DRAFT/PROVISIONAL rule.
 
+Lite mode has no sprint directory (`docs/specs/{feature}/`), so Step 8's `GATE_LOG` and
+`SNAPSHOT_DIR` paths do not apply as written. Substitute, scoped to lite mode only:
+
+- `GATE_LOG: docs/tooling/{tool-name}-GATE-LOG.md` (this session's Frank spec-gate verdict is
+  written to a `## Spec Gate` section in this file; `/forge-start --lite`'s own Frank forge-gate
+  reuses the same file, adding a `## Forge Gate` section alongside it, per
+  `forge-07152026/commands/forge-start.md`'s Lite-mode section — this file is the shared handoff
+  point between the two, so its path must match exactly)
+- `SNAPSHOT_DIR: docs/tooling/.gate-snapshots/{tool-name}/spec/` (same snapshot-before-retry
+  procedure as Step 8: on each FAIL/HALT verdict, copy the current state of the single document
+  in `ARTIFACTS` into `SNAPSHOT_DIR/attempt-{N}/` before re-delegation)
+
 ### Lite Step 3: Human Approval
 
 Present the single document plus Frank's verdict to Danny, exactly as Step 9 does for the full
