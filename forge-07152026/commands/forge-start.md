@@ -93,11 +93,19 @@ feature.
   two gates.
 - **The Forge Cycle (per slice), Forge Advisor Final Check, and Frank Binding Forge-Gate procedure
   below are otherwise UNCHANGED** — same agents, same automated gates, same attempt-counter/
-  snapshot/convergence-judgment machinery at the binding gate, no manual override. The only
-  substitution in the Frank forge-gate contract is `SPRINT_NORTH_STAR: docs/tooling/{tool-name}.md`
-  in place of the sprint `NORTH-STAR.md` path — Layer 1 becomes "does the implementation fulfill
-  this locked document's contract," Layer 2 (project North Star relevance) is unchanged, reading
-  `docs/NORTHSTAR.md` directly per the same DRAFT/PROVISIONAL rule as the full cycle.
+  snapshot/convergence-judgment machinery at the binding gate, no manual override. Lite mode has no
+  sprint directory (`docs/specs/{feature}/`), so the Frank forge-gate contract's `SPRINT_NORTH_STAR`,
+  `GATE_LOG`, and `SNAPSHOT_DIR` paths do not apply as written below. Substitute, scoped to lite mode
+  only:
+  - `SPRINT_NORTH_STAR: docs/tooling/{tool-name}.md` in place of the sprint `NORTH-STAR.md` path —
+    Layer 1 becomes "does the implementation fulfill this locked document's contract," Layer 2
+    (project North Star relevance) is unchanged, reading `docs/NORTHSTAR.md` directly per the same
+    DRAFT/PROVISIONAL rule as the full cycle.
+  - `GATE_LOG: docs/tooling/{tool-name}-GATE-LOG.md` — the same file `/spec-start --lite`'s Frank
+    spec-gate wrote to (its `## Spec Gate` section stays as-is; this gate adds a `## Forge Gate`
+    section alongside it), as described above.
+  - `SNAPSHOT_DIR: docs/tooling/.gate-snapshots/{tool-name}/forge/` in place of
+    `docs/specs/{feature}/.gate-snapshots/forge/`.
 - **End-of-Feature Tasks step 4 (PR)** follows the same Git Flow Determination as the full cycle —
   no lite-specific exception.
 
@@ -268,6 +276,10 @@ PROJECT_NORTH_STAR: docs/NORTHSTAR.md  ← Frank reads this himself; the
 GATE_LOG: docs/specs/{feature}/GATE-LOG.md (prior attempts, if any — read
           directly, don't trust the orchestrator's recap of them either)
 SNAPSHOT_DIR: docs/specs/{feature}/.gate-snapshots/forge/
+← In lite mode, GATE_LOG and SNAPSHOT_DIR substitute to
+  docs/tooling/{tool-name}-GATE-LOG.md and
+  docs/tooling/.gate-snapshots/{tool-name}/forge/ respectively — see the
+  Lite Mode section above.
 
 OBJECTIVE: Layer 1 (sprint North Star fidelity) AND Layer 2 (project North
 Star relevance) must both independently PASS, evaluated on EVERY attempt
@@ -312,7 +324,8 @@ PASS  → the orchestrator performs its own full review of the artifact —
         Layer 2 pass still counts as PASS — not blocking — but the
         PROVISIONAL tag carries through to the Session End summary and PR
         description, it is never silently dropped.
-FAIL  → snapshot current artifacts to docs/specs/{feature}/.gate-snapshots/forge/attempt-{N}/,
+FAIL  → snapshot current artifacts to docs/specs/{feature}/.gate-snapshots/forge/attempt-{N}/
+        (lite mode: docs/tooling/.gate-snapshots/{tool-name}/forge/attempt-{N}/),
         append to GATE-LOG.md, route Fix/Next-step items to the named
         agent(s) (@code-executor / @test-writer / @test-runner / @qc-agent
         as applicable), re-delegate, increment attempt counter, re-invoke
