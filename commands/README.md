@@ -25,6 +25,13 @@ homes rather than here:
   existing project. Distributed under agent-rig stewardship.
 - **`HOMELAB-CLAUDE.md.template`** — the CLAUDE.md master `/new-project` distributes at bootstrap
   (stewardship moved to agent-rig 2026-07-17, recorded in DDR-014 §3.1).
+- **`MAP-NOT-ROUTE-BRIEFING.md.template`** and **`ASSERT-CONVENTION.md.template`** — practice-only
+  conventions (briefing composition for dispatched checkers; fail-closed coupling checks and
+  sentinel patterns) added under the signpost-pillar-propagation sprint. Source-of-record here;
+  already deployed to `~/.claude/templates/` (diff-verified byte-identical, Slice 9). Not scaffolded
+  into individual new projects by `/new-project`'s bootstrap sequence — only cross-referenced from
+  `HOMELAB-CLAUDE.md.template`. Retrofit into already-bootstrapped external repos is a separate,
+  non-blocking, per-project initiative (see `docs/specs/signpost-pillar-propagation/`).
 
 ## Upstream references (not forked into this repo)
 
