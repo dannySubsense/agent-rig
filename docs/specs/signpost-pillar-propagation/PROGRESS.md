@@ -1,6 +1,6 @@
 # Progress: signpost-pillar-propagation
 
-## Status: IN_PROGRESS
+## Status: COMPLETE (forge-gate PASS attempt 2/3; post-gate blind-audit finding fixed and independently re-verified twice — see GATE-LOG.md; PR #4 open, pending Danny's review. Slices 10-12 track separately as non-blocking ongoing work — see Forge-closability note below.)
 
 ## Branch
 `feature/signpost-pillar-propagation` (created from `main` @ `74c20ed`, 2026-08-09)
