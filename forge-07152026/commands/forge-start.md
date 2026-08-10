@@ -17,7 +17,7 @@ At session start, read the following, **in order**:
 1. `CLAUDE.md` — Project context. No HALT if absent (unchanged behavior — it is not part of this gate).
 2. `docs/INVARIANTS.md` — Inviolable rules. **If missing, the Forge Advisor authors it** (procedure below) — no one else hands this to you.
 3. `docs/CADENCE.md` — Workflow phases. **If missing, the Forge Advisor authors it** (procedure below) — same authorship rule as `INVARIANTS.md`; the prior asymmetric wording (this one HALTs, that one doesn't) was cosmetic, not a real distinction, and is retired along with the HALT-only behavior for both.
-4. `docs/specs/{feature}/NORTH-STAR.md` — Sprint North Star. **HALT if missing**, before any delegation. (Forge's binding Frank gate cannot evaluate Layer 1 fidelity without the same artifact spec produced — this is the artifact `/spec-start` authors once in Step 2 of its own sequence. Unlike INVARIANTS/CADENCE, this one genuinely is handed to Forge by a prior step, so a HALT here means that prior step didn't run, not that Forge should author it itself.)
+4. `docs/specs/{feature}/NORTH-STAR.md` — Sprint North Star. **HALT if missing**, before any delegation — UNLESS this is a **lite-mode forge session** (see Lite Mode below), in which case the locked single-document tooling spec (e.g. `docs/tooling/{tool-name}.md`, `Status: LOCKED`) is the Layer 1 fidelity input instead, and no `NORTH-STAR.md`/sprint directory is expected to exist. (Forge's binding Frank gate cannot evaluate Layer 1 fidelity without *some* artifact spec produced upstream — normally that's `NORTH-STAR.md` from `/spec-start` Step 2; in lite mode it's the locked doc from `/spec-start --lite`. Either way, a HALT here means the corresponding prior step didn't run, not that Forge should author the artifact itself.)
 
 **Authoring procedure for `INVARIANTS.md`/`CADENCE.md` (confirmed incident: Cairn, `register-agent-drain`, 2026-07-17 — the old HALT-and-dead-end behavior blocked a real session with no path forward):**
 
@@ -93,6 +93,56 @@ delegation in the Forge Cycle below — skipping it is exactly the incident this
 prevent: slices committed straight to `main` in a PR-flow repo, leaving nothing to open a PR
 against at feature completion. (Confirmed incident: agent-dashboard, project-bootstrap-v2,
 2026-07-15 — see LORE doc a79081a1.)
+
+---
+
+## Lite Mode (`--lite`)
+
+### When to use it
+
+Invoked explicitly: `/forge-start --lite <name>`, paired with a spec produced by `/spec-start
+--lite <name>` and locked (`docs/tooling/{tool-name}.md`, `Status: LOCKED`). Reserved for the same
+bounded-internal-tooling scope `/spec-start --lite` reserves for itself — no independent product
+surface, no UI, no multi-stakeholder scope. As with the spec side, the orchestrator pushes back
+(HALT-and-ask) if `--lite` looks like it's being used for something that's actually a product
+feature.
+
+### What's different from the full cycle
+
+- **Load Governance Step 4** is satisfied by the locked `docs/tooling/{tool-name}.md` instead of
+  `docs/specs/{feature}/NORTH-STAR.md` — see the amended Step 4 above. `docs/INVARIANTS.md` and
+  `docs/CADENCE.md` are still loaded/authored per the normal procedure; nothing about those two
+  changes in lite mode.
+- **No `04-ROADMAP.md`.** The locked tooling spec's own Acceptance Criteria section is the slice
+  source: the Forge Advisor derives a slice breakdown directly from it (typically one slice per
+  major rule/component the spec defines, or a single slice if the tool is small enough that
+  splitting it would be artificial — orchestrator's judgment, stated explicitly before Slice 1
+  begins so Danny can object before work starts).
+- **`PROGRESS.md` still applies**, at `docs/tooling/{tool-name}-PROGRESS.md` (lite artifacts have
+  no sprint directory to hold it) — same shape and update discipline as the full cycle's
+  `docs/specs/{feature}/PROGRESS.md`.
+- **`GATE-LOG.md`** lives at `docs/tooling/{tool-name}-GATE-LOG.md` for the same reason. If
+  `/spec-start --lite` already created one during its own Lite Step 2 (Frank spec-gate), reuse that
+  file — its `## Spec Gate` section stays as-is, this session's Frank forge-gate writes to a new
+  `## Forge Gate` section in the same file, exactly like the full-cycle relationship between the
+  two gates.
+- **The Forge Cycle (per slice), Forge Advisor Final Check, and Frank Binding Forge-Gate procedure
+  below are otherwise UNCHANGED** — same agents, same automated gates, same attempt-counter/
+  snapshot/convergence-judgment machinery at the binding gate, no manual override. Lite mode has no
+  sprint directory (`docs/specs/{feature}/`), so the Frank forge-gate contract's `SPRINT_NORTH_STAR`,
+  `GATE_LOG`, and `SNAPSHOT_DIR` paths do not apply as written below. Substitute, scoped to lite mode
+  only:
+  - `SPRINT_NORTH_STAR: docs/tooling/{tool-name}.md` in place of the sprint `NORTH-STAR.md` path —
+    Layer 1 becomes "does the implementation fulfill this locked document's contract," Layer 2
+    (project North Star relevance) is unchanged, reading `docs/NORTHSTAR.md` directly per the same
+    DRAFT/PROVISIONAL rule as the full cycle.
+  - `GATE_LOG: docs/tooling/{tool-name}-GATE-LOG.md` — the same file `/spec-start --lite`'s Frank
+    spec-gate wrote to (its `## Spec Gate` section stays as-is; this gate adds a `## Forge Gate`
+    section alongside it), as described above.
+  - `SNAPSHOT_DIR: docs/tooling/.gate-snapshots/{tool-name}/forge/` in place of
+    `docs/specs/{feature}/.gate-snapshots/forge/`.
+- **End-of-Feature Tasks step 4 (PR)** follows the same Git Flow Determination as the full cycle —
+  no lite-specific exception.
 
 ---
 
@@ -276,6 +326,10 @@ PROJECT_NORTH_STAR: docs/NORTHSTAR.md  ← Frank reads this himself; the
 GATE_LOG: docs/specs/{feature}/GATE-LOG.md (prior attempts, if any — read
           directly, don't trust the orchestrator's recap of them either)
 SNAPSHOT_DIR: docs/specs/{feature}/.gate-snapshots/forge/
+← In lite mode, GATE_LOG and SNAPSHOT_DIR substitute to
+  docs/tooling/{tool-name}-GATE-LOG.md and
+  docs/tooling/.gate-snapshots/{tool-name}/forge/ respectively — see the
+  Lite Mode section above.
 
 OBJECTIVE: Layer 1 (sprint North Star fidelity) AND Layer 2 (project North
 Star relevance) must both independently PASS, evaluated on EVERY attempt
@@ -320,7 +374,8 @@ PASS  → the orchestrator performs its own full review of the artifact —
         Layer 2 pass still counts as PASS — not blocking — but the
         PROVISIONAL tag carries through to the Session End summary and PR
         description, it is never silently dropped.
-FAIL  → snapshot current artifacts to docs/specs/{feature}/.gate-snapshots/forge/attempt-{N}/,
+FAIL  → snapshot current artifacts to docs/specs/{feature}/.gate-snapshots/forge/attempt-{N}/
+        (lite mode: docs/tooling/.gate-snapshots/{tool-name}/forge/attempt-{N}/),
         append to GATE-LOG.md, route Fix/Next-step items to the named
         agent(s) (@code-executor / @test-writer / @test-runner / @qc-agent
         as applicable), re-delegate, increment attempt counter, re-invoke
