@@ -134,8 +134,11 @@ Practice convention, not an automated gate. Nothing validates these; include the
 
 ## Step 5 — Verify your own edit
 
+In Claude Code, `grep` routes to ugrep with `--ignore-files` and is **blind to gitignored files**
+when used recursively — use `command grep`, or grep the path directly as below. (`alpha`, 2026-08-12.)
+
 ```bash
-grep -c -i "signpost" CLAUDE.md          # expect >0
+command grep -c -i "signpost" CLAUDE.md  # expect >0
 grep -c "Pillar:" CLAUDE.md              # expect >0
 grep -c "Re-verify with" CLAUDE.md       # expect >0
 git ls-files --error-unmatch CLAUDE.md >/dev/null 2>&1 && echo "durable" || echo "LOCAL ONLY"
