@@ -115,6 +115,10 @@ architecture, where things live, what is claimed. Never the **route** — your m
 your completion notes. **A method handed over is a lens handed over; it caps their ceiling at
 yours.**
 
+State it as a consequence, not a courtesy: the point is not briefing hygiene, it is that **you lose
+the verifier's independent ceiling the moment you hand them your route.** They stop checking the
+thing and start checking your account of it. (`beta`, 2026-08-12.)
+
 This is not theoretical. On 2026-08-12, `alpha` specified a cutover shape wrongly — merging project
 logic into the canonical probe, the anti-pattern named at `02-ARCHITECTURE.md:274-276`. Frank caught
 it *because he was briefed objective+architecture only and went to the source*. Had he received
