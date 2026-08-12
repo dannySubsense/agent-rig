@@ -8,8 +8,9 @@ their own `CLAUDE.md` files.
 `agent-rig/MAP-NOT-ROUTE-BRIEFING.md.template` (Component 5).
 **Sprint:** `signpost-pillar-propagation`. **Architecture:** `02-ARCHITECTURE.md`.
 
-This is a **full instruction packet, not a map.** Map-not-route applies to briefing a *verifier*
-(your Frank gate, step 6) — it does not apply here. You are the doer; you get everything.
+This is a **full instruction packet, not a map.** Map-not-route governs briefing a *verifier* — it
+does not apply here. You are the doer; you get everything. (This slice has no Frank gate; see
+step 6.)
 
 ---
 
@@ -19,8 +20,8 @@ Components 4, 5, and 7 are **practice-only**: prose in your `CLAUDE.md` plus two
 Zero engineering. No scripts, no hooks, no settings changes.
 
 **This is not Slice 12.** Slice 12 (probe + hook, Components 1-3) is separate, tracked separately,
-and released to agents independently. Do not bundle them — if you install a probe while doing this,
-you have made your Frank gate unable to tell which change it is certifying.
+and released to agents independently. Do not bundle them — Slice 12 *does* carry a binding Frank
+gate, and mixing a prose edit into that change makes the gate unable to tell what it is certifying.
 
 ---
 
@@ -42,35 +43,36 @@ is invisible to every other agent and to code review, and cannot be verified by 
 on your filesystem. The change is real but **local**. That is not a reason to skip the slice; it is
 a reason to know which of the two you are doing.
 
-**Your call, recorded either way.** You own your repo's blast radius; agent-rig does not decide
-this for you. Pick one and state it in your step-7 capture:
+**The text goes in `CLAUDE.md` either way — that is not optional.** Being auto-loaded into context is the entire mechanism. Tracked-vs-untracked only decides whether it also survives a clone. You own your repo's blast radius; agent-rig does not decide
+this for you. Pick one and state it in your step-7 capture (see step 6 — this slice has no Frank gate):
 
 - **(a) Keep it untracked** — accept the edit as deliberately machine-local practice. Record
   `claudeMdTracked: false` and do not claim the change is propagated beyond this machine.
 - **(b) Track it** — `git rm --cached` the ignore, drop the `.gitignore` line, commit. Do this only
   if your `CLAUDE.md` holds no secrets or machine-specific paths. **Check before you commit** —
   several of these files carry local absolute paths, and one carries connection strings.
-- **(c) Split it** — move the Component 4/7 sections into a tracked `docs/SESSION-START.md` and have
-  `CLAUDE.md` reference it. Durable without publishing the rest of the file. Costs one extra edit.
+- **(c) Split it — WITHDRAWN 2026-08-12. Do not do this.** The earlier version of this packet
+  offered moving C4/C7 into a tracked `docs/SESSION-START.md` referenced from `CLAUDE.md`, and
+  recommended it. That was wrong and it broke the mechanism: **`CLAUDE.md` is loaded into context
+  automatically at session start; a referenced doc is not.** The convention only works because the
+  text is in front of you before your first reply. Moving it to a file an agent must choose to open
+  turns a forcing function into documentation. Durable-and-never-loaded is worse than
+  local-and-always-loaded. If you already did this, fold it back into `CLAUDE.md`.
 
 If your `CLAUDE.md` is already tracked (`ask-edgar-repo`, `sonic-store`), take (a) trivially — you
 are already durable — and record `claudeMdTracked: true`.
 
 ---
 
-## Step 1 — Blast-radius audit
+## Step 1 — Pre-existing content: already established, don't re-derive
 
-Grep your repo before editing:
+**Cancelled — do not run a blast-radius grep.** `docs/reports/roster-gitignore-audit-2026-08-12.md`
+already established this centrally, with its method stated: C4/C7 content exists nowhere on the
+roster except `market_data`, and three repos (`ask-edgar-repo`, `sonic-store`, `runtime/agent-lore`)
+have no Session Start Behaviour section at all — for those, step 2 is an insert, not an edit.
 
-```bash
-grep -rn -i "signpost\|pillar" --include="*.md" . | grep -v node_modules
-grep -rn "Session Start Behaviour" --include="*.md" .
-grep -rn "Re-verify with\|Verification:" --include="*.md" .
-ls MAP-NOT-ROUTE-BRIEFING.md ASSERT-CONVENTION.md 2>/dev/null
-```
-
-Record what exists. Three roster repos (`ask-edgar-repo`, `sonic-store`, `runtime/agent-lore`) have
-**no Session Start Behaviour section at all** — for those, step 2 is an insert, not an edit.
+Read your own row in that audit. Seven agents re-deriving a known-empty result is cost with no
+information yield.
 
 ---
 
@@ -138,10 +140,13 @@ Practice convention, not an automated gate. Nothing validates these; include the
 
 ## Step 5 — Verify your own edit
 
+In Claude Code, `grep` routes to ugrep with `--ignore-files` and is **blind to gitignored files**
+when used recursively — use `command grep`, or grep the path directly as below. (`alpha`, 2026-08-12.)
+
 ```bash
-grep -c -i "signpost" CLAUDE.md          # expect >0
-grep -c "Pillar:" CLAUDE.md              # expect >0
-grep -c "Re-verify with" CLAUDE.md       # expect >0
+command grep -c -i "signpost" CLAUDE.md  # expect >0
+command grep -c "Pillar:" CLAUDE.md      # expect >0
+command grep -c "Re-verify with" CLAUDE.md  # expect >0
 git ls-files --error-unmatch CLAUDE.md >/dev/null 2>&1 && echo "durable" || echo "LOCAL ONLY"
 ```
 
@@ -152,18 +157,31 @@ when it isn't.)
 
 ---
 
-## Step 6 — Independent, unbriefed Frank gate
+## Step 6 — No Frank gate for this slice
 
-Dispatch `subagent_type: frank` from your own session. Give him: the objective, this sprint's
-architecture, and your finalized `CLAUDE.md` section. **Withhold** your step-1 audit, your step-5
-results, and this checklist. His verdict (PASS/FAIL/HALT) is binding — no manual override.
+**Cancelled.** Do not dispatch a Frank gate for Slice 11. The step-5 self-check is the whole
+verification.
+
+Why, since the sprint mandates a gate elsewhere: **a gate cannot verify a habit.** C4/C5/C7 are
+practice conventions — they are followed, or not, in *future sessions*, not at install time. All a
+gate could check here is that text is present and whether the file is tracked, which is a two-line
+grep you run yourself in step 5. And in the 6 of 8 repos where `CLAUDE.md` is untracked, a binding
+PASS would stamp a machine-local, unversioned, unreviewable working-copy edit — a seal on state
+nobody else can inspect.
+
+The per-repo unbriefed gate was written for the **cutover** case (Slice 10/12): replacing live
+executable code with unknown call-sites. It was inherited by a slice whose risk profile it was never
+sized for. Correct where it was born, ceremony where it landed.
+
+**The Frank gate remains mandatory for Slice 12** — that installs a probe script and a SessionStart
+hook, and it has already caught two real defects.
 
 ---
 
 ## Step 7 — Record to LORE
 
 `documentType: "decision"`, `epistemicType: "FACT"`, with `Verification:` / `Re-verify with:` lines
-(this slice's own convention applies to its own completion record). Include:
+(this slice's own convention applies to its own completion record). Keep it short:
 
 ```typescript
 {
@@ -172,9 +190,6 @@ results, and this checklist. His verdict (PASS/FAIL/HALT) is binding — no manu
   componentsApplied: ["4", "5", "7"];
   claudeMdTracked: boolean;        // step 0 — false means this edit is machine-local
   trackingDecision: "keep-untracked" | "tracked-it" | "split-to-docs";
-  preExistingContent: string[];    // step 1 findings
-  frankGateVerdict: "PASS" | "FAIL" | "HALT";
-  frankGateUnbriefed: boolean;     // must be true
 }
 ```
 
@@ -182,9 +197,15 @@ results, and this checklist. His verdict (PASS/FAIL/HALT) is binding — no manu
 
 ## Reporting back
 
-Message `wright` on Switchboard, thread `signpost-pillar-propagation`, with your verdict, your
-`claudeMdTracked` value, and your tracking decision. The roster-wide durability picture depends on
-those three fields; without them "Slice 11 complete" means different things in different repos.
+One message to `wright` on Switchboard, thread `signpost-pillar-propagation`, three fields:
+your step-5 self-check result, `claudeMdTracked`, and `trackingDecision`. Without those three,
+"Slice 11 complete" means different things in different repos.
+
+**If you chose option (b), track it** — add one line: that you checked for secrets and machine-local
+absolute paths before committing. That is the one place this slice can do real damage, and a
+self-attestation is the right-sized control for it.
+
+A short reply is the expected output here. Don't write a report.
 
 If you hit something this packet does not cover, or something in it is wrong for your repo, **say so
 rather than improvising silently** — a defect found in one repo gets fixed centrally before it
