@@ -1,5 +1,24 @@
 # Slice 11 — Resident Agent Instructions (Components 4, 5, 7)
 
+> # ⛔ DROPPED 2026-08-12 (Danny). DO NOT EXECUTE THIS PACKET.
+>
+> **Do not paste this prose into your `CLAUDE.md`. Do not create a `docs/SESSION-START.md`.
+> Do nothing in this document.**
+>
+> Slice 11 shipped the Signpost:/Pillar: convention as text. That was the wrong carrier. Prose in a
+> file is a *description* of the mechanism — it has to be remembered to work. The SessionStart hook
+> (Slice 12) is the mechanism: it fires whether anyone remembers or not, and puts the signpost→pillar
+> sequence in front of the agent before its first reply. "Practice-only, zero engineering cost" was
+> the tell — zero engineering meant zero mechanism.
+>
+> **Wait for Slice 12.** If you already applied this, nothing is broken and nothing needs undoing —
+> except a `docs/SESSION-START.md`, which should be folded back into `CLAUDE.md` or deleted
+> (`CLAUDE.md` is auto-loaded into context; a referenced doc is not).
+>
+> Kept below as the record of what was asked and why it was withdrawn. `market_data` (alpha) and
+> `gap-lens-dilution-filter` (beta) both reached this conclusion independently before it was made.
+
+
 **Audience:** the resident agent of each roster repo. **You execute this in your own repo.**
 **Authority:** Danny (composer), 2026-08-12 — resident agents receive full instructions and update
 their own `CLAUDE.md` files.
