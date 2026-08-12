@@ -1,6 +1,6 @@
 # Roadmap: Signpost→Pillar Propagation
 
-**Status**: DRAFT — pending Frank spec-gate
+**Status**: PASS — Frank spec-gate PASS attempt 1, 2026-08-08 (GATE-LOG.md, Spec Gate table). Both layers firm, no PROVISIONAL.
 **Author**: wright
 **Date**: 2026-08-08
 
