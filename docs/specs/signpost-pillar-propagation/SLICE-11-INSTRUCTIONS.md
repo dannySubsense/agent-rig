@@ -1,0 +1,192 @@
+# Slice 11 — Resident Agent Instructions (Components 4, 5, 7)
+
+**Audience:** the resident agent of each roster repo. **You execute this in your own repo.**
+**Authority:** Danny (composer), 2026-08-12 — resident agents receive full instructions and update
+their own `CLAUDE.md` files.
+
+**Source of record:** `agent-rig/HOMELAB-CLAUDE.md.template` (Components 4/7 text),
+`agent-rig/MAP-NOT-ROUTE-BRIEFING.md.template` (Component 5).
+**Sprint:** `signpost-pillar-propagation`. **Architecture:** `02-ARCHITECTURE.md`.
+
+This is a **full instruction packet, not a map.** Map-not-route applies to briefing a *verifier*
+(your Frank gate, step 6) — it does not apply here. You are the doer; you get everything.
+
+---
+
+## What this slice is, and what it is not
+
+Components 4, 5, and 7 are **practice-only**: prose in your `CLAUDE.md` plus two template docs.
+Zero engineering. No scripts, no hooks, no settings changes.
+
+**This is not Slice 12.** Slice 12 (probe + hook, Components 1-3) is separate, tracked separately,
+and released to agents independently. Do not bundle them — if you install a probe while doing this,
+you have made your Frank gate unable to tell which change it is certifying.
+
+---
+
+## Step 0 — Decide and record: is your `CLAUDE.md` tracked?
+
+**Do this first. It determines whether anything else in this slice is durable.**
+
+```bash
+git ls-files --error-unmatch CLAUDE.md >/dev/null 2>&1 && echo TRACKED || echo untracked
+git check-ignore -v CLAUDE.md   # shows the ignoring rule, if any
+```
+
+Audited 2026-08-12 (`docs/reports/roster-gitignore-audit-2026-08-12.md`): **6 of 8 roster repos
+gitignore `CLAUDE.md`; 2 track it.** `agent-rig` ignores its own. Untracked is the house norm.
+
+**Why you are being asked:** Components 4/7 ship *as `CLAUDE.md` prose*. If that file is
+gitignored, your edit changes one working copy on one machine — it does not survive a fresh clone,
+is invisible to every other agent and to code review, and cannot be verified by anyone not sitting
+on your filesystem. The change is real but **local**. That is not a reason to skip the slice; it is
+a reason to know which of the two you are doing.
+
+**Your call, recorded either way.** You own your repo's blast radius; agent-rig does not decide
+this for you. Pick one and state it in your step-7 capture:
+
+- **(a) Keep it untracked** — accept the edit as deliberately machine-local practice. Record
+  `claudeMdTracked: false` and do not claim the change is propagated beyond this machine.
+- **(b) Track it** — `git rm --cached` the ignore, drop the `.gitignore` line, commit. Do this only
+  if your `CLAUDE.md` holds no secrets or machine-specific paths. **Check before you commit** —
+  several of these files carry local absolute paths, and one carries connection strings.
+- **(c) Split it** — move the Component 4/7 sections into a tracked `docs/SESSION-START.md` and have
+  `CLAUDE.md` reference it. Durable without publishing the rest of the file. Costs one extra edit.
+
+If your `CLAUDE.md` is already tracked (`ask-edgar-repo`, `sonic-store`), take (a) trivially — you
+are already durable — and record `claudeMdTracked: true`.
+
+---
+
+## Step 1 — Blast-radius audit
+
+Grep your repo before editing:
+
+```bash
+grep -rn -i "signpost\|pillar" --include="*.md" . | grep -v node_modules
+grep -rn "Session Start Behaviour" --include="*.md" .
+grep -rn "Re-verify with\|Verification:" --include="*.md" .
+ls MAP-NOT-ROUTE-BRIEFING.md ASSERT-CONVENTION.md 2>/dev/null
+```
+
+Record what exists. Three roster repos (`ask-edgar-repo`, `sonic-store`, `runtime/agent-lore`) have
+**no Session Start Behaviour section at all** — for those, step 2 is an insert, not an edit.
+
+---
+
+## Step 2 — Component 4: Session Start Behaviour + Signpost:/Pillar: labeling
+
+Copy the `## Session Start Behaviour` section verbatim from
+`agent-rig/HOMELAB-CLAUDE.md.template` (lines 91-158), substituting `<PROJECT-ID>` and
+`<AGENT-NAME>` with your own. It contains:
+
+1. The three cold-start checks (LORE `search_knowledge`, Switchboard `read_messages`, `git fetch` +
+   `git status -uno` — **fetch and report only, never auto-merge/pull/push**).
+2. The **Signpost: / Pillar:** first-turn labeling convention.
+
+**The labeling convention is the substance of this slice.** Your first-turn state summary must
+separate:
+
+- **Signpost:** what `search_knowledge` (and a SessionStart probe, if your repo runs one) returned —
+  prior-session claims and narrative, **not yet independently checked this session**.
+- **Pillar:** what you personally verified this session against a primary source — read the actual
+  file, ran the query, checked live state — stated *with its verification method*. If nothing has
+  been verified yet, say so explicitly: `Pillar: none yet — nothing independently checked this
+  session`. Do not omit the label.
+
+Never state a status claim as settled fact without it falling under one of these two labels.
+
+**Note if you also run the probe hook (Slice 12):** the hook's raw output is still a **Signpost** —
+mechanically gathered, not independently verified. It is not a Pillar, and its presence is not
+evidence that priming happened. Neither the hook nor this convention is an automatic gate; both
+depend on you actually doing them.
+
+---
+
+## Step 3 — Component 5: map-not-route briefing convention
+
+Copy `agent-rig/MAP-NOT-ROUTE-BRIEFING.md.template` into your repo and reference it from
+`CLAUDE.md`.
+
+When briefing a verifier (Frank, an auditor, a reviewer): give the **map** — objective,
+architecture, where things live, what is claimed. Never the **route** — your method, your checklist,
+your completion notes. **A method handed over is a lens handed over; it caps their ceiling at
+yours.**
+
+This is not theoretical. On 2026-08-12, `alpha` specified a cutover shape wrongly — merging project
+logic into the canonical probe, the anti-pattern named at `02-ARCHITECTURE.md:274-276`. Frank caught
+it *because he was briefed objective+architecture only and went to the source*. Had he received
+alpha's checklist, he would have inherited the blind spot and the anti-pattern would have propagated
+to seven repos with a Frank stamp on it.
+
+---
+
+## Step 4 — Component 7: capture schema
+
+Copy the `Verification:` / `Re-verify with:` convention from the template's `## Capture Behaviour`
+section. Every durable capture's free-text body must include both lines:
+
+- **`Verification:`** — what was checked and by what method ("read the live file at `path` and
+  confirmed the section exists"; "ran `git log --oneline -5`, commit present"). A capture that
+  restates a claim without saying how it was checked **does not satisfy this line**.
+- **`Re-verify with:`** — the exact command or query a future session can run to re-confirm.
+  Concrete and runnable, not a vague pointer.
+
+Practice convention, not an automated gate. Nothing validates these; include them by discipline.
+
+---
+
+## Step 5 — Verify your own edit
+
+```bash
+grep -c -i "signpost" CLAUDE.md          # expect >0
+grep -c "Pillar:" CLAUDE.md              # expect >0
+grep -c "Re-verify with" CLAUDE.md       # expect >0
+git ls-files --error-unmatch CLAUDE.md >/dev/null 2>&1 && echo "durable" || echo "LOCAL ONLY"
+```
+
+**Reading the file back is not sufficient on its own.** Content-presence returns "present" in
+exactly the least durable case — the untracked one. Pair it with the tracked-status check, and
+report both. (Same trap as the Slice 12 exec-bit defect: the naive observation says fine precisely
+when it isn't.)
+
+---
+
+## Step 6 — Independent, unbriefed Frank gate
+
+Dispatch `subagent_type: frank` from your own session. Give him: the objective, this sprint's
+architecture, and your finalized `CLAUDE.md` section. **Withhold** your step-1 audit, your step-5
+results, and this checklist. His verdict (PASS/FAIL/HALT) is binding — no manual override.
+
+---
+
+## Step 7 — Record to LORE
+
+`documentType: "decision"`, `epistemicType: "FACT"`, with `Verification:` / `Re-verify with:` lines
+(this slice's own convention applies to its own completion record). Include:
+
+```typescript
+{
+  project: string;
+  residentAgent: string;
+  componentsApplied: ["4", "5", "7"];
+  claudeMdTracked: boolean;        // step 0 — false means this edit is machine-local
+  trackingDecision: "keep-untracked" | "tracked-it" | "split-to-docs";
+  preExistingContent: string[];    // step 1 findings
+  frankGateVerdict: "PASS" | "FAIL" | "HALT";
+  frankGateUnbriefed: boolean;     // must be true
+}
+```
+
+---
+
+## Reporting back
+
+Message `wright` on Switchboard, thread `signpost-pillar-propagation`, with your verdict, your
+`claudeMdTracked` value, and your tracking decision. The roster-wide durability picture depends on
+those three fields; without them "Slice 11 complete" means different things in different repos.
+
+If you hit something this packet does not cover, or something in it is wrong for your repo, **say so
+rather than improvising silently** — a defect found in one repo gets fixed centrally before it
+reaches the other seven. That is exactly how the Slice 12 exec-bit and trace-location defects were
+caught.

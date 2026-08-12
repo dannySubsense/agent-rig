@@ -16,7 +16,7 @@
 - [x] Slice 8: Retrofit procedure doc — COMPLETE (Frank map-not-route QC gate PASS; self-fixed line-wrap spot-check bug in verify-slice8-retrofit-procedure.sh Check 7)
 - [x] Slice 9: Deploy Mechanism (copy to `~/.claude/`) — COMPLETE (Frank map-not-route QC gate PASS; all four deploy targets independently diffed byte-identical by both Wright and Frank separately)
 - [x] Slice 10: Retrofit pilot (`market_data`) — COMPLETE 2026-08-12 (alpha; Frank gate PASS round 2, round 1 FAIL). Commit `32bf3fe` in market_data; RetrofitAuditRecord LORE `e1226c84-168a-4121-a790-f09823e695c8`; trace `docs/reports/retrofit-2026-08-12/`. Canonical Components 1-3 byte-identical to `reference/`; project DB/cron logic correctly layered as a separate script per API Contracts, not merged into the canonical probe. Surfaced two procedure defects (exec bit, trace location) — both fixed in PR #5 `7a99d8f`. Caveat: market_data gitignores `CLAUDE.md`, so this pilot does NOT demonstrate Components 4/7.
-- [ ] Slice 11: Retrofit rollout, practice-only items (remaining roster) — **HELD** pending composer decision: 6 of 8 roster repos gitignore `CLAUDE.md`, so Components 4/7 (delivered as CLAUDE.md prose) would not survive a clone there. Architecture premise defect, not an execution gap — see `docs/reports/roster-gitignore-audit-2026-08-12.md`.
+- [ ] Slice 11: Retrofit rollout, practice-only items (remaining roster) — RELEASED 2026-08-12 (Danny: resident agents get full instructions and update their own `CLAUDE.md`). Packet: `SLICE-11-INSTRUCTIONS.md`. Tracked-status is an explicit per-agent step-0 decision, recorded per repo — 6 of 8 roster repos gitignore `CLAUDE.md`, so durability varies by repo and is reported, not assumed (`docs/reports/roster-gitignore-audit-2026-08-12.md`).
 - [ ] Slice 12: Retrofit rollout, probe-hook items (remaining roster) — IN PROGRESS (unblocked 2026-08-12 by PR #5 `7a99d8f`: retrofit-procedure exec-bit step 2a + in-repo trace location; released to alpha via Switchboard). Scope correction: 7 greenfield installs, not 7 cutovers — only `market_data` is retrofitted (roster audit `docs/reports/roster-gitignore-audit-2026-08-12.md`).
 
 **Forge-closability**: Slices 1-9 = sprint closable (fully within agent-rig's control). Slices 10-12
@@ -26,7 +26,7 @@ forge-gate does not wait on `market_data`'s (Slice 10) own Frank gate to reach P
 
 ## Current
 Slice: 12
-Step: Slice 12 released to alpha 2026-08-12 after PR #5 merged; awaiting per-repo execution across 7 greenfield installs. Slice 11 HELD on composer decision (CLAUDE.md tracked-status).
+Step: Slice 12 released to alpha 2026-08-12 after PR #5 merged; awaiting per-repo execution across 7 greenfield installs. Slice 11 released to roster 2026-08-12 with full instruction packet.
 Last updated: 2026-08-12
 
 Note: Slice 10 (retrofit pilot) targets `market_data`, a different repo — this forge session's per-slice implementation work in agent-rig itself may be substantially complete after this commit.
