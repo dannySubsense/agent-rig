@@ -43,7 +43,7 @@ is invisible to every other agent and to code review, and cannot be verified by 
 on your filesystem. The change is real but **local**. That is not a reason to skip the slice; it is
 a reason to know which of the two you are doing.
 
-**Your call, recorded either way.** You own your repo's blast radius; agent-rig does not decide
+**The text goes in `CLAUDE.md` either way — that is not optional.** Being auto-loaded into context is the entire mechanism. Tracked-vs-untracked only decides whether it also survives a clone. You own your repo's blast radius; agent-rig does not decide
 this for you. Pick one and state it in your step-7 capture (see step 6 — this slice has no Frank gate):
 
 - **(a) Keep it untracked** — accept the edit as deliberately machine-local practice. Record
@@ -51,8 +51,13 @@ this for you. Pick one and state it in your step-7 capture (see step 6 — this 
 - **(b) Track it** — `git rm --cached` the ignore, drop the `.gitignore` line, commit. Do this only
   if your `CLAUDE.md` holds no secrets or machine-specific paths. **Check before you commit** —
   several of these files carry local absolute paths, and one carries connection strings.
-- **(c) Split it** — move the Component 4/7 sections into a tracked `docs/SESSION-START.md` and have
-  `CLAUDE.md` reference it. Durable without publishing the rest of the file. Costs one extra edit.
+- **(c) Split it — WITHDRAWN 2026-08-12. Do not do this.** The earlier version of this packet
+  offered moving C4/C7 into a tracked `docs/SESSION-START.md` referenced from `CLAUDE.md`, and
+  recommended it. That was wrong and it broke the mechanism: **`CLAUDE.md` is loaded into context
+  automatically at session start; a referenced doc is not.** The convention only works because the
+  text is in front of you before your first reply. Moving it to a file an agent must choose to open
+  turns a forcing function into documentation. Durable-and-never-loaded is worse than
+  local-and-always-loaded. If you already did this, fold it back into `CLAUDE.md`.
 
 If your `CLAUDE.md` is already tracked (`ask-edgar-repo`, `sonic-store`), take (a) trivially — you
 are already durable — and record `claudeMdTracked: true`.
