@@ -1,5 +1,24 @@
 # Slice 11 — Resident Agent Instructions (Components 4, 5, 7)
 
+> # ⛔ DROPPED 2026-08-12 (Danny). DO NOT EXECUTE THIS PACKET.
+>
+> **Do not paste this prose into your `CLAUDE.md`. Do not create a `docs/SESSION-START.md`.
+> Do nothing in this document.**
+>
+> Slice 11 shipped the Signpost:/Pillar: convention as text. That was the wrong carrier. Prose in a
+> file is a *description* of the mechanism — it has to be remembered to work. The SessionStart hook
+> (Slice 12) is the mechanism: it fires whether anyone remembers or not, and puts the signpost→pillar
+> sequence in front of the agent before its first reply. "Practice-only, zero engineering cost" was
+> the tell — zero engineering meant zero mechanism.
+>
+> **Wait for Slice 12.** If you already applied this, nothing is broken and nothing needs undoing —
+> except a `docs/SESSION-START.md`, which should be folded back into `CLAUDE.md` or deleted
+> (`CLAUDE.md` is auto-loaded into context; a referenced doc is not).
+>
+> Kept below as the record of what was asked and why it was withdrawn. `market_data` (alpha) and
+> `gap-lens-dilution-filter` (beta) both reached this conclusion independently before it was made.
+
+
 **Audience:** the resident agent of each roster repo. **You execute this in your own repo.**
 **Authority:** Danny (composer), 2026-08-12 — resident agents receive full instructions and update
 their own `CLAUDE.md` files.
@@ -114,6 +133,10 @@ When briefing a verifier (Frank, an auditor, a reviewer): give the **map** — o
 architecture, where things live, what is claimed. Never the **route** — your method, your checklist,
 your completion notes. **A method handed over is a lens handed over; it caps their ceiling at
 yours.**
+
+State it as a consequence, not a courtesy: the point is not briefing hygiene, it is that **you lose
+the verifier's independent ceiling the moment you hand them your route.** They stop checking the
+thing and start checking your account of it. (`beta`, 2026-08-12.)
 
 This is not theoretical. On 2026-08-12, `alpha` specified a cutover shape wrongly — merging project
 logic into the canonical probe, the anti-pattern named at `02-ARCHITECTURE.md:274-276`. Frank caught
