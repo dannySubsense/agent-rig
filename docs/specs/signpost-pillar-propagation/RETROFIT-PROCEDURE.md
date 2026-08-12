@@ -68,6 +68,15 @@ Each resident agent, in their own repo, executes the following six steps in orde
    confirming priming still fires) — not response-text plausibility. This is the same bar
    department-os's own pilot was verified against.
 
+   **Verify via the production invocation path, not a convenient equivalent.** A verification that
+   does not use the same invocation shape production uses is not a verification. In the Slice 10
+   pilot the implementer self-checked with `venv/bin/python scripts/session_probe.py` while the hook
+   execs the probe directly — same script, same session, two invocation shapes, **opposite
+   verdicts**: the interpreter path succeeded while the hook path died exit 126. A unit test would
+   have mocked the hook and passed while the artifact was broken. Run what production runs.
+   (Source: `alpha`, market_data Slice 10 pilot, 2026-08-12. This is the general rule; the step-2a
+   exec-bit check is one instance of it.)
+
    **Park the trace artifact in-repo at `docs/reports/retrofit-<YYYY-MM-DD>/`** — a fixed,
    version-controlled location inside the retrofitted project, committed alongside the cutover.
    A session-scoped scratchpad path does not count: the trace must still be openable by the step-5
@@ -78,12 +87,31 @@ Each resident agent, in their own repo, executes the following six steps in orde
    trace as unverifiable at gate time; convention adopted from that pilot's own
    `docs/reports/retrofit-2026-08-12/`.)
 
+   **If in-tree bytes are a problem for your repo, park them elsewhere and commit a pointer.** A
+   raw trace runs ~100KB per capture; a repo with tighter size discipline or an established reports
+   convention may not want that in-tree. Acceptable alternative: commit the **grep-evidence table
+   plus a durable pointer** to where the raw bytes live, provided the step-5 gate can actually open
+   them. The requirement is that the gate can reach the evidence — **not** that the bytes sit in
+   this specific directory. What is never acceptable is a pointer only you can resolve.
+   (Raised by `alpha`, 2026-08-12, from the pilot's own ~100KB trace.)
+
 5. **Dispatch an independent, unbriefed Frank gate** — the resident agent supplies Frank with
    objective + architecture (this document + Components 1-4's finalized text) and explicitly
    withholds their own step-1 audit checklist and step-2/3/4 completion notes, per the map-not-route
    convention this same sprint is propagating (Component 5) — the retrofit process is its own first
    dogfooding case. Frank's verdict (PASS/FAIL/HALT) is binding per this repo's existing Decision
    Discipline; no manual override.
+
+   **Expect your own reading of the architecture to be the thing most likely wrong.** This
+   convention does not depend on you noticing your own gap — that is the entire point of it. In the
+   Slice 10 pilot the coordinating agent had read the Components table and this procedure but not
+   the API Contracts or Rejected Alternatives sections, then briefed an implementer with confident,
+   specific, wrong instructions, and got exactly what was asked for: the anti-pattern named at
+   `02-ARCHITECTURE.md:274-276`. Frank returned FAIL in round 1 **because the withheld checklist
+   forced him to the architecture itself instead of inheriting that reading.** Briefed route-style
+   ("here is what I did, confirm it"), he would have inherited the blind spot and stamped it.
+   (Source: `alpha`, market_data Slice 10 pilot, 2026-08-12 — the convention's first validated
+   catch.)
 
 6. **Record** the completed `RetrofitAuditRecord` (LORE capture, `documentType: "decision"`,
    `epistemicType: "FACT"`, with `Verification:`/`Re-verify with:` lines per Component 7 — this
