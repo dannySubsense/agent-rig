@@ -8,8 +8,9 @@ their own `CLAUDE.md` files.
 `agent-rig/MAP-NOT-ROUTE-BRIEFING.md.template` (Component 5).
 **Sprint:** `signpost-pillar-propagation`. **Architecture:** `02-ARCHITECTURE.md`.
 
-This is a **full instruction packet, not a map.** Map-not-route applies to briefing a *verifier*
-(your Frank gate, step 6) — it does not apply here. You are the doer; you get everything.
+This is a **full instruction packet, not a map.** Map-not-route governs briefing a *verifier* — it
+does not apply here. You are the doer; you get everything. (This slice has no Frank gate; see
+step 6.)
 
 ---
 
@@ -19,8 +20,8 @@ Components 4, 5, and 7 are **practice-only**: prose in your `CLAUDE.md` plus two
 Zero engineering. No scripts, no hooks, no settings changes.
 
 **This is not Slice 12.** Slice 12 (probe + hook, Components 1-3) is separate, tracked separately,
-and released to agents independently. Do not bundle them — if you install a probe while doing this,
-you have made your Frank gate unable to tell which change it is certifying.
+and released to agents independently. Do not bundle them — Slice 12 *does* carry a binding Frank
+gate, and mixing a prose edit into that change makes the gate unable to tell what it is certifying.
 
 ---
 
@@ -43,7 +44,7 @@ on your filesystem. The change is real but **local**. That is not a reason to sk
 a reason to know which of the two you are doing.
 
 **Your call, recorded either way.** You own your repo's blast radius; agent-rig does not decide
-this for you. Pick one and state it in your step-7 capture:
+this for you. Pick one and state it in your step-7 capture (see step 6 — this slice has no Frank gate):
 
 - **(a) Keep it untracked** — accept the edit as deliberately machine-local practice. Record
   `claudeMdTracked: false` and do not claim the change is propagated beyond this machine.
@@ -139,8 +140,8 @@ when used recursively — use `command grep`, or grep the path directly as below
 
 ```bash
 command grep -c -i "signpost" CLAUDE.md  # expect >0
-grep -c "Pillar:" CLAUDE.md              # expect >0
-grep -c "Re-verify with" CLAUDE.md       # expect >0
+command grep -c "Pillar:" CLAUDE.md      # expect >0
+command grep -c "Re-verify with" CLAUDE.md  # expect >0
 git ls-files --error-unmatch CLAUDE.md >/dev/null 2>&1 && echo "durable" || echo "LOCAL ONLY"
 ```
 

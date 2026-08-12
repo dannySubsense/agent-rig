@@ -30,3 +30,49 @@ Fixed in commit `883ae91`: exit status now captured and branched; a "PROBE OUTPU
 The fix was independently re-verified twice: once by Frank via live execution (forced an actual timeout and an actual nonzero exit against the real script, confirmed the marker fires in both cases) immediately after the fix landed, and again during a second, fully blind comprehensive review of PR #4 itself (2026-08-10) — which re-executed the hook live in a scratch repo and re-diffed every deploy target independently, arriving at PASS without reference to the first verification. This second blind review flagged that this specific post-gate fix had not yet been recorded in this log (a paper-trail gap, not a content defect) — this entry closes that gap.
 
 Orchestrator independent re-derivation: AGREES — this fix, and both independent verifications of it, were confirmed directly against file content and live execution output by Wright before this entry was written, not taken from either Frank dispatch's summary alone.
+
+---
+
+## Process Gate — Slice 11 proportionality (2026-08-12)
+
+**Not a spec or forge gate.** An independent Frank dispatch judging the sprint's own *rollout
+machinery*, triggered by Danny, who judged the Slice 11 rollout over-ceremonious and holding up
+other agents' work.
+
+| Dispatch | Date | Verdict | Findings Summary |
+|---|---|---|---|
+| Process gate, map-not-route briefing (objective + doc locations + what was claimed; Wright's diagnosis and proposed cuts explicitly withheld) | 2026-08-12 | **FAIL** for Slice 11; Slice 12 correctly sized | Slice 11's per-repo binding Frank gate, blast-radius grep, and structured audit record were promoted defaults: controls written for the *cutover* case (US-10 — replacing live executable code with unknown call-sites) inherited by a slice that pastes prose into a file 6 of 8 roster repos do not track. Two findings the orchestrator had not reached independently: (a) **a gate cannot verify a habit** — C4/C5/C7 are followed or not in future sessions, not at install time, so a gate can only confirm text presence and tracked status, which the resident agent self-checks; in the 6 untracked repos a binding PASS would stamp a machine-local, unversioned, unreviewable edit. (b) **Seven "independent unbriefed" gates reading the same already-gated template is one review run seven times** — their unanimity would prove nothing the sprint-level gate did not, an anti-circularity control specified on the wrong axis. Also found step 1's grep redundant with the roster audit. |
+
+**Record provenance — read this before citing the entry.** This entry is **reconstructed by Wright
+(orchestrator) from the dispatch result**, written after PR #7 was opened. There is no LORE capture
+of the dispatch and no `.gate-snapshots/` directory for it — the dispatch was made in-session and
+its transcript is not a durable artifact. The verdict summarized above is therefore **not
+independently re-openable** from this repo; a future reader who needs to audit it must re-run an
+equivalent dispatch rather than read the original.
+
+This gap was itself caught by a second independent Frank gate (PR #7 review, 2026-08-12), which
+correctly refused to accept a binding requirements amendment justified by a verdict with no record —
+"a signpost cited as a pillar, in the very doc set that propagates that distinction." Recorded here
+rather than silently fixed, because the failure is more useful than the correction: the orchestrator
+relaxed a binding control and cited unreadable evidence for it, in a sprint whose entire subject is
+not doing that.
+
+**What the verdict authorized** (implemented in PR #7): cut `SLICE-11-INSTRUCTIONS.md` step 1
+(blast-radius grep) and step 6 (per-repo Frank gate); drop `frankGateVerdict`,
+`frankGateUnbriefed`, `preExistingContent` from the completion record; keep step 0 (tracking
+decision), the content steps, the step-5 self-check, a three-field report, and a slimmed LORE
+capture; add a secrets/machine-local-path self-attestation for agents who choose to track their
+`CLAUDE.md`. **The Slice 12 gate is untouched** — executable artifacts, real blast radius, two live
+defects already caught.
+
+**Requirements amendment authorization:** Danny, in-session, 2026-08-12 — US-10 AC4 scoped to
+tier 2/3 executable work, tier-1 practice-only explicitly exempt. Asserted in-text here; his own
+merge of PR #7 is the traceable sign-off, matching how PRs #5 and #6 were authorized.
+
+Orchestrator independent re-derivation: **AGREES on the substance, and separately re-verified the
+factual predicates rather than accepting them** — the 6/8 untracked figure re-run across all 8 repos
+with `command grep` (shell `grep` is blind to gitignored files when recursive); the "no Session Start
+Behaviour section" finding for `ask-edgar-repo`, `sonic-store`, `runtime/agent-lore` re-confirmed by
+direct-path read; `market_data`'s Slice 11 completion (`9159ffd`, `split-to-docs`) confirmed in that
+repo. The reconstruction gap above is recorded as a real defect in this log's own evidence chain,
+not as a formality.
