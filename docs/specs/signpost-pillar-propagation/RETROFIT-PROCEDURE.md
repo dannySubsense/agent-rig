@@ -40,6 +40,26 @@ Each resident agent, in their own repo, executes the following six steps in orde
    `/new-project`-scaffolded projects receive it (author≠install-location, same pattern this repo's
    own CLAUDE.md already states for Frank/cross-cutting personas).
 
+   **2a. Verify the executable bit, then prove the probe actually ran.** The wrapper execs the probe
+   directly (`timeout 5 "$REPO_DIR/scripts/session_probe.py"`). Installed without `+x` it dies with
+   `Permission denied`, exit 126. The wrapper then degrades exactly as designed — exit 0, honest
+   `PROBE OUTPUT INCOMPLETE` notice, no fabricated data — so session start is never blocked and
+   **nothing looks wrong, while every session receives zero ground truth.** `/new-project`
+   scaffolding sets the bit; retrofit into an existing repo is precisely the path that misses it.
+
+   ```bash
+   chmod +x "$REPO_DIR/scripts/session_probe.py"
+   test -x "$REPO_DIR/scripts/session_probe.py" || { echo "FAIL: probe not executable"; exit 1; }
+   ./.claude/hooks/session-start-probe.sh | tee /tmp/retrofit-probe-check.txt
+   grep -q "PROBE OUTPUT INCOMPLETE" /tmp/retrofit-probe-check.txt \
+     && { echo "FAIL: probe degraded — ground truth is empty"; exit 1; } \
+     || echo "OK: probe returned complete output"
+   ```
+
+   Absence of the `INCOMPLETE` string is the pass condition. Do not substitute reading the wrapper
+   source or observing that session start "worked" — both are true in the failure case.
+   (Source: `alpha`, market_data Slice 10 pilot, 2026-08-12; Frank gate rider, same pilot.)
+
 3. **Remove** the prior project-local variant entirely — script file(s), hook wiring, and every doc
    reference found in step 1. Full replacement, not coexistence (US-10 AC3).
 
@@ -47,6 +67,16 @@ Each resident agent, in their own repo, executes the following six steps in orde
    actual `session_probe.py`/hook invocation and, separately, for the `search_knowledge` call
    confirming priming still fires) — not response-text plausibility. This is the same bar
    department-os's own pilot was verified against.
+
+   **Park the trace artifact in-repo at `docs/reports/retrofit-<YYYY-MM-DD>/`** — a fixed,
+   version-controlled location inside the retrofitted project, committed alongside the cutover.
+   A session-scoped scratchpad path does not count: the trace must still be openable by the step-5
+   Frank gate, which runs as a separate dispatch with no access to your session's scratch space.
+   **A trace the gate cannot open is prose, not evidence** — the `traceVerification` field below
+   demands a pointer to bytes. Include both the raw stream-json capture and the grep output.
+   (Source: `alpha`, market_data Slice 10 pilot, 2026-08-12 — Frank rejected a scratchpad-resident
+   trace as unverifiable at gate time; convention adopted from that pilot's own
+   `docs/reports/retrofit-2026-08-12/`.)
 
 5. **Dispatch an independent, unbriefed Frank gate** — the resident agent supplies Frank with
    objective + architecture (this document + Components 1-4's finalized text) and explicitly
@@ -89,9 +119,12 @@ interface RetrofitAuditRecord {
   };
   cutoverComplete: boolean;
   priorVariantRemoved: boolean;     // must be true, not "coexisting" — US-10
+  probeExecutable: boolean;         // step 2a: `test -x` passed AND wrapper output carried no
+                                    // "PROBE OUTPUT INCOMPLETE" — must be true
   frankGateVerdict: "PASS" | "FAIL" | "HALT";
   frankGateUnbriefed: boolean;      // must be true — map-not-route, US-10
-  traceVerification: string;        // pointer to the stream-json trace / grep evidence, not prose
+  traceVerification: string;        // in-repo path, docs/reports/retrofit-<YYYY-MM-DD>/ — must be
+                                    // committed and openable by the step-5 gate, not a scratchpad
 }
 ```
 
