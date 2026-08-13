@@ -43,15 +43,24 @@ WRITER_SESSION_ID_RE = re.compile(
 
 def extract_writer_session_id(content):
     """Parse the writer-session-id out of a capture's content, per §3's regex. Returns the
-    UUID string if present and well-formed, else None (absent field and malformed field are
-    treated identically — both mean "writer unknown", per the architecture doc's explicit
-    call not to distinguish them)."""
+    UUID string, lowercased, if present and well-formed, else None (absent field and
+    malformed field are treated identically — both mean "writer unknown", per the
+    architecture doc's explicit call not to distinguish them).
+
+    Lowercased here, at the single point of extraction, rather than at the point main()
+    builds the exclusion filename: this is the one choke point every current and future
+    caller passes through, so normalization can't be skipped by a caller that forgets to
+    lowercase downstream. The regex itself stays case-insensitive (re.IGNORECASE) so a
+    hand-edited or corrupted uppercase value still parses as "writer known" instead of
+    silently falling through to UNKNOWN — it's normalized, not rejected. Real Claude Code
+    session transcript filenames on disk are lowercase UUIDs, so the exclusion filename
+    built from this value (f"{writer_id}.jsonl") must be lowercase to ever match reality."""
     if not content:
         return None
     match = WRITER_SESSION_ID_RE.search(content)
     if not match:
         return None
-    return match.group(1)
+    return match.group(1).lower()
 
 
 def load_database_url():
