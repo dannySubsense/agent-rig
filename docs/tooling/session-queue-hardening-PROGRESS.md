@@ -1,6 +1,6 @@
 # Progress: session-queue-hardening (lite)
 
-## Status: IN_PROGRESS — forge-gate attempt 2
+## Status: COMPLETE — Frank binding forge-gate PASS (attempt 2 of 3, both layers, no PROVISIONAL); orchestrator independent re-derivation AGREES. See GATE-LOG.md. NOT yet observed firing in a real session — that done-condition is still open.
 
 ## Spec
 `docs/tooling/session-queue-hardening.md` — Status LOCKED (Frank binding spec-gate PASS
@@ -18,7 +18,7 @@ and reader.
 
 ## Current
 Slice: 2 of 2 complete
-Step: Frank binding forge-gate, attempt 2 (attempt 1 FAIL — see GATE-LOG)
+Step: forge-gate PASSED; awaiting live-session verification and Danny's push/PR decision
 Last updated: 2026-08-13
 
 ## Fix Attempts
