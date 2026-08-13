@@ -18,7 +18,18 @@ and reader.
 
 ## Current
 Slice: 2 of 2 complete
-Step: forge-gate PASSED; awaiting live-session verification and Danny's push/PR decision
+Step: SESSION CLOSED 2026-08-13. Branch pushed (`@{u}` == HEAD), NOT merged to main — Danny
+declined a PR as ceremony for work already reviewed three times. LORE closure capture
+`2e117448-c898-472e-a89c-b7621640edca`, which supersedes the stale 2026-07-21 queue row
+`85ce19a5`.
+
+**First capture ever written carrying `writer-session-id`** — verified end-to-end after writing:
+the probe's parser extracts `9c760bae-…` from the live row. Until now no such row existed, so every
+run necessarily landed in UNKNOWN. Next session is the first that can exercise the writer-known
+branch.
+
+REMAINS UNMET: the hook has never been observed firing in a real session. State is CODE-MERGED,
+deliberately not LIVE.
 Last updated: 2026-08-13
 
 ## Fix Attempts
