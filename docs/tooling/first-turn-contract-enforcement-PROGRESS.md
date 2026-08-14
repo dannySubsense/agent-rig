@@ -1,6 +1,6 @@
 # Progress: first-turn-contract-enforcement
 
-## Status: COMPLETE
+## Status: COMPLETE — Frank binding forge-gate PASS, both layers, no PROVISIONAL
 
 Spec: `docs/tooling/first-turn-contract-enforcement.md` (LOCKED, Danny 2026-08-14)
 Gate log: `docs/tooling/first-turn-contract-enforcement-GATE-LOG.md` (Spec Gate PASS attempt 2/3)
@@ -24,11 +24,14 @@ Mode: forge-lite. No `04-ROADMAP.md` — slices derived from the spec's §11 acc
       C1/C2/C3 executed against a real transcript, not the fixture, and the reading agent's actual
       Signpost-then-Pillar turn (this session's prior turn) passed with zero violations.
       Covers AC 4 (live half), 10.
+- [x] **Frank binding forge-gate** — PASS, both layers, no PROVISIONAL. See
+      `first-turn-contract-enforcement-GATE-LOG.md` `## Forge Gate` for the verbatim verdict.
 
 ## Current
 
-Slice: 3 — COMPLETE. All slices done; sprint ready for final PR review / merge.
-Step: Live first-turn demonstration confirmed via track-record entry (see Slice 3 above).
+Slice: 3 — COMPLETE. Frank binding forge-gate PASS (both layers, no PROVISIONAL). All done-conditions
+met; sprint ready for PR review / merge.
+Step: Forge-gate verdict transcribed to GATE-LOG.md.
 Last updated: 2026-08-14
 
 ## Fix Attempts
