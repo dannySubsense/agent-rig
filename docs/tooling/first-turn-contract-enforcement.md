@@ -111,7 +111,7 @@ agent redoes the turn.
 |---|---|---|
 | `first_turn_contract_probe.py` | Reads Stop-hook stdin JSON + the session transcript, applies C1/C2/C3, emits the block/allow decision. Pure function of stdin (+ transcript, for C3 only); no LORE access, no network. | `scripts/first_turn_contract_probe.py`, mirrored source-of-record copy at `reference/first_turn_contract_probe.py` (same duplication discipline as `session_queue_probe.py`) |
 | `.claude/hooks/first-turn-contract.sh` | Wrapper: captures stdin, replays to the probe under a timeout, validates output shape, fails open on any probe error. Structurally identical to `.claude/hooks/session-queue.sh`. | `.claude/hooks/first-turn-contract.sh` |
-| Track-record log | Append-only record of every invocation's verdict, written by the hook itself. The evidence base §7's propagation standard is measured against. | `docs/tooling/first-turn-contract-track-record.jsonl` (repo-local, git-tracked) |
+| Track-record log | Append-only record of every invocation's verdict, written by the hook itself. The evidence base §7's propagation standard is measured against. | `docs/tooling/first-turn-contract-track-record.jsonl` (repo-local, `.gitignore`d working-copy file — see §6's revision) |
 | `.claude/settings.json` `Stop` hook entry | Wires the wrapper into the `Stop` event, alongside the existing global `switchboard/relay-hook.js` entry (repo-local settings, additive — does not replace the global entry). | `.claude/settings.json` |
 
 Three components, one wiring change. No new library dependency (§9).
@@ -396,8 +396,49 @@ cannot, verify that the tool calls that did run are the ones the Pillar claims d
 
 ## 6. Track-record log
 
-`docs/tooling/first-turn-contract-track-record.jsonl`, one line per hook invocation (both the
-wrapper's own failures and the probe's real decisions), append-only, git-tracked.
+**Revised — post-PASS orchestrator review found a defect the spec gate did not: the design below
+git-tracks a file every `Stop` event appends to.** Verified against this repo's own machinery, not
+reasoned about: `commands/lore-close.md:78` derives the session-close capture's `dirty:` field from
+`git status --porcelain` being non-empty, and that field is read back by the `SessionStart` queue
+hook as part of the `git-state:` block (`session-queue-hardening.md` §2a/§3) — the exact
+state-carrying mechanism the sibling sprint in this family exists to provide.
+`session-queue-hardening`'s own close capture records `dirty: false` as meaningful signal
+(`session-queue-hardening-PROGRESS.md`: "Consistent with a clean handoff"). A git-tracked file that
+every `Stop` event appends to makes `dirty: true` permanent and unconditional in every future
+capture from the moment this hook goes live — this hook would silently corrupt the one mechanism
+the sibling sprint depends on, in a repo where both sprints run.
+
+**Decision: the track-record log is written to the working tree but is `.gitignore`d, not
+committed.** Considered against the other three candidates named in review, and against §7's
+evidence bar specifically:
+
+- **Gitignored, working-copy only (chosen).** Every invocation still gets a line — §7's
+  denominator (total qualifying invocations) stays fully computable, because writing is unaffected;
+  only *committing* stops. `git status --porcelain` never sees the file (ignored paths are excluded
+  from porcelain output by git itself), so `dirty:` semantics are untouched and the tree is never
+  made permanently dirty by this hook's own operation. **Cost, stated plainly**: the log is not
+  durable across a fresh clone, a wiped working tree, or a different machine — it is exactly as
+  durable as any other local, uncommitted file, i.e. not durable at all against those events.
+  Acceptable specifically because Intake §7 already scopes this hook to **one repo, on this
+  machine, for the duration of the evidence-gathering period** (§7 below) — the propagation
+  decision this log exists to support is itself local-machine-scoped by design, so a log with the
+  same scope loses nothing §7 needs. If the working tree is ever wiped mid-evidence-gathering, §7's
+  count resets to zero and gathering resumes from scratch — a known, named cost, not a silent gap.
+- **Write outside the repo entirely (e.g. scratch/session tree).** Rejected: no git-tracking
+  problem to begin with, but also no relationship to the artifact it audits — a track record for a
+  repo-scoped hook living outside the repo it audits is a worse fit for §7's "this repo, this
+  hook" framing than a gitignored in-repo file, for the same durability cost as the chosen option.
+- **Tracked, write only non-allow entries.** Rejected outright: breaks §7's denominator. A
+  false-positive *rate* and "how many qualifying invocations occurred" both require the allow
+  count; a log of violations only cannot compute either.
+- **Tracked, allows to a separate ignored file, blocks/errors committed.** Rejected: still makes
+  every session with at least one real block or probe error dirty the tree at that Stop event
+  (rarer than every turn, but not eliminated), and splits one audit trail into two files with no
+  single source for §7's total-invocations count without reading both and reconciling — added
+  complexity for a durability guarantee (git history for the rare block) that this design doesn't
+  need, since the whole file is git-add-able by hand at any point a human wants to snapshot it
+  (e.g. before wiping a working tree), which is a strictly simpler way to get durability on demand
+  without paying the every-turn cost.
 
 ```typescript
 interface TrackRecordEntry {
@@ -414,11 +455,15 @@ interface TrackRecordEntry {
 ```
 
 Written by the probe itself on every real invocation (including plain allows, per §3.2's explicit-
-allow decision); the wrapper appends a `probe_error` line if it cannot even invoke the probe (e.g.
-timeout killed it before it could write its own entry). This is a deliberate divergence from
-`session_queue_probe.py`'s read-only discipline: that probe writes nothing because its job is
-injection; this probe's job is judgment, and a judgment with no record of its own track is
-unauditable and cannot support §7's propagation decision.
+allow decision — the *write* to this local file is unconditional and independent of what, if
+anything, is emitted to Claude Code on stdout); the wrapper appends a `probe_error` line if it
+cannot even invoke the probe. This remains a deliberate divergence from `session_queue_probe.py`'s
+read-only discipline: that probe writes nothing because its job is injection; this probe's job is
+judgment, and a judgment with no record of its own track is unauditable and cannot support §7's
+propagation decision — gitignoring the file changes *durability*, not *existence*, of that record.
+
+**File**: `docs/tooling/first-turn-contract-track-record.jsonl`, added to `.gitignore` in the same
+commit that adds the hook wiring (§11's acceptance criteria updated accordingly, §11 item 7/8).
 
 ---
 
@@ -428,7 +473,9 @@ This binds *this* sprint's exit condition, not a future one. It must exist befor
 live in agent-rig; it is written here, not left to a future reader.
 
 **What is recorded**: every invocation, in `docs/tooling/first-turn-contract-track-record.jsonl`
-(§6), for as long as the hook runs in agent-rig.
+(§6, gitignored working-copy file — §6's revision), for as long as the hook runs in agent-rig. The
+propagation review reads this file directly from the working copy on this machine at review time;
+it is not read from git history, per §6's durability tradeoff.
 
 **What would constitute evidence for propagating beyond agent-rig** (per Intake §7, this sprint
 does not decide to propagate — it defines what the evidence bar is):
@@ -549,9 +596,12 @@ coordinator's requirement that this be tested against the actual failure that ca
 7. Artifact exists at `scripts/first_turn_contract_probe.py` and
    `reference/first_turn_contract_probe.py` (identical, drift-guarded) plus
    `.claude/hooks/first-turn-contract.sh`; `.claude/settings.json` wires `Stop` → the wrapper in
-   agent-rig only.
-8. `docs/tooling/first-turn-contract-track-record.jsonl` exists and gains one entry per real
-   invocation once the hook is live, matching the schema in §6.
+   agent-rig only; `.gitignore` gains an entry for
+   `docs/tooling/first-turn-contract-track-record.jsonl` in the same commit.
+8. `docs/tooling/first-turn-contract-track-record.jsonl` exists in the working copy and gains
+   one entry per real invocation once the hook is live, matching the schema in §6; `git status
+   --porcelain` shows the file as ignored, not as a dirty untracked/modified entry, at every point
+   in the demonstration.
 9. This document's §7 evidence standard exists (it does) before the hook is flipped live — i.e.
    before `.claude/settings.json` is edited to wire it in.
 10. Every criterion above is demonstrated by an executed check attached to the claim (test run
@@ -576,3 +626,18 @@ coordinator's requirement that this be tested against the actual failure that ca
   against a transcript containing a real Pillar-with-tool-calls turn during forge, since the corpus
   used here documents violations and prose-mentions but was not exhaustively checked for every C3
   edge case (e.g. a tool call that started before the turn but whose `tool_result` lands mid-turn).
+- **Cross-sprint machinery interaction — worth naming explicitly, not just fixing once.** This
+  sprint's own artifact (the track-record log, §6) was designed, described, and passed a binding
+  Frank spec-gate without anyone checking it against `session-queue-hardening`'s `git-state`/
+  `dirty:` mechanism — a different sprint, in this same repo, in this same artifact family, whose
+  entire subject is git/session state fidelity. The defect was real (an every-`Stop`-event
+  git-tracked write permanently corrupting `dirty:` semantics the sibling sprint depends on) and
+  was caught by the orchestrator's post-PASS independent review, not by the spec gate and not by
+  ordinary review — because neither is scoped to check "does this artifact's own file-write
+  behavior corrupt a *different* artifact's read assumptions about repo state." **This is a
+  category of check, not a one-off bug**: any future artifact in this family (Slice 12's
+  propagation, or any new hook installed in a repo that also runs `session-queue-hardening`'s
+  close/inject machinery) needs an explicit pass asking "does this write anything that
+  `git status --porcelain`, `lore-close`'s `dirty:` derivation, or the `git-state:` block would
+  observe, and does that observation still mean what those mechanisms assume it means?" — not
+  assumed clean because the artifact's own spec gate passed on its own terms.
