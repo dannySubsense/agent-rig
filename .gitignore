@@ -7,3 +7,8 @@ node_modules/
 dist/
 __pycache__/
 *.pyc
+
+# first-turn-contract-enforcement track record — repo-local, working-copy only (spec §6):
+# gitignored so every Stop-hook append does not permanently dirty the tree (would corrupt
+# session-queue-hardening's git-state dirty: derivation).
+docs/tooling/first-turn-contract-track-record.jsonl

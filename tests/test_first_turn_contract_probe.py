@@ -34,6 +34,7 @@ except ImportError:
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROBE_PATH = os.path.join(REPO_ROOT, "scripts", "first_turn_contract_probe.py")
+REFERENCE_PROBE_PATH = os.path.join(REPO_ROOT, "reference", "first_turn_contract_probe.py")
 CORPUS_PATH = os.path.join(REPO_ROOT, "tests", "fixtures", "first_turn_contract_corpus.json")
 REAL_TRANSCRIPT_PATH = os.path.join(
     REPO_ROOT, "tests", "fixtures", "real_transcript_turn1.jsonl"
@@ -536,6 +537,27 @@ def test_track_record_entry_shape_on_probe_error_path(monkeypatch, tmp_path):
     assert entry["reason"] is None
     assert isinstance(entry["probe_error"], str) and "RuntimeError" in entry["probe_error"]
     assert "injected fault" in entry["probe_error"]
+
+
+# ---------------------------------------------------------------------------
+# Drift guard — reference/ vs scripts/ (spec §10, Slice 2)
+# ---------------------------------------------------------------------------
+
+def test_reference_copy_matches_executed_copy():
+    """reference/ is the propagation template; scripts/ is what the Stop hook actually runs
+    (this suite loads scripts/, per the header note above). A fix landing in one and not the
+    other ships a probe nothing tested — the exact gap
+    test_session_queue_probe.py::test_reference_copy_matches_executed_copy exists to catch for
+    the sibling probe; this is the same guard for first_turn_contract_probe.py."""
+    with open(PROBE_PATH, "rb") as f:
+        executed = f.read()
+    with open(REFERENCE_PROBE_PATH, "rb") as f:
+        reference = f.read()
+    assert executed == reference, (
+        "reference/first_turn_contract_probe.py has drifted from "
+        "scripts/first_turn_contract_probe.py — the tests exercise scripts/, so the reference "
+        "copy would propagate untested code."
+    )
 
 
 # ---------------------------------------------------------------------------

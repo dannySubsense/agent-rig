@@ -12,7 +12,7 @@ Mode: forge-lite. No `04-ROADMAP.md` — slices derived from the spec's §11 acc
       (queue-injection detection via the `HEADER` marker, first-turn determination,
       `stop_hook_active` unconditional allow); C1, C2, C3 predicates; track-record entry write (§6).
       Covers AC 1, 2, 3, 6, 8 (schema half).
-- [ ] **Slice 2: Wrapper, wiring, drift guard** — `.claude/hooks/first-turn-contract.sh`;
+- [x] **Slice 2: Wrapper, wiring, drift guard** — COMPLETE 2026-08-14 (QC PASS on re-review). — `.claude/hooks/first-turn-contract.sh`;
       fail-open on every probe failure mode; output-shape validation; `reference/` mirror + drift
       test; `.gitignore` entry; `.claude/settings.json` `Stop` wiring **last**, per AC 9 (the §7
       evidence standard must exist before the hook is flipped live — it does).
@@ -25,8 +25,8 @@ Mode: forge-lite. No `04-ROADMAP.md` — slices derived from the spec's §11 acc
 
 ## Current
 
-Slice: 2 — Wrapper, wiring, drift guard
-Step: Slice 1 stamped APPROVED; dispatching Slice 2
+Slice: 3 — Live demonstration (blocked on a NEW session; not closeable from inside this one)
+Step: Slice 2 stamped APPROVED and committed; hook is WIRED and has fired live once
 Last updated: 2026-08-14
 
 ## Fix Attempts
@@ -87,3 +87,71 @@ it, and Slice 1's spec does not ask it to.
 
 **Carried to Slice 2:** `docs/tooling/first-turn-contract-track-record.jsonl` shows as untracked
 until the `.gitignore` entry lands (§11 item 7). It must not ship without it.
+
+## Slice 2 — record
+
+**QC FAIL then PASS.** The wrapper failed open correctly on every mode tried, but wrote **no
+track-record entry** on the three paths where the probe cannot write its own — timeout kill,
+non-executable, truncated stdout. Measured: real probe +1, hung probe 0, non-executable 0.
+
+Why that blocked: §3.4 step 4 and §6 both require it. Without it, a permission change, bad merge or
+hang makes the hook permanently inert while the log accumulates clean allows and zero errors — and
+§7's bar then reads a growing denominator with zero blocks and zero errors and passes its "zero
+false positives" clause **on a dead hook.** Slice 1's silently-inert defect one layer up, with the
+audit trail that would have exposed it being the missing piece.
+
+Fixed via `write_probe_error()` on timeout (124/137), non-zero exit, and exit-0-malformed-shape.
+Verified independently: all four paths now +1, no duplicates, and every emitted line's key set is
+exactly equal to §6's `TrackRecordEntry`.
+
+**The check that mattered most was the positive control**, not the fault injection: a wrapper that
+swallowed everything would have passed all five fail-open tests while shipping a hook that never
+blocks. A real C1 violation still emits `{"decision":"block",...}` through the wrapper unchanged.
+Fail-open, not fail-always.
+
+**5s timeout re-justified rather than inherited.** The value survives — QC measured this probe at
+167ms on a 5.4 MB / 3203-record transcript, 85ms on 1.9 MB, ~30x headroom — but the borrowed
+rationale did not transfer. `session-queue.sh` sets 5s so its *inner* 3s connect timeout fires
+first and yields a real error instead of a silent kill; this probe has no inner timeout, so a kill
+here is always the silent case. Comment now cites the measurement on this probe's own terms.
+Promoted default caught before it set.
+
+### Residuals carried, named not fixed
+
+1. **`probe_error` lines write `queue_injected: false` / `first_turn: false` as facts when they are
+   unknowns.** The direction is safe — those entries are excluded from §7's 10-entry denominator,
+   so a hook dead for a whole session accrues zero propagation credit and cannot manufacture
+   evidence. But **§7's reviewer must discriminate on `decision`, and must never read
+   `queue_injected`/`first_turn` on an error line.** An error rate computed as
+   `probe_errors / qualifying invocations` divides by a denominator that structurally excludes
+   every error.
+2. **The malformed-shape branch's assumption is unenforced.** A probe that writes its own line,
+   then emits malformed stdout, then exits 0 produces two entries. Unreachable today — the shipped
+   probe has exactly one stdout write, valid by construction — and the comment now states the
+   assumption, why it holds, and the bounded consequence rather than asserting a guarantee the code
+   does not have.
+3. **An unreadable `transcript_path` is indistinguishable from "not queue-injected."** Both log
+   `queue_injected: false` and allow. §5.1 specifies failing toward not-injected, so changing this
+   is a spec amendment, not an implementation fix. QC concurred that carrying it is correct.
+
+## Hook is LIVE — first harness-fired invocation observed
+
+`.claude/settings.json` gained its `Stop` entry (wired by the orchestrator, not delegated; the
+global `switchboard/relay-hook.js` entry is untouched — repo-local settings are additive). AC 9's
+precondition held: §7's evidence standard existed in the locked spec before the flip.
+
+Confirmed by attribution, not assumption — the log's first three entries carry `sid=qc2` (QC's
+fault injections); the fourth carries the real session id:
+
+```
+2026-08-14T13:39:02  sid=cb179922-d422-4af4-91f9-329633de92b5  allow  qi=True  ft=False
+```
+
+Written by the harness on a real `Stop` event. It proves the wiring, marker detection against
+harness-written data (the exact defect QC caught in Slice 1), correct turn-scoping, and the log
+write — and `git status --porcelain` still shows no track-record entry, so `lore-close`'s `dirty:`
+derivation survives.
+
+**What it does NOT prove, stated plainly:** `first_turn: false` means C1/C2/C3 never ran. AC 4's
+live half requires a *new* session where the queue is injected and the first turn is actually
+checked. **Slice 3 is not closeable from inside this session.**
