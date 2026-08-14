@@ -140,3 +140,70 @@ verification was thorough, or the capture was written.
 
 This is a DRAFT DDR recording a diagnosis. It proposes no implementation, and nothing in it is
 approved. Next step per the project workflow is Danny's review, then Intake if it proceeds.
+
+---
+
+## 9. Producer position (wright, 2026-08-14) — recorded because a single-source DDR is the thing this family of DDRs argues against
+
+§§1–5 are Danny's diagnosis, transcribed. A document that contained only that would be a
+single-source artifact reviewed by nobody — which every other DDR in this family (002, 004,
+cadence-hardening, prevention-layer) exists to warn against. This section is the second source. It
+agrees with most of it and dissents from one part.
+
+**§2 (work orders) — strongest item, endorsed without qualification, and the cheapest.** Nothing to
+build; it changes on the next message. The 2026-08-14 session is the control group: it opened with
+"Howdy! Cold session start", contained no objective at all, and produced fourteen commits of
+scaffolding around a defect nobody had asked for. Defensible work — but the agent chose it.
+
+**§3 (close every fork) — endorsed; it is a corollary of §2 and binds the agent harder than the
+human.** The agent-side form is concrete and unilaterally adoptable: before ending a turn with a
+question, state the answer you would give if forced; if an answer exists, that *is* the decision —
+make it and delete the question. This is the existing "no-hedge GATE" backlog item (§6), and it is
+the rule the producer broke most often in the session that produced this DDR.
+
+**§4 (no mid-task conduct litigation) — endorsed, with one carve-out.** The retrospective pattern
+cost that session hours. But Frank's gates are also mid-task conduct litigation, and they are why
+two live-breaking defects were caught that day. The difference is **shape, not subject**: a gate
+emits a verdict and a routed fix; a conversational correction emits three turns of prose and no
+artifact. Keep the gates; cap the conversational form at Danny's one line.
+
+**§1 — half endorsed, half dissented.**
+
+`WORKPLAN.md` and the move of mechanizable conduct into hooks: endorsed. **The instruction to
+*delete* the prose versions is dissented from as stated**, on two grounds.
+
+1. **The causal claim is confounded.** The conduct corpus did not crowd out the work on 2026-08-14
+   — there was no work in the slot to crowd out. That predicts a different primary fix: the missing
+   objective is the disease and the conduct volume is a symptom filling a vacuum. `WORKPLAN.md`
+   alone may resolve most of the observed effect, which would leave the deletion unjustified by its
+   own evidence.
+2. **The corpus caught both real defects that day.** "Verify, don't relay" is why the producer
+   grepped the installed binary instead of accepting a docs-consulting agent's answer — which
+   caught a false claim that `stop_hook_active` does not exist. And the founding postmortem's
+   promoted-default framing is the exact vocabulary Frank used to name F1, the producer's own error
+   (`first-turn-contract-enforcement-GATE-LOG.md`, attempt 1). The corpus is not pure overhead; it
+   is load-bearing.
+
+Its actual defect is that it is **undifferentiated** — ~20 files at equal weight, no priority, no
+trigger conditions. That is a different problem from being too large, and it has a different fix.
+
+**Recommendation:** the five hard rules should be *precisely the ones that cannot be mechanized*.
+Everything mechanizable becomes a failing check and is deleted **on replacement, per rule — never
+as a batch.** Deleting before §7 Q3's partition is drawn permanently loses the unmechanizable half,
+which is where both of that day's saves came from, and deletion is the one move in this DDR that
+cannot be undone once it is wrong. The producer further recommends that the partition be drawn by
+someone other than the producer, whose behaviour the rules constrain.
+
+**Sequencing recommendation:** §2 and §3 start immediately at zero cost. `WORKPLAN.md` next, as a
+small build. Deletion last, gated on the partition.
+
+**Correction to §5's named test.** The `symbol_history` acquisition step belongs to `alpha`
+(`market_data`), not to this repo — agent-rig cannot run it without violating the repo-lane rule,
+and the point was the pattern, not that task (Danny, confirming). An in-lane equivalent with the
+same properties — no decisions needed beyond "go", checkable output — is already queued:
+
+> "Build the first-turn-contract probe. Done means: `scripts/first_turn_contract_probe.py` exists,
+> tests pass against the real corpus fixtures, the track-record log writes an entry. Decide the
+> details yourself. Report when done or blocked."
+
+The judgment criterion is unchanged and is the whole point: **does the file exist.**
