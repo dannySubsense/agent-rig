@@ -1,6 +1,9 @@
 # Architecture — first-turn-contract-enforcement
 
-**Status**: DRAFT
+**Status**: LOCKED — approved by Danny 2026-08-14, after Frank's binding spec-gate PASS (attempt 2
+of 3, both layers, no PROVISIONAL) and the orchestrator's independent post-PASS review. Ready for
+implementation handoff (`/forge-start`). Amendments to a LOCKED document follow the same discipline
+as `session-queue-hardening.md` §7: append a dated amendment, do not rewrite the original text.
 **Author**: architect (dispatched by wright)
 **Date**: 2026-08-14 (revised same day — see §0)
 **Intake**: `docs/specs/first-turn-contract-enforcement/INTAKE.md` (APPROVED 2026-08-14, Danny)
