@@ -1,6 +1,6 @@
 # Progress: session-queue-hardening (lite)
 
-## Status: COMPLETE — Frank binding forge-gate PASS (attempt 2 of 3, both layers, no PROVISIONAL); orchestrator independent re-derivation AGREES. See GATE-LOG.md. NOT yet observed firing in a real session — that done-condition is still open.
+## Status: COMPLETE — Frank binding forge-gate PASS (attempt 2 of 3, both layers, no PROVISIONAL); orchestrator independent re-derivation AGREES. See GATE-LOG.md. FOOTER repair observed firing live and compliant 2026-08-14 (see "FOOTER repair — CLOSED" below) — all done-conditions met.
 
 ## Spec
 `docs/tooling/session-queue-hardening.md` — Status LOCKED (Frank binding spec-gate PASS
@@ -138,7 +138,20 @@ Stale citation, not corrected: `session-queue-hardening-GATE-LOG.md:30` cites
 `reference/session_queue_probe.py:63` for the `.lower()` choke point. The line lives in both
 copies; the GATE-LOG is a historical record of what Frank saw and is not rewritten after the fact.
 
-### Residual unknown — the FOOTER repair is NOT closed
+### FOOTER repair — CLOSED 2026-08-14, session `04a0945a-52f3-4af6-ac11-e57fb147a731`
+
+First live fire post-fix, and the reading agent's actual first-turn reply complied: `Signpost:`
+section led (queue claims restated as claims), `Pillar:` section followed with the method that
+checked each one (git commands, file reads, track-record reads, switchboard/LORE queries listed
+inline), and the one open item (whether *this* session's own Stop event would register
+`first_turn: true`) was stated as an explicit BLOCKER naming what was missing — not folded into a
+"not yet verified" list. Independently corroborated by the mechanism itself: the same turn's
+Stop-hook track-record entry (`2026-08-14T13:52:26.567430+00:00`) recorded `decision: "allow"`,
+`violations: []` — the probe's own C1/C2/C3 check of that exact turn agreed with the manual read.
+Two independent measurements (human-legible compliance + probe verdict) agree. N=1 live fire,
+behaviour matches the hypothesis. This closes the sprint's last open done-condition.
+
+<details><summary>Prior state (superseded by the above)</summary>
 
 The new FOOTER is a hypothesis about how a reading agent responds to it. **N=0 live fires
 post-fix.** The three FOOTER tests pin the *string*, not the *behaviour* — they prevent the wording
@@ -151,3 +164,5 @@ section second with methods, no third section. Until that observation exists, th
 built-and-gated, not proven.
 
 (Frank, forge-gate on `ae3fa0d`, 2026-08-14 — raised as a limit he required stated plainly.)
+
+</details>

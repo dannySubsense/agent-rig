@@ -1,6 +1,6 @@
 # Progress: first-turn-contract-enforcement
 
-## Status: IN_PROGRESS
+## Status: COMPLETE
 
 Spec: `docs/tooling/first-turn-contract-enforcement.md` (LOCKED, Danny 2026-08-14)
 Gate log: `docs/tooling/first-turn-contract-enforcement-GATE-LOG.md` (Spec Gate PASS attempt 2/3)
@@ -17,16 +17,18 @@ Mode: forge-lite. No `04-ROADMAP.md` — slices derived from the spec's §11 acc
       test; `.gitignore` entry; `.claude/settings.json` `Stop` wiring **last**, per AC 9 (the §7
       evidence standard must exist before the hook is flipped live — it does).
       Covers AC 5, 7, 8 (ignored-not-dirty half), 9.
-- [ ] **Slice 3: Live demonstration** — the part no harness can do. AC 4 requires a compliant turn
-      to pass *on a real live session, not the fixture alone*, and AC 10 requires every criterion
-      be demonstrated by an executed check. This is its own slice because the sibling sprint's
-      entire lesson is that running the script is not the same as the harness running it.
+- [x] **Slice 3: Live demonstration** — COMPLETE 2026-08-14, new session `04a0945a-52f3-4af6-ac11-e57fb147a731`.
+      Track-record entry `2026-08-14T13:52:26.567430+00:00`: `session_id: 04a0945a-...`,
+      `queue_injected: true`, `first_turn: true`, `decision: "allow"`, `violations: []`. First
+      harness Stop event where the queue was injected AND the turn was scored as first-turn —
+      C1/C2/C3 executed against a real transcript, not the fixture, and the reading agent's actual
+      Signpost-then-Pillar turn (this session's prior turn) passed with zero violations.
       Covers AC 4 (live half), 10.
 
 ## Current
 
-Slice: 3 — Live demonstration (blocked on a NEW session; not closeable from inside this one)
-Step: Slice 2 stamped APPROVED and committed; hook is WIRED and has fired live once
+Slice: 3 — COMPLETE. All slices done; sprint ready for final PR review / merge.
+Step: Live first-turn demonstration confirmed via track-record entry (see Slice 3 above).
 Last updated: 2026-08-14
 
 ## Fix Attempts
