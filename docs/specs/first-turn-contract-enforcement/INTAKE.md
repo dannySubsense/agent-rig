@@ -1,6 +1,6 @@
 # INTAKE — first-turn-contract-enforcement
 
-**Status**: DRAFT — awaiting Danny's approval (mandatory pre-spec gate)
+**Status**: APPROVED (2026-08-14, Danny) — §7 resolved: agent-rig-only, propagate on evidence
 **Author**: wright
 **Date**: 2026-08-14
 **Mode**: full (not spec-lite — this ships a blocking hook to every repo)
@@ -79,7 +79,8 @@ a control that defended one axis and was cited as if it defended another.
 - Any turn other than the first of a queue-injected session.
 - Retrofitting the seven repos. That is `signpost-pillar-propagation` Slice 12's lane; this sprint
   produces the artifact in the same `reference/`-source-of-record shape Slice 12 already propagates
-  (`commands/new-project.md:494`) so it can be carried by that slice without redesign.
+  (`commands/new-project.md:494`) so it can be carried by that slice without redesign. Per §7,
+  propagation is gated on an evidence record from agent-rig, not on this design being approved.
 - Changing the `SessionStart` queue hook or the FOOTER again.
 
 ## 6. Decisions already made (producer, not open questions)
@@ -93,13 +94,31 @@ a control that defended one axis and was cited as if it defended another.
   to block the same turn indefinitely. Exact escape is an architecture decision.
 - **The FOOTER stays.** Delivery and enforcement are different jobs; this does not replace it.
 
-## 7. Open question for Danny — the one thing I should not decide alone
+## 7. Resolved by Danny, 2026-08-14 — blast radius
 
-A blocking `Stop` hook installed across eight repos can, if wrong, make every session in every repo
-unable to finish its first turn. That is a bigger blast radius than anything else in this workshop,
-and the failure-open discipline in §6 is my mitigation, not a proof. **Is a blocking hook the
-sanctioned instrument here, or is the acceptable version one that blocks in agent-rig only until it
-has a track record, and propagates on evidence rather than on design?**
+**Decision: block in agent-rig only. Propagate on evidence, not on design.**
+
+The hook is installed and blocking in agent-rig alone. No other repo receives it in this sprint,
+and no propagation is scheduled against a design review — the trigger for extending it is an
+accumulated track record of it blocking real violations and not blocking compliant turns, in live
+sessions, in this repo.
+
+Two consequences that bind this sprint:
+
+1. **Blast radius is one repo, and the fail-open discipline (§6) is still required inside it.**
+   Scoping down is not a substitute for the hook being unable to deadlock a session; both hold.
+2. **The artifact is still built in the `reference/` source-of-record shape (§5).** Building it
+   portable costs nothing now and avoids a redesign later; what is withheld is *deployment*, not
+   *portability*. The design is ready to travel; it does not travel until the evidence says so.
+
+This is the same standard the sprint applies to itself elsewhere: `session-queue-hardening` refused
+to label the queue hook LIVE on the strength of manual invocation, and its FOOTER repair is recorded
+as unproven at N=0 live fires. A mechanism that enforces "verify before you assert" does not get
+deployed fleet-wide on the assertion that it works.
+
+**What counts as the track record is not defined here** — it is a spec-stage question (how many
+sessions, what mix of blocked and passed turns, recorded where). It must be written down before the
+hook goes live, not decided retrospectively when someone wants to propagate.
 
 ## 8. Done-when
 
@@ -108,5 +127,8 @@ has a track record, and propagates on evidence rather than on design?**
 - [ ] A first turn asserting Pillar with no tool calls in the transcript is blocked.
 - [ ] A compliant first turn passes untouched, and is demonstrated on a real session, not a harness.
 - [ ] The hook's own failure never blocks a session — proven by fault injection, not by inspection.
-- [ ] Artifact exists in the `reference/` source-of-record shape Slice 12 propagates.
+- [ ] Artifact exists in the `reference/` source-of-record shape Slice 12 propagates, and is
+      installed in agent-rig ONLY (§7) — no other repo touched by this sprint.
+- [ ] The track-record standard that would justify propagation is written down before the hook goes
+      live, not decided retrospectively.
 - [ ] Every one of the above is demonstrated by an executed check attached to the claim.
