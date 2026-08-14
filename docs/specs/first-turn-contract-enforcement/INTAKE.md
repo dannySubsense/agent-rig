@@ -3,7 +3,14 @@
 **Status**: APPROVED (2026-08-14, Danny) — §7 resolved: agent-rig-only, propagate on evidence
 **Author**: wright
 **Date**: 2026-08-14
-**Mode**: full (not spec-lite — this ships a blocking hook to every repo)
+**Mode**: spec-lite — **amended 2026-08-14, after §7 was resolved.** Originally recorded as `full`
+on the stated ground that "this ships a blocking hook to every repo." §7 removed that ground: the
+hook installs in agent-rig only and propagates on evidence. What remains is one blocking checker
+script with no UI, no product surface and no multi-stakeholder scope — the definition of bounded
+internal tooling, and the same shape as `session-queue-hardening`, which ran spec-lite and produced
+a single `docs/tooling/` document. Frank's binding gate and human approval are NOT skipped by lite
+mode; requirements/UI/roadmap layering is, because a hook script has no UI to spec and is too small
+to split across three documents.
 **DDR**: none
 
 ---
