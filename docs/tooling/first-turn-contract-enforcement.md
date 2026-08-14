@@ -34,6 +34,53 @@ logic (`stop_hook_active` + wrapper fail-open). Presenting an environment-depend
 primary safety claim was flagged as the promoted-default pattern from this project's founding
 postmortem and corrected before this draft was reported complete.
 
+**Third addendum — Frank's binding spec-gate, attempt 1, FAIL, both findings routed here.**
+Full verdict: `docs/tooling/first-turn-contract-enforcement-GATE-LOG.md`. Two corrections, and a
+verification standard this document now states explicitly rather than leaving implicit:
+
+- **F1 (blocking, now fixed, §3.2/§3.3/§3.4/§6 below).** The prior revision of this document
+  switched the decision protocol from `{"decision": "block", "reason": ...}` (the original
+  draft's choice) to `hookSpecificOutput.permissionDecision`, on the strength of both strings
+  being present in the installed binary. That was wrong: `permissionDecision` is bound inside a
+  `hookEventName: "PreToolUse"` literal and its consumer guards on `=== "PreToolUse"` — it is not
+  read for `Stop`. The binary's own help text is explicit: *"`decision` — 'block' for
+  PostToolUse/Stop/UserPromptSubmit hooks (deprecated for PreToolUse, use
+  hookSpecificOutput.permissionDecision instead)."* As previously specified, the hook would have
+  emitted a payload `Stop` silently ignores — it would never have blocked anything, while the
+  track-record log recorded verdicts with no effect. **Restored: top-level `{"decision": "block",
+  "reason": "..."}`, the original draft's choice, confirmed correct.**
+- **F2 (resolved by live capture, not further inference).** `last_assistant_message` — the field
+  §5.1 depends on — is now confirmed live on this host's actual Stop-hook stdin by direct
+  observation: a throwaway Stop hook was installed that teed real stdin to a file, fired once, and
+  was removed. The captured payload's key set:
+  `['background_tasks', 'cwd', 'effort', 'hook_event_name', 'last_assistant_message',
+  'permission_mode', 'prompt_id', 'session_crons', 'session_id', 'stop_hook_active',
+  'transcript_path']`. `last_assistant_message`, `stop_hook_active`, `transcript_path`, and
+  `session_id` are all confirmed present and populated as specified. **`stop_reason` is not a
+  field on this payload and is not referenced anywhere in this document.**
+
+**Verification standard adopted going forward (Frank's fix #3), stated explicitly because the
+same document produced both a correct and an incorrect binary-sourced claim in the same session:**
+three evidence classes exist for a binary-sourced runtime-behavior claim, not two, and they are not
+interchangeable:
+
+1. **Live capture** (strongest) — the field is observed, populated, on the actual event, on this
+   host. This is how F2 (`last_assistant_message` et al.) is now settled, and is the standard §5.1
+   already met even before this gate.
+2. **String presence + surrounding code context** (acceptable, but only with the context) — the
+   claim is verified by reading the guard, the comparison, and the consumer around the field, not
+   merely confirming the string exists somewhere in the binary. This is why §4.3
+   (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`) held: it was read with its `if (_o > 0 && ms > _o)` guard,
+   its comparison, and its telemetry call, not as a bare string.
+3. **String presence alone** (insufficient, do not use for behavior claims) — proves a string
+   exists in the binary; proves nothing about which event consumes it. This is exactly what
+   produced F1: `permissionDecision` and `hookSpecificOutput` are both real strings in the binary,
+   present in a code path that fires on a *different* event. Presence in the bundle is not
+   evidence that a field is honored on the event this design cares about.
+
+Every binary-sourced claim remaining in this document (§4.3's block cap) meets class 2 or better.
+No remaining claim rests on class 3.
+
 ---
 
 ## 1. Purpose and non-goals
@@ -101,47 +148,53 @@ simplification the prior draft's own §12 anticipated verifying, and it removes 
 
 ### 3.2 Decision protocol (how "block" is communicated)
 
-**Revision from the prior draft**: the prior draft offered `decision: "block"` as the mechanism
-and separately noted exit-code-2 as a documented alternative, without picking one. Both
-`permissionDecisionReason` and the wrapped `hookSpecificOutput` shape are confirmed present in the
-installed binary. This document picks the wrapped shape — it is the same shape
-`session_queue_probe.py` already uses for `SessionStart`, so both hooks in this repo share one
-output convention, and it is unambiguous (no reliance on exit-code side-channels for the payload).
-Exit-code-2 is not used.
+**Restored, per Frank's spec-gate F1 (§0)**: top-level `{"decision": "block", "reason": ...}` —
+the original draft's choice, reversed by the prior revision on a string-presence-only reading of
+the binary, and now confirmed correct by reading the binary's own help text against the consuming
+guard (evidence class 2, §0): *"`decision` — 'block' for PostToolUse/Stop/UserPromptSubmit hooks
+(deprecated for PreToolUse, use hookSpecificOutput.permissionDecision instead)."* `Stop` is
+explicitly in the `decision: "block"` list. `hookSpecificOutput.permissionDecision` is a
+`PreToolUse`-only mechanism and is **not used anywhere in this document**.
 
 ```typescript
 interface FirstTurnHookOutput {
-  hookSpecificOutput: {
-    hookEventName: "Stop";
-    permissionDecision: "allow" | "deny";      // "deny" is this hook's block
-    permissionDecisionReason: string;           // required when permissionDecision === "deny";
-                                                 // names the check, quotes the exact triggering
-                                                 // text, and states what to do
-  };
+  decision?: "block";  // present only when blocking; absent (or the key omitted entirely) means
+                        // allow — this is the same "omission means no opinion" convention the
+                        // prior (pre-F1) draft used, restored here
+  reason?: string;      // required when decision === "block"; names the check, quotes the exact
+                         // triggering text, and states what to do. Optional/unused on allow.
 }
 ```
 
-On allow, the probe still emits this shape with `permissionDecision: "allow"` and a short
-`permissionDecisionReason` (e.g. `"no queue-injection marker in this session"` or `"C1/C2/C3 all
-pass"`) — an explicit allow, not silence, so the track-record log (§6) always has a real verdict
-to write, and so "the probe ran and had no opinion" is distinguishable from "the probe crashed"
-(handled entirely at the wrapper layer, §3.4).
+On allow, the probe emits `{}` (or equivalently no `decision` key) on stdout — there is no
+allow-side signal Claude Code consumes, so nothing is gained by inventing one, and the binary's
+own documented convention for these hooks is silence-means-allow. The track-record log (§6) does
+not depend on what is written to stdout for its own "allow was reached" entry — the probe writes
+its track-record line internally regardless of what it emits externally, so "the probe ran and
+explicitly decided allow" remains distinguishable from "the probe crashed" (§3.4) without needing
+an allow-side field in the Claude Code-facing payload.
 
-`permissionDecisionReason` on deny must contain: which check fired (C1/C2/C3), the exact text span
-that triggered it (quoted, not paraphrased), and one line telling the agent what to do ("re-emit
-the turn with Signpost before Pillar" / "remove the third section; if a claim is genuinely
-unverifiable, report it as a BLOCKER, not a to-do" / "run the verifying tool call(s) for the Pillar
-claims before reporting them").
+`reason` on block must contain: which check fired (C1/C2/C3), the exact text span that triggered
+it (quoted, not paraphrased), and one line telling the agent what to do ("re-emit the turn with
+Signpost before Pillar" / "remove the third section; if a claim is genuinely unverifiable, report
+it as a BLOCKER, not a to-do" / "run the verifying tool call(s) for the Pillar claims before
+reporting them").
+
+Also visible in the binary's help text, alongside `decision`, and available to this hook but not
+used by this design: `continue` (boolean; false blocks/stops), `stopReason` (message shown when
+`continue` is false), `suppressOutput` (boolean). This design uses `decision`/`reason` exclusively
+— `continue`/`stopReason` is a separate, coarser mechanism for the same class of event and mixing
+the two would create two possible block signals to keep in sync for no benefit.
 
 ### 3.3 What "block" means mechanically
 
-On `permissionDecision: "deny"`, Claude Code does not end the turn — it feeds
-`permissionDecisionReason` back to the model as an instruction and lets it continue generating in
-the same stop cycle. The next time the model tries to stop, the `Stop` hook fires again with
-`stop_hook_active: true` on that pass (§4.1) — this hook allows unconditionally at that point, so
-in the normal case there is no "keeps triggering denies" scenario to speak of. If some other Stop
-hook (not this one) kept denying regardless, `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (default **8**,
-confirmed in the binary, §4.3) is the runtime's own backstop ceiling — but that is a fact about the
+On `{"decision": "block", "reason": ...}`, Claude Code does not end the turn — it feeds `reason`
+back to the model as an instruction and lets it continue generating in the same stop cycle. The
+next time the model tries to stop, the `Stop` hook fires again with `stop_hook_active: true` on
+that pass (§4.1) — this hook allows unconditionally at that point, so in the normal case there is
+no "keeps triggering blocks" scenario to speak of. If some other Stop hook (not this one) kept
+blocking regardless, `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (default **8**, confirmed in the binary with
+its consuming guard, §4.3) is the runtime's own backstop ceiling — but that is a fact about the
 platform's general safety valve, not a guarantee this design leans on (§4.3 explains why).
 
 ### 3.4 Wrapper responsibilities (`.claude/hooks/first-turn-contract.sh`)
@@ -155,13 +208,13 @@ Structurally identical to `session-queue.sh`:
    trip — `last_assistant_message` needs no parsing beyond what's already on stdin, and the
    transcript read for C3 is one local file — so if anything this budget is generous relative to
    its precedent, not newly invented).
-3. Validate stdout is either empty, or valid JSON matching `FirstTurnHookOutput`'s shape
-   (`hookSpecificOutput.hookEventName === "Stop"` and `permissionDecision` ∈
-   `{"allow","deny"}`). Anything else (non-JSON, wrong shape, non-zero probe exit, timeout) is
-   treated as **probe failure**.
+3. Validate stdout is either empty / `{}` (allow), or valid JSON matching `FirstTurnHookOutput`'s
+   shape (`decision === "block"` with a non-empty string `reason`). Anything else (non-JSON, a
+   `decision` value other than `"block"`, `decision: "block"` with no `reason`, non-zero probe
+   exit, timeout) is treated as **probe failure**.
 4. On probe failure: emit nothing (empty stdout, exit 0) — i.e. **fail open, silently allow the
    turn to stop**. `SessionStart`'s `additionalContext` is inert if wrong, but a `Stop` hook that
-   emits a malformed `permissionDecision` risks corrupting the block/allow contract itself.
+   emits a malformed `decision` field risks corrupting the block/allow contract itself.
    Silence is the safe failure for a hook whose only power is to block. The wrapper still logs the
    failure to the track-record log (§6) so silent failures are visible in aggregate, just not
    injected into the transcript.
@@ -178,10 +231,10 @@ it was never re-justified). The runtime cap is real and cited, but it is last, n
 
 ### 4.1 `stop_hook_active` — this hook's own restraint (primary guarantee, holds unconditionally)
 
-If `stop_hook_active` is `true` on invocation, the probe **always allows** (`permissionDecision:
-"allow"`) — it does not run C1/C2/C3 at all, regardless of `last_assistant_message`'s content.
-Checked first in the probe's own logic, before any check runs. This bounds *this hook's*
-contribution to a stop cycle to **at most one deny**, full stop — no environment variable, no
+If `stop_hook_active` is `true` on invocation, the probe **always allows** (emits `{}`, no
+`decision` key) — it does not run C1/C2/C3 at all, regardless of `last_assistant_message`'s
+content. Checked first in the probe's own logic, before any check runs. This bounds *this hook's*
+contribution to a stop cycle to **at most one block**, full stop — no environment variable, no
 runtime configuration, and no external actor can change this behavior, because it is logic inside
 our own probe, not a setting we depend on being left alone. This is the guarantee that holds
 regardless of configuration.
@@ -190,7 +243,7 @@ regardless of configuration.
 
 Independently of §4.1, any exception, timeout, or malformed-output condition inside the probe
 results in the wrapper emitting nothing (§3.4 step 4). A probe bug that throws, hangs past the
-timeout, or emits garbage cannot deny a turn — it can only fail to check one. Also entirely inside
+timeout, or emits garbage cannot block a turn — it can only fail to check one. Also entirely inside
 code we own; nothing external can disable it either, short of editing the wrapper itself.
 
 ### 4.3 `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` — the runtime's backstop (not ours, environment-dependent)
@@ -198,7 +251,7 @@ code we own; nothing external can disable it either, short of editing the wrappe
 Confirmed in the installed binary (Claude Code 2.1.232, §0), corroborated by two independent
 reads — a `strings` grep and a separate byte-level scan locating the exact source fragment
 `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP??8;if(_o>0&&ms>_o)return N("tengu_stop_hook_block_count",{...)` —
-Claude Code stops honouring `deny` from Stop/SubagentStop hooks after a running count exceeds this
+Claude Code stops honouring `decision: "block"` from Stop/SubagentStop hooks after a running count exceeds this
 cap, default **8**, enforced behaviour (the surrounding code compares a live counter and emits
 telemetry on trip), not a documentation claim.
 
@@ -353,9 +406,9 @@ interface TrackRecordEntry {
   stop_hook_active: boolean;
   queue_injected: boolean; // §5.1 result; false short-circuits everything below
   first_turn: boolean;     // §5.1 result; false (turn 2+) also short-circuits
-  decision: "allow" | "deny" | "probe_error";
+  decision: "allow" | "block" | "probe_error";
   violations: Array<"C1" | "C2" | "C3">; // empty on allow
-  reason: string | null;   // the exact permissionDecisionReason sent; null on probe_error
+  reason: string | null;   // the exact reason string sent on block; null otherwise
   probe_error: string | null; // exception class + message, only on probe_error
 }
 ```
@@ -386,10 +439,10 @@ to benchmark against; the number is a judgment call, not a measurement).**
 - At least **10** track-record entries with `queue_injected: true` and `first_turn: true`,
   spanning at least **2** distinct calendar days of real usage (not a single burst of manufactured
   test sessions), AND
-- **Zero** entries where a `deny` decision's `reason` was later determined (by human review of the
+- **Zero** entries where a `block` decision's `reason` was later determined (by human review of the
   blocked turn) to have been a false positive — i.e., the blocked turn was in fact compliant with
   the FOOTER contract, AND
-- **At least one** entry where a `deny` decision correctly caught a real violation (a turn that,
+- **At least one** entry where a `block` decision correctly caught a real violation (a turn that,
   absent the block, would have shipped Pillar-before-Signpost, a forbidden third section, or an
   unverified Pillar claim) — a hook with zero true positives has not yet been observed doing its
   job, only observed not misfiring, which is a weaker claim.
@@ -417,7 +470,7 @@ inconvenient.
   session. Frank's binding spec/forge gates are a separate, human-facing judgment layer that this
   tool does not participate in, feed into automatically, or override.
 - **Human judgment.** A human can always override, ignore, or re-litigate a block by reading the
-  `permissionDecisionReason` and the transcript directly — that text is advisory to the *agent*
+  `reason` and the transcript directly — that text is advisory to the *agent*
   continuing the turn, not a verdict binding on the human.
 - **Any turn after the first.** Per Intake §5, this tool has no opinion on turn 2 onward in the
   same session, or on any turn in a session where the queue was not injected.
@@ -478,14 +531,14 @@ Mapped 1:1 to Intake §8's done-when list; none exceed the limit stated in §1/�
 the real corpus (`tests/fixtures/first_turn_contract_corpus.json`) where a fixture exists, per the
 coordinator's requirement that this be tested against the actual failure that caused it.
 
-1. Feeding `true_positive_c1_and_c2` as `last_assistant_message` produces `permissionDecision:
-   "deny"` naming C1, quoting the Pillar heading and noting no Signpost heading precedes it.
-2. Feeding `true_positive_c2_heading` as `last_assistant_message` produces `deny` naming C2,
+1. Feeding `true_positive_c1_and_c2` as `last_assistant_message` produces `{"decision": "block",
+   "reason": ...}` naming C1, quoting the Pillar heading and noting no Signpost heading precedes it.
+2. Feeding `true_positive_c2_heading` as `last_assistant_message` produces `decision: "block"` naming C2,
    quoting `**Not yet verified this session:**`.
 3. A `last_assistant_message` asserting a `Pillar` heading with zero qualifying (non-`TodoWrite`,
-   completed) tool calls before it in the transcript produces `deny` naming C3.
+   completed) tool calls before it in the transcript produces `decision: "block"` naming C3.
 4. Each of the four `must_not_block_prose_mentions` fixtures, and a compliant Signpost-then-Pillar
-   turn with a qualifying tool call, produce `permissionDecision: "allow"` — demonstrated against
+   turn with a qualifying tool call, produce no `decision` key (allow) — demonstrated against
    the fixture corpus AND on a real live session, not the fixture alone.
 5. Wrapper/probe failure (exception, timeout, malformed output) never denies — demonstrated by
    fault injection (a deliberately broken probe swapped in under test) producing an allow, not by
@@ -509,11 +562,14 @@ coordinator's requirement that this be tested against the actual failure that ca
 
 ## 12. Open items for the forge stage (not this document's to resolve)
 
-- §0's verification covered `stop_hook_active`, `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`,
-  `last_assistant_message`, and the `hookSpecificOutput`/`permissionDecisionReason` output shape
-  against the installed binary (2.1.232) directly. Re-verify against whatever Claude Code version
-  is installed at forge/build time if it differs, the same way `CLAUDE_CODE_SESSION_ID` had to be
-  flagged as induction-from-one-install in the sibling spec.
+- §0 verified each claim at the evidence class it required: `stop_hook_active`, `session_id`,
+  `transcript_path`, and `last_assistant_message` by **live capture** on this host (class 1);
+  `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` and the `decision`/`reason` block mechanism by **binary
+  string + surrounding consuming code** (class 2, after F1 corrected a class-3-only reading of
+  `permissionDecision`). Re-verify against whatever Claude Code version is installed at
+  forge/build time if it differs from 2.1.232 — live capture is host- and version-specific, the
+  same way `CLAUDE_CODE_SESSION_ID` had to be flagged as induction-from-one-install in the sibling
+  spec.
 - The exact JSONL record shape used for C3's tool-call scan (which fields distinguish a `tool_use`
   block from its matching `tool_result`, and how `isSidechain` interacts with nested sub-agent
   transcript paths beyond the single session already inspected) should get one more direct check
