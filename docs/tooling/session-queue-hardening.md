@@ -185,6 +185,11 @@ normalization was correct and is unchanged.
 No schema or gateway change (unchanged from INTAKE §4 — `content` is still where this lives, for
 the same reason S3 chose it: no metadata parameter on the write path).
 
+> **AMENDED 2026-08-14 — see §7.** The row above claiming the `FOOTER` is "unaffected" is no
+> longer true. The FOOTER was rewritten wholesale after the hook's first live fire exposed it as a
+> labelling rule where a work rule was required. §7 is the governing text for the FOOTER; the rest
+> of this section stands. Do not propagate the framing described above.
+
 ---
 
 ## 5. Failure modes considered and rejected
@@ -268,3 +273,46 @@ to catch. Kept, with its claim narrowed (§2b) rather than its existence removed
    UNKNOWN, per §2b's "malformed" branch) is specified above, but was not tested against a real
    malformed row because none exists yet. Flagging that the parser needs a test case for this before
    being called done, not before being designed.
+
+---
+
+## 7. Amendment 2026-08-14 — FOOTER rewritten (supersedes §4's "FOOTER unaffected")
+
+**Status:** APPROVED — Danny, 2026-08-14, in the raw content. This document is LOCKED; the original
+§4 text below is NOT rewritten — this section amends it.
+
+**What §4 (line 181) says:** "The `HEADER`/`FOOTER` framing, the tag cross-check (S1), and the
+first-run-transition branch are all unaffected — only the staleness paragraph changes."
+
+**As of 2026-08-14 that is false for the FOOTER, and this section is the governing text.**
+
+On the hook's first live fire the FOOTER was found to be a *labelling* rule where a *work* rule
+was required. It read: "label what you took as `Signpost:` and label separately as `Pillar:`".
+It specified no order, set no completeness bar, and forbade no third bucket — so a reading agent
+that reported Pillar before Signpost and closed with a "not yet verified this session" list was
+fully compliant with it. The instruction produced the behaviour this sprint exists to prevent.
+
+The FOOTER now mandates, in the injected text itself:
+
+1. A numbered pre-reply sequence — **SIGNPOST** (orient; explicitly not verification; it exists
+   to tell you which primary sources to open) then **PILLAR** (open them; every claim gets an
+   executed check; "now, not after you report").
+2. Report order, with its reason: "Reversing the order reports conclusions before their evidence
+   and is wrong even when every fact in it is right."
+3. "**There is no third section.**" A "not yet verified this session" list is prohibited — an
+   unchecked claim is unfinished work, not a finding, and labelling it does not discharge it. The
+   only admissible exit is a **BLOCKER** naming what is missing and what would unblock it.
+
+Live text is `scripts/session_queue_probe.py` (`FOOTER`), mirrored in `reference/`. Contract is
+pinned by three tests in `tests/test_session_queue_probe.py`. §4's other assertions — HEADER, tag
+cross-check (S1), first-run-transition branch — remain accurate and unamended.
+
+Full defect record, including the second defect found underneath it (the test suite loaded
+`reference/` while the hook executes `scripts/`, so the prior gate's green count never covered
+the shipped artifact): `session-queue-hardening-PROGRESS.md`, "Defect repair 2026-08-14".
+
+**Residual:** the new FOOTER has N=0 live fires. The string is tested; the behaviour is not.
+
+Raised as a binding FAIL by Frank's forge-gate on `ae3fa0d`: a locked doc that misdescribes the
+shipped artifact is the contract, not a historical record, and a propagator reading §4 at face
+value would be told the old defective framing is current.
