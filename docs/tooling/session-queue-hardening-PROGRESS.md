@@ -137,3 +137,17 @@ appending a byte to `reference/` (1 failed), then restored to green — not assu
 Stale citation, not corrected: `session-queue-hardening-GATE-LOG.md:30` cites
 `reference/session_queue_probe.py:63` for the `.lower()` choke point. The line lives in both
 copies; the GATE-LOG is a historical record of what Frank saw and is not rewritten after the fact.
+
+### Residual unknown — the FOOTER repair is NOT closed
+
+The new FOOTER is a hypothesis about how a reading agent responds to it. **N=0 live fires
+post-fix.** The three FOOTER tests pin the *string*, not the *behaviour* — they prevent the wording
+regressing, and that is all they do. Citing "19 passed" as evidence the defect is fixed would be
+the founding-postmortem error again: a green count measuring internal consistency, not validity.
+
+What actually closes this: the next SessionStart fire in this repo, with the reading agent's
+first-turn output captured and checked against the contract — Signpost section first, Pillar
+section second with methods, no third section. Until that observation exists, the repair is
+built-and-gated, not proven.
+
+(Frank, forge-gate on `ae3fa0d`, 2026-08-14 — raised as a limit he required stated plainly.)
