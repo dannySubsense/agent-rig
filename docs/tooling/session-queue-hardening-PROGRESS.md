@@ -94,3 +94,46 @@ Last updated: 2026-08-13
 - Prior lineage on this predicate: five review rounds, four FAILs, every defect caught externally,
   three of them in this same staleness predicate. The current design was authored by @architect,
   not by the producer, for that reason.
+
+---
+
+## Defect repair 2026-08-14 — first live fire of the hook
+
+The hook fired in a real session for the first time (observed as SessionStart `additionalContext`;
+tag resolution to `2e117448` correct, writer-known staleness branch fired for the first time ever,
+predicted false `45e3ed27` entry did not appear, LORE priming not masked). The sprint's last unmet
+done-condition is met. Two defects surfaced *because* it fired.
+
+- **FOOTER was a labelling rule, not a work rule — FIXED.** Prior text: "label what you took as
+  `Signpost:` and label separately as `Pillar:`". It specified no order, set no completeness bar,
+  and forbade no third bucket. The reading agent led with Pillar and closed with a "not yet
+  verified this session" list, twice — both fully compliant with that wording. The instruction
+  produced the behaviour the sprint exists to prevent, and did so on its first live run.
+
+  New FOOTER mandates a numbered pre-reply sequence (1. SIGNPOST orient → 2. PILLAR open the
+  sources, "now, not after you report"), mandates that report order explicitly ("Reversing the
+  order reports conclusions before their evidence and is wrong even when every fact in it is
+  right"), and states "There is no third section" — an unchecked claim is unfinished work, not a
+  finding, and the only exit is a BLOCKER naming what would unblock it, never a to-do.
+
+- **The test suite was validating a file the harness never executes — FIXED.** `tests/` loaded
+  `reference/session_queue_probe.py`; `.claude/hooks/session-queue.sh` runs
+  `scripts/session_queue_probe.py`. The two were byte-identical, so all 15 tests passed and the
+  gap was invisible. Last session's "pytest 15 passed" therefore did not cover the shipped
+  artifact, and the FOOTER — the single string the entire mechanism exists to deliver — had no
+  test at all. That is how a defective instruction cleared a binding Frank gate.
+
+  Tests now load `scripts/`. §4 requires the two copies be kept identical "per existing
+  convention — confirm identical after edit, do not let the two drift"; that manual check is now
+  mechanical (`test_reference_copy_matches_executed_copy`). The duplication is retained, not
+  removed: §4 is locked and human-approved, and `reference/` is the spec'd propagation
+  source-of-record convention (`commands/new-project.md:494`, signpost-pillar-propagation Slices
+  2/3). A guarded copy honours the locked spec; deleting it would amend one unilaterally.
+
+Three FOOTER-contract tests added (order, no-third-section, verify-before-report). Suite: 19
+passed under `pytest` and 19/19 under the fallback runner. The drift guard was proven to fail by
+appending a byte to `reference/` (1 failed), then restored to green — not assumed to work.
+
+Stale citation, not corrected: `session-queue-hardening-GATE-LOG.md:30` cites
+`reference/session_queue_probe.py:63` for the `.lower()` choke point. The line lives in both
+copies; the GATE-LOG is a historical record of what Frank saw and is not rewritten after the fact.

@@ -243,9 +243,24 @@ HEADER = (
 )
 
 FOOTER = (
-    "\n\nEND QUEUE. Nothing above is verified. Your first-turn summary must label what you "
-    "took from here as `Signpost:` and label separately, as `Pillar:`, only what you have "
-    "independently checked this session and by what method."
+    "\n\nEND QUEUE. Nothing above is verified.\n\n"
+    "BEFORE YOUR FIRST REPLY, IN THIS ORDER:\n\n"
+    "1. SIGNPOST — restate the queue's claims as claims. This is the orientation pass. It is "
+    "cheap, it is not verification, and it comes first because it is what tells you which "
+    "primary sources to open.\n"
+    "2. PILLAR — then go open them. Every claim you intend to put in front of the human gets "
+    "an executed check: read the document, run the query, run the command. Do this now, not "
+    "after you report.\n\n"
+    "Your first-turn summary must then present those two passes IN THAT ORDER: a `Signpost:` "
+    "section (the queue's claims, explicitly unverified) followed by a `Pillar:` section (what "
+    "you checked this session, each with the method that checked it). Reversing the order "
+    "reports conclusions before their evidence and is wrong even when every fact in it is "
+    "right.\n\n"
+    "There is no third section. Do NOT emit a 'not yet verified this session' list — an "
+    "unchecked claim is unfinished work, not a finding, and labelling it does not discharge "
+    "it. If you notice an unverified claim while drafting, stop drafting and go verify it. "
+    "The only admissible exception is a check you genuinely CANNOT run, which is reported as "
+    "a BLOCKER naming what is missing and what it would take to unblock — never as a to-do."
 )
 
 

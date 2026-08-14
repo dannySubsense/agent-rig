@@ -1,4 +1,9 @@
-"""Tests for reference/session_queue_probe.py — the SessionStart staleness/parser logic.
+"""Tests for scripts/session_queue_probe.py — the SessionStart staleness/parser logic and the
+FOOTER contract the injected text delivers to the reading agent.
+
+Loads the copy the hook EXECUTES (scripts/). The spec (§4) requires reference/ to be kept
+identical to it; test_reference_copy_matches_executed_copy enforces that mechanically instead of
+by the spec's manual "confirm identical after edit".
 
 Spec: docs/tooling/session-queue-hardening.md §2b (three staleness cases) and §3 (writer-session-id
 regex). Writer contract: commands/lore-close.md Step 4 ("session-queue-meta:" fenced block).
@@ -24,7 +29,13 @@ except ImportError:
     HAVE_PYTEST = False
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROBE_PATH = os.path.join(REPO_ROOT, "reference", "session_queue_probe.py")
+# Load the copy the SessionStart wrapper actually executes (.claude/hooks/session-queue.sh runs
+# "$REPO_DIR/scripts/session_queue_probe.py"), NOT the reference/ propagation template. Until
+# 2026-08-14 these tests loaded reference/, so every green run validated a file the harness never
+# executed — invisible only because the two copies happened to be byte-identical. Drift between
+# them is now caught explicitly by test_reference_copy_matches_executed_copy below.
+PROBE_PATH = os.path.join(REPO_ROOT, "scripts", "session_queue_probe.py")
+REFERENCE_PROBE_PATH = os.path.join(REPO_ROOT, "reference", "session_queue_probe.py")
 
 
 def _load_probe():
@@ -267,6 +278,59 @@ def test_subagent_transcripts_never_counted(monkeypatch, tmp_path):
 
     result = probe.newer_session_transcripts(repo_dir, created_at, set())
     assert result == []
+
+
+# ---------------------------------------------------------------------------
+# FOOTER contract — the instruction the agent actually acts on
+#
+# Observed 2026-08-14, the hook's first live fire: the prior FOOTER said only "label what you
+# took as `Signpost:` and label separately as `Pillar:`". The reading agent led with Pillar and
+# closed with a "not yet verified this session" list — twice. Both are compliant with that
+# wording, which is how the defect passed a Frank gate: the footer had no test at all, so the
+# one string the whole mechanism exists to deliver was the one string nothing constrained.
+# These tests pin the three properties that failure proved were load-bearing.
+# ---------------------------------------------------------------------------
+
+def test_reference_copy_matches_executed_copy():
+    """reference/ is the propagation template; scripts/ is what the hook runs. A fix landing in
+    one and not the other ships a probe nothing tested — the exact gap that hid the FOOTER
+    defect until 2026-08-14, when the tests were still loading reference/."""
+    with open(PROBE_PATH, "rb") as f:
+        executed = f.read()
+    with open(REFERENCE_PROBE_PATH, "rb") as f:
+        reference = f.read()
+    assert executed == reference, (
+        "reference/session_queue_probe.py has drifted from scripts/session_queue_probe.py — "
+        "the tests exercise scripts/, so the reference copy would propagate untested code."
+    )
+
+
+def test_footer_orders_signpost_before_pillar():
+    """Order is the point, not just the labels: the signpost is what tells you which primary
+    sources to open, so a report that leads with Pillar presents conclusions before evidence."""
+    footer = probe.FOOTER
+    assert footer.index("SIGNPOST") < footer.index("PILLAR")
+    assert footer.index("`Signpost:`") < footer.index("`Pillar:`")
+    assert "IN THAT ORDER" in footer
+
+
+def test_footer_forbids_an_unverified_tail():
+    """An unchecked claim is unfinished work, not a finding. The footer must forbid the third
+    section outright — 'label what you checked' silently sanctions leaving the rest unchecked."""
+    footer = probe.FOOTER
+    assert "There is no third section." in footer
+    assert "not yet verified" in footer
+    assert "unfinished work, not a finding" in footer
+
+
+def test_footer_demands_verification_before_reporting_with_a_blocker_escape():
+    """Verification is work to do before the reply, not a formatting rule applied to it — and
+    the only exit is a BLOCKER (what's missing, what would unblock), never a to-do."""
+    footer = probe.FOOTER
+    assert "BEFORE YOUR FIRST REPLY" in footer
+    assert "executed check" in footer
+    assert "BLOCKER" in footer
+    assert "never as a to-do" in footer
 
 
 # ---------------------------------------------------------------------------
