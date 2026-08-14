@@ -147,7 +147,9 @@ fault injections); the fourth carries the real session id:
 2026-08-14T13:39:02  sid=cb179922-d422-4af4-91f9-329633de92b5  allow  qi=True  ft=False
 ```
 
-Written by the harness on a real `Stop` event. It proves the wiring, marker detection against
+Written by the harness on a real `Stop` event. **Updated at session close: four harness-fired
+entries now, all carrying this session's id, one per turn** — the hook fires on every `Stop`, not
+once by luck. It proves the wiring, marker detection against
 harness-written data (the exact defect QC caught in Slice 1), correct turn-scoping, and the log
 write — and `git status --porcelain` still shows no track-record entry, so `lore-close`'s `dirty:`
 derivation survives.
@@ -155,3 +157,24 @@ derivation survives.
 **What it does NOT prove, stated plainly:** `first_turn: false` means C1/C2/C3 never ran. AC 4's
 live half requires a *new* session where the queue is injected and the first turn is actually
 checked. **Slice 3 is not closeable from inside this session.**
+
+
+## Close-out 2026-08-14 — verified states
+
+- **Slices 1 and 2: CODE-MERGED and pushed.** `git log` shows `e46c911` and `4169a0b` on
+  `feature/first-turn-contract-enforcement`, `@{u}` == HEAD, PR #9 (draft, 14 commits).
+- **The hook itself: LIVE.** Runtime probe, not inference — four entries in the track-record log
+  carry this session's id (`cb179922-…`), written by the Claude Code harness on real `Stop` events
+  across four separate turns. Marker detection works against harness-written transcript data
+  (`queue_injected: true` every time), turn-scoping works (`first_turn: false`, correctly out of
+  scope), and the log write works. `git status --porcelain` is empty, so the ignore rule holds and
+  `lore-close`'s `dirty:` derivation is intact.
+- **Slice 3: PENDING, and not closeable from inside this session.** Every live fire recorded
+  `first_turn: false`, so C1/C2/C3 have never executed under the harness. AC 4's live half and
+  AC 10 require a *new* session where the queue injects and the first turn is genuinely checked.
+
+**Correction to an earlier claim in this session:** I twice described the sibling branch as sitting
+at "18 unpushed commits." Both halves were wrong. `feature/session-queue-injection` is **6 ahead of
+`main`** and fully pushed; the 18/22 figure was this branch's own count against `main`, misread as
+the sibling's. Current: sibling 6 ahead of main, this branch 16 ahead of the sibling, 22 ahead of
+main, 0 unpushed.
