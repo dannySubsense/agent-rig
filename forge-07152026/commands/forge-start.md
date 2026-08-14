@@ -534,6 +534,10 @@ Maintain progress in `docs/specs/{feature}/PROGRESS.md`:
 - [x] Slice 1: Types and Store — COMPLETE (2024-01-15)
 - [ ] Slice 2: Filter Component — IN_PROGRESS
 - [ ] Slice 3: Integration — PENDING
+- [ ] **Frank binding forge-gate** — PENDING. Runs once, only after every slice above is checked
+      off (see `## Frank Binding Forge-Gate` above). Do not set `Status: COMPLETE` before this
+      line is checked and its verdict is transcribed into `GATE-LOG.md`'s `## Forge Gate` section —
+      "all slices done" is not "sprint done."
 
 ## Current
 Slice: 2
