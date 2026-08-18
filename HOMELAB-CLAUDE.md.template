@@ -1,5 +1,6 @@
 # CLAUDE.md — <PROJECT-NAME>
 
+<!-- SETUP-ONLY:start -->
 ## Setup
 
 Copy this file to `CLAUDE.md` and fill in the placeholders.
@@ -11,6 +12,7 @@ cp ~/.claude/templates/HOMELAB-CLAUDE.md.template CLAUDE.md
 `CLAUDE.md` is gitignored — your config stays local to this checkout. The runtime read copy lives at `~/.claude/templates/HOMELAB-CLAUDE.md.template` (what `/new-project` reads); the **source-of-record** is the `agent-rig` repo, which owns this template per DDR-014 — edit it there and redeploy to `~/.claude/templates/`, don't edit the installed copy directly.
 
 ---
+<!-- SETUP-ONLY:end -->
 
 ## Agent Identity
 

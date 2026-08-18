@@ -25,7 +25,7 @@ These values are locked. Never ask Danny about them.
 | HOMELAB-CLAUDE.md template filename | `HOMELAB-CLAUDE.md.template` |
 | MACHINE-SETUP.md template filename | `MACHINE-SETUP.md.template` |
 | Bootstrap commit message | `chore: project bootstrap` |
-| Bootstrap staged files | `.gitignore`, `HOMELAB-CLAUDE.md.template`, `.claude/commands/relay.md`, `docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md`, `docs/NORTHSTAR.md`, `scripts/session_probe.py`, `.claude/hooks/session-start-probe.sh`, `.claude/settings.json` (path is variable — `<InputBundle.projectId>` is resolved at runtime) |
+| Bootstrap staged files | `.gitignore`, `.claude/commands/relay.md`, `docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md`, `docs/NORTHSTAR.md`, `scripts/session_probe.py`, `.claude/hooks/session-start-probe.sh`, `.claude/settings.json` (path is variable — `<InputBundle.projectId>` is resolved at runtime) |
 | LORE documentType (bootstrap) | `decision` |
 | LORE epistemicType (bootstrap) | `FACT` |
 | LORE status (bootstrap) | `locked` |
@@ -388,19 +388,26 @@ Substitute all placeholders using the following map:
 
 Before writing, verify that zero placeholder strings of the form `<ALL-CAPS-WITH-HYPHENS>` remain in the resolved content. If any remain, the substitution is incomplete — do not write the file.
 
+### Substep 4.3.5 — Strip setup-only sections
+
+Remove every section delimited by `<!-- SETUP-ONLY:start -->` / `<!-- SETUP-ONLY:end -->` markers (inclusive of the marker lines themselves) from the resolved content. These sections contain instructions for creating this file from the template — they describe how the file the agent is now reading came to exist, not anything about the project — and have no ongoing value once bootstrap is complete.
+
+- **HALT if a `<!-- SETUP-ONLY:start -->` marker has no matching `<!-- SETUP-ONLY:end -->`** (or vice versa) in the resolved content: `Unmatched SETUP-ONLY marker in resolved CLAUDE.md content. Template may have changed. Resolve before proceeding.`
+- If zero marker pairs are found, proceed without stripping anything — the template may not have a setup-only section.
+
 ### Substep 4.4 — Write CLAUDE.md
 
 Write the resolved content to `CLAUDE.md` in the project root using the Write tool.
 
-### Substep 4.5 — Copy reference template
+### Substep 4.5 — No reference template copy
 
-Copy `~/.claude/templates/HOMELAB-CLAUDE.md.template` to `HOMELAB-CLAUDE.md.template` in the project root. This reference copy is staged and committed in Step 12. Note: `CLAUDE.md` is gitignored by Step 7 and excluded from all commits.
+The seed template is not copied into the project root or committed. `~/.claude/templates/HOMELAB-CLAUDE.md.template` remains the sole runtime-read copy; the agent-rig repo remains its source-of-record (DDR-014). Note: `CLAUDE.md` is gitignored by Step 7 and excluded from all commits.
 
 ---
 
 ## Step 4.5 — Northstar
 
-**Editorial note:** Step 4 already ends with its own `Substep 4.5` (Copy reference template, above). This new top-level section is `## Step 4.5 — Northstar` — a different heading level and namespace (`Step` vs `Substep`), so there is no literal collision, but the coincidence is worth flagging so a future reader does not confuse "Substep 4.5" (Step 4's last substep) with "Step 4.5" (this new step).
+**Editorial note:** Step 4 already ends with its own `Substep 4.5` (No reference template copy, above). This new top-level section is `## Step 4.5 — Northstar` — a different heading level and namespace (`Step` vs `Substep`), so there is no literal collision, but the coincidence is worth flagging so a future reader does not confuse "Substep 4.5" (Step 4's last substep) with "Step 4.5" (this new step).
 
 Draft `docs/NORTHSTAR.md` from `InputBundle.projectContext` (collected in Step 1) and gate it on Danny's explicit confirmation before writing — thesis and drift-tripwires are judgment calls, not something to silently invent and commit. This step must complete before Step 5 begins.
 
@@ -791,10 +798,10 @@ ls docs/NORTHSTAR.md
 
 `<InputBundle.projectId>` in the command above is a documentation placeholder — the executing agent substitutes the confirmed `projectId` value before running this command.
 
-Stage exactly these eight items — no others:
+Stage exactly these seven items — no others:
 
 ```bash
-git add .gitignore HOMELAB-CLAUDE.md.template .claude/commands/relay.md docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md docs/NORTHSTAR.md scripts/session_probe.py .claude/hooks/session-start-probe.sh .claude/settings.json
+git add .gitignore .claude/commands/relay.md docs/specs/<InputBundle.projectId>-ddrs/00-DDR-INDEX.md docs/NORTHSTAR.md scripts/session_probe.py .claude/hooks/session-start-probe.sh .claude/settings.json
 ```
 
 Run `git status` and verify that `CLAUDE.md` and `MACHINE-SETUP.md` appear as excluded (listed under gitignore-excluded files, not in the staged set). If either file appears in the staged set, do not commit — investigate and resolve before proceeding.
@@ -854,6 +861,7 @@ Record the pending action.
 | Pre-flight | gh CLI not authenticated or wrong account | `gh auth status` failed or shows account other than dannySubsense. Run `gh auth login` as dannySubsense. |
 | Pre-flight | LORE gateway unreachable | `check_health` failed. Verify lore-gateway MCP is registered and LORE DB is reachable over Tailscale. |
 | Step 4 | HOMELAB-CLAUDE.md.template missing | Template not found at `~/.claude/templates/HOMELAB-CLAUDE.md.template`. Verify the template deploy at ~/.claude/templates/ (source-of-record: agent-rig repo). |
+| Step 4 | Unmatched `SETUP-ONLY` marker in resolved content | Unmatched SETUP-ONLY marker in resolved CLAUDE.md content. Template may have changed. Resolve before proceeding. |
 | Step 5 | `docs/NORTHSTAR.md` not found before Step 5 begins | `docs/NORTHSTAR.md not found. Step 4.5 did not complete successfully. Resolve Step 4.5 before proceeding.` |
 | Step 6 | MACHINE-SETUP.md.template missing | Template not found at `~/.claude/templates/MACHINE-SETUP.md.template`. Verify the template deploy at ~/.claude/templates/ (source-of-record: agent-rig repo). |
 | Step 6.5 | `.claude/settings.json` exists but has no `SessionStart` block | Do not guess at a merge — HALT and surface the existing file's contents to Danny for manual reconciliation. |
