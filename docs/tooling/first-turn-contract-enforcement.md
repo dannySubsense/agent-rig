@@ -395,6 +395,17 @@ rules out is the shape of the observed live failure: a turn that asserts a Pilla
 the transcript shows zero tool invocations of any kind before it. It does not, and per Intake §4
 cannot, verify that the tool calls that did run are the ones the Pillar claims describe.
 
+**Observed 2026-08-18 — same-turn tool calls do not satisfy C3.** A session-start turn that ran
+real, on-topic verifying tool calls (git status/log, Switchboard read, LORE search) and then wrote
+a "**Pillar:**" heading *in that same assistant turn* still tripped C3, because `preceding` is
+`records[:current_turn_index]` — the current turn's own tool calls are excluded by construction
+(consistent with this section as written above; not a parsing bug). Net effect: the first reply of
+a session, if it verifies and reports in one turn, will always trip C3, regardless of whether the
+verification was real. Confirmed by reading this probe's logic directly, not inferred.
+Disposition per Danny (2026-08-18): document and watch, no code change yet — re-open only if this
+recurs and turns out to cause the agent to produce a *false* explanation of the failure (as
+happened once this session) rather than just eating the friction of a second turn.
+
 ---
 
 ## 6. Track-record log
