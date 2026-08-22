@@ -15,11 +15,12 @@ Deep-diagnosis evidence:
 Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
 
 ## Forge Gate
-Counter: 0/3 (binding gate — runs once at feature completion per standard cycle, not consumed by the slice-scoped check below)
+Counter: 1/3
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
 |---|---|---|---|---|
 | Slice-1-check (non-binding) | 2026-08-22 | PASS | Frank reviewed Slice 1 (probe core) only, ahead of standard cycle ordering — Danny corrected mid-session to standard per-slice qc-agent + binding gate at feature completion, so this does not count against the 3-attempt binding budget. Ran the real test suite (17/17 pass, 0.07s), verified §6 step 3 normalization and §6 step 4 scan-surface restriction directly in code (not just via test names) — both prior spec-gate failure classes confirmed closed. Deny shape, fail-open, §7 schema field names all verified. Two minor non-blocking notes carried to Slice 2: wrapper must guarantee `$CLAUDE_PROJECT_DIR` is set; step-1 non-Edit/Write track-record entries record a slightly misleading `manifest_status`. Layer 2 PASS, non-PROVISIONAL. | n/a |
+| 1 | 2026-08-22 | PASS (binding, final) | All 3 slices complete. Layer 1 PASS: live-fired the real wrapper (not the fix report) to confirm the Slice-3 exec-bit bug is genuinely fixed — deny/allow both produced correctly; confirmed via `ls -la` + direct-executable invocation path. Ran all three suites live: probe 17/17, corpus 10/10, wrapper 15/15 = 42/42. All 9 ACs mapped to passing tests; AC4's deny additionally verified live. Cross-slice consistency confirmed (wrapper's assumptions match probe behavior, no double-logging). Confirmed NOT wired into `.claude/settings.json` (grep, zero matches). Two trivial non-blocking notes (a stale date in a comment; the carried Slice-1 `manifest_status` nit). Layer 2 PASS, non-PROVISIONAL. **Orchestrator's own independent check** (separate from Frank's): re-confirmed settings.json unwired, exec bits correct, clean 4-commit branch history, and a real live-fire against agent-rig's own tree (no manifest present) correctly resolves to allow per §4's posture — no discrepancies found, concurs with PASS. | n/a |
 
 Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
 Deep-diagnosis evidence:

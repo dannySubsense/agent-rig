@@ -437,6 +437,52 @@ manifest JSON parsing) — only the optional schema-validation convenience noted
 - Reusing the bare `PROVISIONAL` marker as the citation format — rejected in §5 with rationale (the
   two claims are semantically different; conflating them defeats DDR-0014's purpose).
 
+## 13. Adopting This Hook in Another Repo
+
+Retrofit is out of scope for this sprint (§2) — this section is a short how-to for whoever does it
+later (named consumer: `gap-lens-dilution-filter`, per DDR-0014/DDR-006).
+
+**1. Copy the mechanism.** Bring over `.claude/hooks/domain-boundary-provenance.sh`,
+`scripts/domain_boundary_provenance_probe.py`, and register the hook for `PreToolUse` on
+`Edit`/`Write` in the target repo's `.claude/settings.json`, matching how
+`first-turn-contract.sh` is registered there today.
+
+**2. Write the manifest.** Create `docs/tooling/domain-boundary-manifest.json` in the target repo,
+validating against `domain-boundary-manifest.schema.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "pipelineConfigGlobs": ["src/pipelines/*.py", "config/*.yaml"],
+  "externalSourceIdentifiers": ["MAX_BYTE_CAP", "re:daily_universe\\."]
+}
+```
+
+- `pipelineConfigGlobs`: which files in *this* repo the hook inspects on Edit/Write. Only files
+  matching one of these globs are checked at all — everything else passes silently. Glob syntax is
+  `fnmatch.fnmatch()`, not shell glob: `*` crosses path separators, and `**` has no special meaning
+  (behaves like `*`).
+- `externalSourceIdentifiers`: the specific constants, flags, or references that count as a
+  cross-domain read in this pipeline — a literal substring, or a `re:`-prefixed regex. Start from
+  the pipeline's own known trouble spots (imported constants, config keys owned by another
+  pipeline) rather than trying to be exhaustive on day one; the manifest can grow over time.
+
+If no manifest exists at that path, the hook allows every edit unchecked — writing the manifest is
+the entire opt-in.
+
+**3. Cite in practice.** When an edit introduces a matched identifier, add a `DOMAIN-BOUNDARY:`
+comment within 5 lines of it, on its own line, with the marker followed by non-whitespace content:
+
+```python
+# DOMAIN-BOUNDARY: floor sourced from market_data's daily_universe view;
+# see DDR-0014 for why this repo now owns its own ceiling constant instead.
+MAX_BYTE_CAP = 50_000
+```
+
+No marker within the 5-line window → the edit is denied, with a reason naming the file, the
+matched identifier, and this same remediation. A marker that exists but is wrong or stale still
+passes — this hook checks presence only, not correctness (§9).
+
 ## 12. Open Items Carried to Forge
 
 - **§5's 5-line proximity window and §6's 5s timeout** — both explicitly PROVISIONAL, owner wright,
