@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-rig/docs/tooling/domain-boundary-manifest.schema.json",
+  "title": "DomainBoundaryManifest",
+  "description": "Schema for a target repo's docs/tooling/domain-boundary-manifest.json, per docs/tooling/domain-boundary-provenance-hook.md §4. Declares the pipeline config/spec files this hook inspects (pipelineConfigGlobs) and the identifiers that count as domain-boundary reads requiring a DOMAIN-BOUNDARY: citation (externalSourceIdentifiers).",
+  "type": "object",
+  "required": ["schemaVersion", "pipelineConfigGlobs", "externalSourceIdentifiers"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "description": "Schema version. v1 only value: 1.",
+      "const": 1
+    },
+    "pipelineConfigGlobs": {
+      "description": "Glob patterns (relative to repo root, POSIX-style, matched with Python's stdlib fnmatch.fnmatch()). '*' matches any characters INCLUDING path separators; '**' has no special recursive meaning and behaves identically to '*'. Identifies files this pipeline treats as its own config/spec surface — the files this hook inspects on Edit/Write. A file not matching any entry is never inspected (silent pass).",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "externalSourceIdentifiers": {
+      "description": "Explicit list of identifiers that, if found in an inspected file's proposed content, count as a domain-boundary read requiring citation. Each entry is a literal substring or a 're:'-prefixed Python regex (case-sensitive). No wildcard/glob semantics here.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
