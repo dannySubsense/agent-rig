@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "pipelineConfigGlobs": [
+    "docs/tooling/*.json",
+    "pipelines/*/config.json",
+    "pipelines/*/spec.json"
+  ],
+  "externalSourceIdentifiers": [
+    "EXTERNAL_CAP_V1",
+    "MARKET_DATA_FLOOR",
+    "re:UNIVERSE_[A-Z_]+_THRESHOLD"
+  ]
+}

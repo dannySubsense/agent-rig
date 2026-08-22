@@ -1,0 +1,158 @@
+{
+  "source": "Self-authored corpus for domain-boundary-provenance-hook Slice 3, per docs/tooling/domain-boundary-provenance-hook.md §6's fixture-corpus requirement and §8 AC7's named minimum case list. Paired with tests/fixtures/domain_boundary_manifest_fixture.json (schemaVersion 1, pipelineConfigGlobs: docs/tooling/*.json + pipelines/*/config.json + pipelines/*/spec.json, externalSourceIdentifiers: EXTERNAL_CAP_V1, MARKET_DATA_FLOOR, re:UNIVERSE_[A-Z_]+_THRESHOLD). Each case's file_path is repo-root-relative unless is_absolute is true, in which case the test harness must join it onto the fixture project root to produce a real absolute path before invoking the probe -- the corpus itself cannot express an absolute path, since the project root only exists at test-run time (tmp_path).",
+  "note_ac7_wording": "AC7's prose says the marker-just-outside-window case is 'at line 6' while §5's own normative text defines the window as 'within 5 lines, inclusive' -- meaning a marker at distance 5 is INSIDE the window (allow), and only distance 6 is outside (deny). The implementation (PROXIMITY_WINDOW = 5, inclusive both directions) follows §5 correctly; AC7's line-6 example is consistent with that (distance 6 = deny), but the surrounding paragraph is easy to misread as implying distance 5 already denies. This corpus adds the distance-5 case explicitly (case id distance_5_boundary_allows) as the missing positive control the QC notes on Slice 1/2 flagged as untested. Do not silently edit the locked spec -- this note exists so the wording issue is visible to a follow-up review.",
+  "cases": [
+    {
+      "id": "no_manifest",
+      "description": "No manifest present at docs/tooling/domain-boundary-manifest.json -> allow, manifest_status absent_or_invalid.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "docs/tooling/pipeline.json",
+      "is_absolute": false,
+      "content": "EXTERNAL_CAP_V1 = 5\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "absent_or_invalid"
+      }
+    },
+    {
+      "id": "out_of_scope_file",
+      "description": "File does not match any pipelineConfigGlobs entry -> allow, file_in_scope false.",
+      "use_manifest": true,
+      "tool_name": "Write",
+      "file_path": "src/app.py",
+      "is_absolute": false,
+      "content": "EXTERNAL_CAP_V1 = 5\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "matched",
+        "file_in_scope": false
+      }
+    },
+    {
+      "id": "in_scope_no_match",
+      "description": "In-scope file whose content contains no externalSourceIdentifiers match -> allow, matches_found 0.",
+      "use_manifest": true,
+      "tool_name": "Write",
+      "file_path": "docs/tooling/pipeline.json",
+      "is_absolute": false,
+      "content": "totally unrelated content, nothing tracked here\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "matched",
+        "file_in_scope": true,
+        "matches_found": 0
+      }
+    },
+    {
+      "id": "in_scope_match_cited",
+      "description": "In-scope match with a qualifying DOMAIN-BOUNDARY marker within the window -> allow.",
+      "use_manifest": true,
+      "tool_name": "Write",
+      "file_path": "docs/tooling/pipeline.json",
+      "is_absolute": false,
+      "content": "# DOMAIN-BOUNDARY: sourced from market_data's daily_universe view, see DDR-0014\nEXTERNAL_CAP_V1 = 5\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "matched",
+        "file_in_scope": true,
+        "matches_found": 1,
+        "matches_cited": 1
+      }
+    },
+    {
+      "id": "in_scope_match_uncited",
+      "description": "In-scope match with no qualifying marker anywhere in the window -> deny.",
+      "use_manifest": true,
+      "tool_name": "Write",
+      "file_path": "docs/tooling/pipeline.json",
+      "is_absolute": false,
+      "content": "EXTERNAL_CAP_V1 = 5\n",
+      "expect": {
+        "decision": "deny",
+        "manifest_status": "matched",
+        "file_in_scope": true,
+        "matches_found": 1,
+        "matches_cited": 0
+      }
+    },
+    {
+      "id": "marker_just_outside_window",
+      "description": "Marker at distance 6 (lines) from the match -- one line past the inclusive 5-line window -- must deny. AC7 names this 'boundary case at line 6'.",
+      "use_manifest": true,
+      "tool_name": "Write",
+      "file_path": "docs/tooling/pipeline.json",
+      "is_absolute": false,
+      "content": "EXTERNAL_CAP_V1 = 5\nfiller line 1\nfiller line 2\nfiller line 3\nfiller line 4\nfiller line 5\n# DOMAIN-BOUNDARY: too far away\n",
+      "expect": {
+        "decision": "deny",
+        "manifest_status": "matched",
+        "file_in_scope": true,
+        "matches_found": 1,
+        "matches_cited": 0
+      }
+    },
+    {
+      "id": "distance_5_boundary_allows",
+      "description": "Marker at exactly distance 5 (lines) from the match -- the inclusive edge of PROXIMITY_WINDOW per §5's normative text ('within 5 lines, inclusive') -- must allow, not deny. This is the true edge case Slice 1/2 QC found untested (existing tests covered distance 4 and distance 6 only).",
+      "use_manifest": true,
+      "tool_name": "Write",
+      "file_path": "docs/tooling/pipeline.json",
+      "is_absolute": false,
+      "content": "EXTERNAL_CAP_V1 = 5\nfiller line 1\nfiller line 2\nfiller line 3\nfiller line 4\n# DOMAIN-BOUNDARY: exactly at the inclusive edge\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "matched",
+        "file_in_scope": true,
+        "matches_found": 1,
+        "matches_cited": 1
+      }
+    },
+    {
+      "id": "pre_existing_uncited_match_unrelated_edit",
+      "description": "Edit whose new_string never touches the pre-existing uncited match elsewhere in the file -- scan surface is new_string only, so this must not be denied.",
+      "use_manifest": true,
+      "tool_name": "Edit",
+      "file_path": "docs/tooling/pipeline.json",
+      "is_absolute": false,
+      "new_string": "totally unrelated replacement text, no identifiers here\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "matched",
+        "file_in_scope": true,
+        "matches_found": 0
+      }
+    },
+    {
+      "id": "absolute_path_vs_relative_glob",
+      "description": "A manifest glob written relative to repo root (docs/tooling/*.json) must match a realistic, non-relativized ABSOLUTE tool_input.file_path -- the real PreToolUse envelope shape.",
+      "use_manifest": true,
+      "tool_name": "Write",
+      "file_path": "docs/tooling/foo.json",
+      "is_absolute": true,
+      "content": "EXTERNAL_CAP_V1 = 5\n",
+      "expect": {
+        "decision": "deny",
+        "manifest_status": "matched",
+        "file_in_scope": true,
+        "matches_found": 1,
+        "matches_cited": 0
+      }
+    },
+    {
+      "id": "absolute_path_outside_project_dir",
+      "description": "Absolute tool_input.file_path resolving outside $CLAUDE_PROJECT_DIR entirely -> allow, file_in_scope false, no glob match attempted (the step 3 fail-open edge case). is_absolute_outside_root signals the harness to build this path against a sibling directory of the fixture project root, not under it.",
+      "use_manifest": true,
+      "tool_name": "Write",
+      "file_path": "docs/tooling/foo.json",
+      "is_absolute": true,
+      "is_absolute_outside_root": true,
+      "content": "EXTERNAL_CAP_V1 = 5\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "matched",
+        "file_in_scope": false
+      }
+    }
+  ]
+}

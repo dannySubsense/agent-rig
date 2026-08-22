@@ -85,10 +85,10 @@ PYEOF
 }
 
 # PROVISIONAL — owner: wright. 5s budget, reused as a starting value from
-# first-turn-contract.sh's own measured-and-cited 5s bound, but NOT itself measured for this
-# probe (this probe does manifest file I/O the sibling probe does not). Forge must measure this
-# probe's actual runtime against representative manifest sizes before this value is treated as
-# settled — see docs/tooling/domain-boundary-provenance-hook.md §6's timeout note.
+# first-turn-contract.sh's own measured-and-cited 5s bound. Measured 2026-08-21 against a
+# representative fixture manifest, 10 runs: probe-only median ~60ms (range 50-90ms), full
+# wrapper end-to-end median ~140ms — see docs/tooling/domain-boundary-provenance-hook.md §6's
+# timeout note.
 PROBE_EXIT=0
 timeout 5 "$REPO_DIR/scripts/domain_boundary_provenance_probe.py" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
 
