@@ -15,10 +15,11 @@ Deep-diagnosis evidence:
 Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
 
 ## Forge Gate
-Counter: 0/3
+Counter: 0/3 (binding gate — runs once at feature completion per standard cycle, not consumed by the slice-scoped check below)
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
 |---|---|---|---|---|
+| Slice-1-check (non-binding) | 2026-08-22 | PASS | Frank reviewed Slice 1 (probe core) only, ahead of standard cycle ordering — Danny corrected mid-session to standard per-slice qc-agent + binding gate at feature completion, so this does not count against the 3-attempt binding budget. Ran the real test suite (17/17 pass, 0.07s), verified §6 step 3 normalization and §6 step 4 scan-surface restriction directly in code (not just via test names) — both prior spec-gate failure classes confirmed closed. Deny shape, fail-open, §7 schema field names all verified. Two minor non-blocking notes carried to Slice 2: wrapper must guarantee `$CLAUDE_PROJECT_DIR` is set; step-1 non-Edit/Write track-record entries record a slightly misleading `manifest_status`. Layer 2 PASS, non-PROVISIONAL. | n/a |
 
 Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
 Deep-diagnosis evidence:
