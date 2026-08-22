@@ -207,3 +207,31 @@ same properties — no decisions needed beyond "go", checkable output — is alr
 > details yourself. Report when done or blocked."
 
 The judgment criterion is unchanged and is the whole point: **does the file exist.**
+
+---
+
+## 10. Related research (2026-08-21, updated same day — findings complete)
+
+External research plan and completed findings: `docs/research/ddr-005-context-ratio/` (`RESEARCH-PLAN.md`,
+`FINDINGS.md`). Scoped to gather citable evidence (Anthropic's own docs, academic literature,
+practitioner community, other agent frameworks) bearing on §1's ratio-inversion claim and §7's open
+questions, before this DRAFT advances further — per this repo's Decision Discipline, "best practice"
+claims need a source, not just this session's diagnosis. Kept as a separate document rather than
+folded into this DDR, for the same reason §9 gives for existing at all: a single-source diagnosis
+reviewed by nobody is the failure this family of DDRs warns against.
+
+**Findings summary** (`FINDINGS.md` §1): the evidence corroborates the core mechanism (large,
+conduct-heavy standing context degrades instruction adherence generally, not just conduct compliance)
+and strongly corroborates moves (1) short standing files and (3) mechanize-into-hooks — Anthropic's
+own docs state bloated CLAUDE.md files cause instructions to be ignored, and Claude Code's hooks
+system is exactly the "rules that live as failing checks get satisfied" mechanism §1 proposes.
+**Not corroborated**: the specific ~90/10 ratio number and the "theatrics of rigor" causal story —
+no source anywhere measures a conduct-vs-task ratio; that framing is original to this DDR, not
+literature-derived. **Complicates §9's dissent in both directions**: one community source reports no
+measurable adherence difference from 25–500 lines (undercuts the "length causes degradation" causal
+claim, reframes brevity as a cost argument); one academic benchmark found system-prompt *removal*
+causes universal multi-turn performance degradation (supports "the corpus is load-bearing," some
+support for the producer's anti-deletion position). §7's four open questions remain largely
+unaddressed by external evidence — see `FINDINGS.md` §4 for the per-question breakdown; question 4
+(delete-on-replacement vs. all-at-once) was explicitly searched for and confirmed absent from the
+literature, so it stays a judgment call this repo has to make without outside precedent.
