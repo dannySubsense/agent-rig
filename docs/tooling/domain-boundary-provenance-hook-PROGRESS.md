@@ -1,12 +1,12 @@
 # Progress: domain-boundary-provenance-hook
 
-## Status: IN_PROGRESS
+## Status: COMPLETE — Frank binding forge-gate PASS (both layers, non-PROVISIONAL, attempt 1/3), logged in GATE-LOG.md. Not wired into `.claude/settings.json` — separate, deliberate, unmade decision.
 
 ## Slices
 - [x] Slice 1: Probe core — COMPLETE 2026-08-22 (17/17 tests, QC PASS, non-binding Frank check PASS) — `scripts/domain_boundary_provenance_probe.py` (manifest loading/schema validation, path normalization, scan-surface/citation-window detection, track-record writing; AC1-AC7)
 - [x] Slice 2: Wrapper, wiring, manifest schema — COMPLETE 2026-08-22 (15/15 wrapper tests, 17/17 probe regression, QC PASS). Wrapper/schema/gitignore only — NOT wired into `.claude/settings.json` (deliberately deferred, separate decision).
 - [x] Slice 3: Self-test fixture corpus + live demonstration — COMPLETE 2026-08-22 (27/27 probe+corpus, 15/15 wrapper, QC PASS). **Found and fixed a real bug**: probe script lacked its executable bit, so the wrapper had never successfully executed it — every real invocation would have silently fail-opened via exit 126. Fixed (chmod +x), re-verified independently by QC (reproduced the exit-126 failure, confirmed the fix, fired the real wrapper end-to-end for deny and allow). Timeout measured: ~60ms probe-only median, ~140ms wrapper end-to-end, 5s bound retained (>50x headroom).
-- [ ] **Frank binding forge-gate** — PENDING. Runs once, only after every slice above is checked off. Do not set Status: COMPLETE before this line is checked and its verdict is transcribed into GATE-LOG.md's `## Forge Gate` section.
+- [x] **Frank binding forge-gate** — PASS, both layers, non-PROVISIONAL, attempt 1/3. Verdict in GATE-LOG.md's `## Forge Gate` section.
 
 ## Current
 Slice: 3
