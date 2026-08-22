@@ -371,8 +371,9 @@ interface TrackRecordEntry {
    (a log write failure never changes the allow/deny decision already computed) — same guarantee as
    the sibling hook's `write_track_record`.
 7. The self-test fixture corpus (§6) exercises, at minimum: no-manifest, out-of-scope file,
-   in-scope-no-match, in-scope-match-cited, in-scope-match-uncited, marker-just-outside-window
-   (boundary case at line 6), pre-existing-uncited-match-unrelated-edit — an Edit whose
+   in-scope-no-match, in-scope-match-cited, in-scope-match-uncited, the true window edge at
+   distance 5 (allows, per §5's "5 lines, inclusive"), marker-just-outside-window (distance 6,
+   denies), pre-existing-uncited-match-unrelated-edit — an Edit whose
    `old_string`/`new_string` do not touch the line carrying a pre-existing, uncited
    `externalSourceIdentifiers` match elsewhere in the file, asserted **not denied** (§6 step 4's
    scan-surface scope: only `new_string`/`content` is inspected, never the rest of the file) — and
