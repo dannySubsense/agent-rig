@@ -12,3 +12,8 @@ __pycache__/
 # gitignored so every Stop-hook append does not permanently dirty the tree (would corrupt
 # session-queue-hardening's git-state dirty: derivation).
 docs/tooling/first-turn-contract-track-record.jsonl
+
+# domain-boundary-provenance-hook track record — repo-local, working-copy only (spec §6):
+# same rationale as the sibling entry above, gitignored so every PreToolUse-hook append does
+# not permanently dirty the tree.
+docs/tooling/domain-boundary-provenance-track-record.jsonl
