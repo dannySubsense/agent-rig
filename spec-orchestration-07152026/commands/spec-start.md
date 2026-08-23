@@ -78,6 +78,16 @@ any doubt whether something qualifies, it doesn't: run the full sequence above i
 orchestrator, not the human, is responsible for pushing back if `--lite` is requested for
 something that is really a feature — this is a HALT-and-ask, not a silent downgrade.
 
+### Lite Mode File Layout
+
+**Every artifact for a lite-mode feature lives together, under one folder:
+`docs/tooling/{tool-name}/`** — `INTAKE.md`, `SPEC.md`, `GATE-LOG.md`, `PROGRESS.md`, and
+`.gate-snapshots/`. Not scattered across a sprint directory and a flat `docs/tooling/` filename
+prefix (the old convention) — one place to look for everything about one feature. The only
+exception is the DDR, if one exists (`docs/specs/agent-rig-ddrs/DDR-NNN-*.md`), which stays with
+other DDRs since it's a different lifecycle (a decision record, indexed alongside sibling DDRs),
+not a build artifact.
+
 ### What it skips, and why that's safe
 
 Lite mode skips Intake, Interview, `NORTH-STAR.md`, `01-REQUIREMENTS.md`, `03-UI-SPEC.md`, and
@@ -110,7 +120,7 @@ Agent: @architect
 
 INPUTS
 - TOOL_NAME: [actual tool/utility name]
-- OUTPUT_PATH: docs/tooling/{tool-name}.md
+- OUTPUT_PATH: docs/tooling/{tool-name}/SPEC.md
 - CONTEXT: [the problem this tool solves, why it's needed, any known
   defect history or precedent it's grounded in — the orchestrator's own
   words, not a template]
@@ -131,12 +141,12 @@ CONSTRAINTS
 - HALT on ambiguity
 
 OUTPUT
-Write: docs/tooling/{tool-name}.md
+Write: docs/tooling/{tool-name}/SPEC.md
 Report: Status + summary under 30 lines
 ═══════════════════════════════════════════════════════════════════
 ```
 
-VERIFY: `docs/tooling/{tool-name}.md` exists before proceeding.
+VERIFY: `docs/tooling/{tool-name}/SPEC.md` exists before proceeding.
 
 **Revision loop:** if Frank (Lite Step 2) or Danny's own review (Lite Step 3) finds the document
 not lock-ready, re-delegate to `@architect` with the specific findings as the map (not a
@@ -153,14 +163,15 @@ lock-ready," Layer 2 (project North Star relevance) still applies unchanged, rea
 `docs/NORTHSTAR.md` directly per the same DRAFT/PROVISIONAL rule.
 
 Lite mode has no sprint directory (`docs/specs/{feature}/`), so Step 8's `GATE_LOG` and
-`SNAPSHOT_DIR` paths do not apply as written. Substitute, scoped to lite mode only:
+`SNAPSHOT_DIR` paths do not apply as written. Substitute, scoped to lite mode only, per the Lite
+Mode File Layout above:
 
-- `GATE_LOG: docs/tooling/{tool-name}-GATE-LOG.md` (this session's Frank spec-gate verdict is
+- `GATE_LOG: docs/tooling/{tool-name}/GATE-LOG.md` (this session's Frank spec-gate verdict is
   written to a `## Spec Gate` section in this file; `/forge-start --lite`'s own Frank forge-gate
   reuses the same file, adding a `## Forge Gate` section alongside it, per
   `forge-07152026/commands/forge-start.md`'s Lite-mode section — this file is the shared handoff
   point between the two, so its path must match exactly)
-- `SNAPSHOT_DIR: docs/tooling/.gate-snapshots/{tool-name}/spec/` (same snapshot-before-retry
+- `SNAPSHOT_DIR: docs/tooling/{tool-name}/.gate-snapshots/spec/` (same snapshot-before-retry
   procedure as Step 8: on each FAIL/HALT verdict, copy the current state of the single document
   in `ARTIFACTS` into `SNAPSHOT_DIR/attempt-{N}/` before re-delegation)
 
@@ -186,6 +197,10 @@ FAIL → HALT
   Blocking: Any downstream doc generation
   Needs: Danny to author/approve INTAKE.md via INTAKE-TEMPLATE.md
 ```
+
+**Lite mode path override**: `--lite` uses `docs/tooling/{tool-name}/INTAKE.md` instead of
+`docs/specs/{feature}/INTAKE.md`, per the Lite Mode File Layout above — same check, same
+case-insensitive `APPROVED` requirement, same mechanical FAIL on anything else.
 
 Anything other than an exact case-insensitive match of `APPROVED` on that Status line — a missing file, `DRAFT`, `REJECTED`, or the Status line absent entirely — is a FAIL. There is no "if exists" fallback and no partial credit: this gate is mechanical, not a judgment call, and it blocks every subsequent step in this sequence, including the Interview stage.
 
@@ -677,7 +692,8 @@ When the human provides a feature request:
 
 1. Acknowledge the request
 2. Propose a FEATURE_NAME (kebab-case, e.g., `model-viewer`)
-3. Create the output directory: `mkdir -p docs/specs/{FEATURE_NAME}`
+3. Create the output directory: `mkdir -p docs/specs/{FEATURE_NAME}` (full mode) or
+   `mkdir -p docs/tooling/{FEATURE_NAME}` (`--lite` mode, per Lite Mode File Layout above)
 4. Run Step 0 — the Intake gate — before anything else
 
 ---

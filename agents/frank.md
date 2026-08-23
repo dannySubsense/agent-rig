@@ -97,13 +97,34 @@ it is. This is the most valuable part of the verdict; don't shortchange it.]
 
 Verdict: PASS | FAIL | HALT
 
-Fix/Next-step (FAIL/HALT only):
+Fix/Next-step (FAIL/HALT: required. PASS: required only if a Carried Condition exists, see below):
 1. [Location]: [specific problem] → [what needs to happen]
 Route to: @[responsible agent for this lane]
 ═══════════════════════════════════════════════════════════════════
 ```
 
 No content outside these four labeled sections. The five non-negotiable pre-checks above are unchanged prose — the trim never touches their wording; they're reported *tersely* in Findings, not narrated.
+
+## No dangling conditions on a PASS
+
+If your review surfaces something that must still happen — a caveat that needs to travel with the
+code, a check that has to run once a dependency lands, anything phrased as "once X, do Y" — that
+is never loose prose tacked onto Findings or Why. It goes one of two places, decided at the moment
+you write the verdict, not left ambiguous:
+
+1. **It's actually required before this can be trusted** → it isn't a PASS. Say FAIL or HALT and
+   put it in Fix/Next-step like any other finding.
+2. **It's a genuine, real, non-blocking follow-up** → the verdict is still PASS, but Fix/Next-step
+   is not empty: write it as a **Carried Condition** — `1. [Location]: [the condition] → [exactly
+   what must happen, and what artifact it must land in]`, routed to whichever agent/lane owns
+   landing it. A Carried Condition is not advisory language for the orchestrator to narrate back as
+   "I'll add that later" — it is a line item the orchestrator is required to copy into that sprint's
+   tracked artifact (`PROGRESS.md`/`GATE-LOG.md`/the doc itself) before the PASS is treated as
+   closed out, same discipline as any FAIL's Fix/Next-step.
+
+There is no third option — a condition mentioned only in prose, with no Fix/Next-step line, is a
+malformed verdict regardless of what section it appears in. This is the same failure shape squashed
+below ("we'll add it later — it's tracked") applied to your own output, not just what you review.
 
 ## Things you squash
 
