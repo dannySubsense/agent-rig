@@ -15,6 +15,51 @@ Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
 Deep-diagnosis evidence:
 Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
 
+## Post-approval revision (Danny-directed, 2026-08-23)
+
+At human review, Danny rejected §9's originally-accepted mutation/deletion bypass (a checkbox-flip
+edit that also changes the description or drops the PROOF: segment was silently allowed) — required
+it be denied, not accepted. Six further Frank supplementary rounds followed, all FAIL until the
+seventh PASS, each finding real and progressively deeper:
+
+1. C2 deny mechanism added (mutation → deny). PASS on the mechanism, FAIL on residual-gap accuracy.
+2. Residual statement corrected, still understated the attack surface (single-call line-count-mismatch
+   variant cheaper than the stated two-call dodge). FAIL.
+3. Residual statement corrected again — found a THIRD variant (line reordering breaks positional/
+   index-based matching entirely). FAIL. Danny: stop patching instances, redesign the mechanism.
+4. Real redesign — index-based line diffing replaced with identity-based matching (description
+   segment primary key, PROOF segment fallback). Closes the whole positional family (line-count
+   mismatch, reordering) at once. Surfaced one new honest residual: simultaneous description+PROOF
+   mutation in one edit has no surviving content-based identity key.
+5. Danny's decision: close that via a new optional `SLICE-ID:` segment (stable, author-assigned,
+   forward-only — never retrofitted onto existing PROGRESS.md files). Added, with fallback to
+   content-matching when absent. FAIL — over-claimed closure didn't account for the token itself
+   also changing in the same edit.
+6. Residual qualified precisely; Danny's decision recorded: accept the token-mutation variant as
+   residual (self-honesty threat model, not adversarial security; the two-call dodge is already
+   accepted and easier to exploit; a deny rule would false-positive on legitimate edits). Two
+   documentation-consistency FAILs followed (a stale contradictory clause left behind across two
+   sub-rounds) before all four sections (§4/§6/§9/§12) said the same thing once, with one owner.
+
+**Final PASS (2026-08-23)**, both layers, non-PROVISIONAL. Frank's verdict used the new Carried
+Condition structure (per the agents/frank.md fix shipped same session) instead of loose prose —
+copied verbatim into PROGRESS.md's Fix Attempts / Notes per that same rule:
+
+1. PROVISIONAL constants (allowlist content, 25s inner / 30s outer timeouts) → forge measures
+   against real proof commands before values are treated as settled. Route: forge.
+2. Edit-specific PreToolUse envelope shape has never been live-verified (only Write was captured,
+   for the sibling hook) → forge runs the same throwaway-hook live-capture method scoped to Edit
+   before trusting old_string/new_string presence and the deny shape. Route: forge.
+3. The two-call mutate-then-flip dodge (§12 item 1) — close now vs. accept — is an explicit open
+   decision point for Danny, at forge kickoff, not decided here.
+
+Also worth noting for future sessions: this revision cycle surfaced and corrected a real process
+error — Frank's dispatches in rounds 1-3 used unearned adversarial/hostile-actor framing
+("attacker," "dodge," "bypass") inherited from this session's higher-stakes hooks, applied to a
+self-honesty mechanism where the actual actor is an agent or human under time pressure, not a
+hostile party. Recalibrated from round 4 onward — review posture should match actual stakes, not
+default to whatever framing was used last.
+
 ## Forge Gate
 Counter: 0/3
 
