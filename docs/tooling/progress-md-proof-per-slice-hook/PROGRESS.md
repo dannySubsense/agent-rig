@@ -11,8 +11,14 @@
 - [x] Slice 2: Wrapper, allowlist, wiring prep — COMPLETE 2026-08-23 (15/15 wrapper tests, 34/34
       probe regression, QC PASS). `$CLAUDE_PROJECT_DIR` guarantee correct on first pass this time
       (sibling hook's Slice 2 bug not repeated). NOT wired into `.claude/settings.json` — deliberate.
-- [ ] Slice 3: Fixture corpus + live demonstration — full AC suite as reusable fixtures, real
-      fired-wrapper demonstration (the sibling's Slice 3 caught a real exec-bit bug this way).
+- [x] Slice 3: Fixture corpus + live demonstration — COMPLETE 2026-08-23 (55/55 probe+corpus,
+      15/15 wrapper, 2 rounds of QC — first FAIL was real: a fixture claimed to test AC7b's honest
+      residual but actually tested a happy path). Both Carried Conditions resolved: timeout
+      measurement (real pytest proof, ~2.1s median vs. 25s/30s budget, ~12x headroom) and Edit
+      envelope live-verification (confirmed via throwaway hook; found and documented a previously
+      unknown `replace_all` field, confirmed harmless to the probe, §7/§12 updated). Advisory,
+      non-blocking: no raw capture payload artifact committed for the replace_all observation —
+      cite this file if reproducibility is ever needed.
 - [ ] **Frank binding forge-gate** — PENDING. Runs once, after every slice above is checked off.
       Do not set Status: COMPLETE before this line is checked and its verdict is transcribed into
       GATE-LOG.md's `## Forge Gate` section.

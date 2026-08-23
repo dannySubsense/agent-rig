@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "allowedCommandPrefixes": [
+    "python3 scripts/"
+  ]
+}

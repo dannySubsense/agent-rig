@@ -520,24 +520,27 @@ failure, not a probe correctly reaching a deny verdict on the input it was given
 
 ```typescript
 /** PreToolUse stdin, fields this probe reads. Full envelope has more fields (session_id,
- *  transcript_path, etc.) — only fields this probe uses are listed. Shape confirmed by the
- *  sibling hook's live verification (domain-boundary-provenance-hook.md §3, 2026-08-22) for
- *  the same PreToolUse Edit/Write envelope on this same harness — not re-verified independently
- *  in this document; if PreToolUse's real envelope shape differs for Edit specifically (the
- *  sibling's own live capture covered Write only, per its §3 closing note), that gap is
- *  inherited here and remains open (§12). */
+ *  transcript_path, etc.) — only fields this probe uses are listed. Shape confirmed for Edit
+ *  specifically by this slice's own live verification (a real throwaway PreToolUse/Edit hook,
+ *  a real Edit call, a real captured payload, 2026-08-23) — old_string/new_string/file_path
+ *  presence and the deny-shape schema are independently confirmed for this hook's actual
+ *  Edit trigger surface, not merely inherited from the sibling hook's Write-only capture
+ *  (domain-boundary-provenance-hook.md §3, 2026-08-22). replace_all was also observed present
+ *  on the real Edit envelope and is recorded below though this probe does not currently read it. */
 interface ProgressProofHookInput {
   tool_name: string;                 // "Edit" | other (ignored)
   tool_input: {
     file_path: string;
     old_string?: string;
     new_string?: string;
+    replace_all?: boolean;
   };
 }
 
 interface ProgressProofHookOutput {
-  // Deny shape reused from the sibling/first-turn-contract precedent, not independently
-  // re-verified for this hook — see §12. One shape covers every denial kind (ambiguous-match
+  // Deny shape reused from the sibling/first-turn-contract precedent, independently re-verified
+  // for this hook's own Edit envelope (see the interface comment above and §12's closed item).
+  // One shape covers every denial kind (ambiguous-match
   // denial, C2 mutation-denial by either matching tier, and step-10 proof-fail/timeout-denial) —
   // `reason` is prose in all cases, distinguished only by its text content, not by a separate
   // field. No new top-level field is needed on this output schema: `decision`/`reason` already
@@ -811,13 +814,14 @@ prior hooks in this cluster (which never execute anything) but is stdlib, not a 
 - **§5's allowlist content, §6's 25s inner timeout, §6's 30s outer timeout** — all explicitly
   PROVISIONAL, owner wright, to be revisited against real declared proof commands and measured
   runtime, per §8 AC12.
-- **Envelope-shape re-verification for `Edit` specifically.** §7's schema inherits the sibling
-  hook's live-verified `Write` envelope shape without an independent `Edit`-specific capture in this
-  session (the sibling's own §3 already flags this as its own open gap). Forge should perform the
-  same throwaway-hook live-verification method the sibling used, scoped to `Edit`, before treating
-  `tool_input.old_string`/`new_string` field presence and the deny-shape schema as fully confirmed
-  for this hook's actual trigger surface — this document proceeds on the sibling's precedent as a
-  reasonable basis to build against, not as an independent confirmation.
+- **Envelope-shape re-verification for `Edit` specifically — CLOSED, 2026-08-23.** Forge performed
+  the same throwaway-hook live-verification method the sibling used (domain-boundary-provenance-hook
+  §3), scoped to `Edit`: a real throwaway `PreToolUse`/`Edit` hook was registered, a real `Edit` call
+  made, and the captured payload confirmed `tool_input.old_string`/`new_string`/`file_path` present
+  as assumed, plus a previously-unlisted `replace_all: boolean` field (now added to §7's schema).
+  The deny-shape schema was confirmed against this same capture. Cleanup of the throwaway hook was
+  verified. §7's interface comment now cites this capture directly rather than the sibling's
+  Write-only precedent.
 - **`shell=True` execution surface.** §6 step 10 runs the declared command through a shell (needed
   to support `&&`-chained multi-command proofs, §4). Forge should confirm no unintended shell
   metacharacter exposure beyond what an allowlisted command author already controls — the allowlist
