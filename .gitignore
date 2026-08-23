@@ -17,3 +17,8 @@ docs/tooling/first-turn-contract-track-record.jsonl
 # same rationale as the sibling entry above, gitignored so every PreToolUse-hook append does
 # not permanently dirty the tree.
 docs/tooling/domain-boundary-provenance-track-record.jsonl
+
+# progress-proof-per-slice-hook track record — repo-local, working-copy only (spec §6):
+# same rationale as the sibling entries above, gitignored so every PreToolUse-hook append does
+# not permanently dirty the tree.
+docs/tooling/progress-proof-per-slice-track-record.jsonl

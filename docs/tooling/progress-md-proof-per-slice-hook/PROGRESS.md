@@ -8,9 +8,9 @@
       not the earlier positional design superseded during spec review. Two non-blocking QC notes:
       `transitions_found` counts denials too (only defined for allow branch in spec); empty
       `SLICE-ID:` token accepted as a valid key (no bypass power granted, worth a guard later).
-- [ ] Slice 2: Wrapper, allowlist, wiring prep — `.claude/hooks/progress-proof-per-slice.sh`,
-      `docs/tooling/progress-proof-allowlist.json`, `.gitignore` entry. NOT wired into
-      `.claude/settings.json` — deliberate, deferred decision, same as the sibling hook.
+- [x] Slice 2: Wrapper, allowlist, wiring prep — COMPLETE 2026-08-23 (15/15 wrapper tests, 34/34
+      probe regression, QC PASS). `$CLAUDE_PROJECT_DIR` guarantee correct on first pass this time
+      (sibling hook's Slice 2 bug not repeated). NOT wired into `.claude/settings.json` — deliberate.
 - [ ] Slice 3: Fixture corpus + live demonstration — full AC suite as reusable fixtures, real
       fired-wrapper demonstration (the sibling's Slice 3 caught a real exec-bit bug this way).
 - [ ] **Frank binding forge-gate** — PENDING. Runs once, after every slice above is checked off.
@@ -18,7 +18,7 @@
       GATE-LOG.md's `## Forge Gate` section.
 
 ## Current
-Slice: 2
+Slice: 3
 Step: @code-executor
 Last updated: 2026-08-23
 
