@@ -877,6 +877,70 @@ prior hooks in this cluster (which never execute anything) but is stdlib, not a 
   list — both are closed universally by the identity-based redesign (§6, §9) and require no
   `SLICE-ID` or further forge follow-up.**
 
+## 13. Adopting This Hook in Another Repo
+
+This sprint ships the hook with agent-rig's own allowlist as its only v1 consumer (§5) — this
+section is a short how-to for whoever retrofits it into another repo later.
+
+**1. Copy the mechanism.** Bring over `.claude/hooks/progress-proof-per-slice.sh`,
+`scripts/progress_proof_per_slice_probe.py`, and register the hook for `PreToolUse` on `Edit` in
+the target repo's `.claude/settings.json`, matching how `first-turn-contract.sh` is registered
+there today.
+
+**2. Write the allowlist.** Create `docs/tooling/progress-proof-allowlist.json` in the target repo:
+
+```json
+{
+  "schemaVersion": 1,
+  "allowedCommandPrefixes": [
+    "pytest ",
+    "python3 -m pytest ",
+    "bash tests/"
+  ]
+}
+```
+
+`allowedCommandPrefixes` is an exact-prefix allowlist, not a glob/regex — a declared `PROOF:`
+command is trusted to run only if its full trimmed text starts with one of these entries verbatim.
+Start from the shapes your own proof commands actually take; anything not covered is never run — it
+is stamped `manual` and never blocks the `[x]` mark. If no allowlist file exists at that path, every
+declared `PROOF:` command is treated as `manual` and the hook never executes anything.
+
+**3. Declare a proof per slice.** Add a `PROOF:` marker as the last em-dash segment on a slice
+bullet line:
+
+```
+- [ ] Slice 4: Wrapper wiring — PROOF: bash tests/test_progress_proof_wrapper.sh
+```
+
+When the same line is later marked complete, `PROOF:` must remain the line's last segment — any
+new metadata (e.g. `COMPLETE 2026-08-24 (15/15 tests)`) goes between the description and `PROOF:`:
+
+```
+- [x] Slice 4: Wrapper wiring — COMPLETE 2026-08-24 (15/15 tests) — PROOF: bash tests/test_progress_proof_wrapper.sh
+```
+
+If the command is allowlisted, the hook runs it before the checkbox edit is allowed to land, and
+denies the edit on non-zero exit or timeout. If it isn't allowlisted, the mark is allowed
+unconditionally and logged `manual_unverified`. Declaring `PROOF:` at all is opt-in per slice —
+a line with no `PROOF:` marker is never checked (§4).
+
+**4. Optionally adopt `SLICE-ID`.** Add a `SLICE-ID: <token>` segment (placed after the description,
+before `PROOF:`) to give a slice a stable, content-independent identity key:
+
+```
+- [ ] Slice 7: Config loader — SLICE-ID: slice-07 — PROOF: pytest tests/test_config_loader.py
+```
+
+The token must stay unique within the file and never change once assigned, even across renaming or
+rewording of the slice. What it buys you: if a single edit changes *both* the description and the
+`PROOF:` command while flipping the checkbox, plain content-based matching has nothing left to key
+on and the edit falls through unmatched — with a matching `SLICE-ID` present and unchanged on both
+sides, the hook recognizes it as the same slice completing regardless of what else changed in that
+edit, and still runs the proof. `SLICE-ID` is forward-only and per-slice opt-in: this hook never
+adds one on a file's behalf, and a file that never adopts it is matched by description/`PROOF:`
+content alone, same as before.
+
 ---
 
 *This document does not self-lock. Per this repo's workflow, it proceeds to Frank's binding
