@@ -1,9 +1,9 @@
 # DDR-007 — No-Preamble / No-Meta-Narration Response Hook
 
-**Status**: DRAFT — Intake APPROVED, SPEC.md LOCKED, forge resumed 2026-08-24 after the lite-mode
-ceremony fix (branch/PR consent folded into spec approval — see `spec-start.md`/`forge-start.md`
-Lite Mode sections). Briefly SHELVED same day over duplicate-consent ceremony; reopened once the
-fix was made.
+**Status**: FORGE COMPLETE (2026-08-24) — implemented, tested, QC'd, Frank's binding forge-gate
+PASS (attempt 1/3, both layers, no PROVISIONAL). PR #16 ready-for-review, not yet merged. Ships in
+`log_only` mode — promotion to `blocking` is a separate, evidence-gated future decision per
+SPEC.md §6.4's PROVISIONAL threshold (owner: Danny), not authorized by this build.
 **Author**: wright
 **Date**: 2026-08-22 (index entry); this record authored 2026-08-24
 **Scope**: agent-rig build, cross-project reuse expected — same shape as DDR-006/DDR-008's
