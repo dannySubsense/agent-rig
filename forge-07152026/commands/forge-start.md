@@ -40,9 +40,17 @@ the same section `/lore-close`'s push gate already reads at session end. This ru
 Session Start, not per-slice.
 
 - **Declares PR / feature-branch flow** → before creating anything, ask Danny the one-time
-  consent prompt below. Only after explicit approval does @github-ops create (or check out, if it
-  already exists) a feature branch — `feature/{feature-name}`, per the git-operations skill's
-  naming convention — before Slice 1 begins. Every per-slice commit in the Forge Cycle below lands
+  consent prompt below — **unless this is a lite-mode session and `/spec-start --lite`'s Lite
+  Step 3 already recorded this same consent** alongside the spec approval (see that document's
+  Lite Step 3 procedure); in that case, treat consent as already given, state so explicitly in the
+  Session Start report ("Branch/PR consent already given at spec approval, proceeding"), and skip
+  re-asking. This is the one ceremony cut made 2026-08-24 (confirmed incident:
+  `no-preamble-no-meta-narration-hook` sprint, stopped mid-forge over a duplicate consent ask for a
+  decision Danny had effectively already made) — it removes a redundant repeat of the same
+  question, not the question itself; if lite-mode consent was declined or deferred at spec time,
+  ask fresh here as normal. Only after explicit approval (fresh or carried-forward) does
+  @github-ops create (or check out, if it already exists) a feature branch — `feature/{feature-name}`,
+  per the git-operations skill's naming convention — before Slice 1 begins. Every per-slice commit in the Forge Cycle below lands
   on this branch, never on the mainline. After branch creation and the first commit (the spec doc
   set), @github-ops pushes the branch and opens a **draft PR** immediately — title = sprint slug,
   body = links to NORTH-STAR/ROADMAP and a slice checklist. Before Slice 1, not after the gate.
@@ -114,10 +122,12 @@ feature.
   `docs/CADENCE.md` are still loaded/authored per the normal procedure; nothing about those two
   changes in lite mode.
 - **No `04-ROADMAP.md`.** The locked tooling spec's own Acceptance Criteria section is the slice
-  source: the Forge Advisor derives a slice breakdown directly from it (typically one slice per
-  major rule/component the spec defines, or a single slice if the tool is small enough that
-  splitting it would be artificial — orchestrator's judgment, stated explicitly before Slice 1
-  begins so Danny can object before work starts).
+  source: the Forge Advisor derives a slice breakdown directly from it. **Default to a single
+  slice** unless the spec's acceptance criteria clearly span independent, separately-testable
+  components (e.g. two unrelated scripts, or a component with its own distinct test surface) — most
+  bounded lite-mode tools are one slice, and treating that as the default rather than something
+  re-derived from scratch each time is itself part of the ceremony fix (2026-08-24). State the
+  chosen slice count explicitly before Slice 1 begins so Danny can object before work starts.
 - **`PROGRESS.md` still applies**, at `docs/tooling/{tool-name}/PROGRESS.md` (lite artifacts have
   no sprint directory to hold it) — same shape and update discipline as the full cycle's
   `docs/specs/{feature}/PROGRESS.md`.
@@ -126,12 +136,27 @@ feature.
   file — its `## Spec Gate` section stays as-is, this session's Frank forge-gate writes to a new
   `## Forge Gate` section in the same file, exactly like the full-cycle relationship between the
   two gates.
-- **The Forge Cycle (per slice), Forge Advisor Final Check, and Frank Binding Forge-Gate procedure
-  below are otherwise UNCHANGED** — same agents, same automated gates, same attempt-counter/
-  snapshot/convergence-judgment machinery at the binding gate, no manual override. Lite mode has no
-  sprint directory (`docs/specs/{feature}/`), so the Frank forge-gate contract's `SPRINT_NORTH_STAR`,
-  `GATE_LOG`, and `SNAPSHOT_DIR` paths do not apply as written below. Substitute, scoped to lite mode
-  only:
+- **The Forge Cycle's four roles (`@code-executor` → `@test-writer` → `@test-runner` →
+  `@qc-agent`), and Frank's Binding Forge-Gate procedure, are UNCHANGED — this separation is never
+  collapsed, in lite mode or otherwise.** (Confirmed 2026-08-24: an earlier ceremony-reduction
+  proposal suggested merging code-executor/test-writer/test-runner into one dispatch for small lite
+  builds; Danny rejected it outright — the role separation exists specifically to prevent an agent
+  from certifying its own work, the same doer≠checker principle `docs/INVARIANTS.md` rule 7 already
+  states for Frank dispatches, and collapsing it for "small" builds reintroduces exactly the
+  conflict of interest the four-role split exists to prevent, regardless of build size.) What
+  *does* change for lite mode is the reporting ceremony around each handoff, not the handoffs:
+  - **Forge Advisor Final Check** (below) is a one-line stamp per slice for lite mode —
+    `Slice N: APPROVED — code/tests/coverage/QC all pass, see [agent reports]` — not the full
+    multi-row report template. The full template remains the default for the non-lite cycle.
+  - **`@qc-agent`'s deep review is scoped to spec compliance** — does the implementation fulfill
+    `SPEC.md`'s acceptance criteria and integration boundary — rather than re-litigating mechanical
+    checks `@test-runner` already ran (test pass/fail, coverage threshold). This narrows what
+    qc-agent re-derives, not whether it runs; it still runs on every lite-mode slice, independently,
+    same as the full cycle.
+  - Same attempt-counter/snapshot/convergence-judgment machinery at the binding gate, no manual
+  override, applies unchanged. Lite mode has no sprint directory (`docs/specs/{feature}/`), so the
+  Frank forge-gate contract's `SPRINT_NORTH_STAR`, `GATE_LOG`, and `SNAPSHOT_DIR` paths do not apply
+  as written below. Substitute, scoped to lite mode only:
   - `SPRINT_NORTH_STAR: docs/tooling/{tool-name}/SPEC.md` in place of the sprint `NORTH-STAR.md` path —
     Layer 1 becomes "does the implementation fulfill this locked document's contract," Layer 2
     (project North Star relevance) is unchanged, reading `docs/NORTHSTAR.md` directly per the same
