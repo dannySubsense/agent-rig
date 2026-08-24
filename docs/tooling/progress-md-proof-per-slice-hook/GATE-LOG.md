@@ -60,11 +60,23 @@ self-honesty mechanism where the actual actor is an agent or human under time pr
 hostile party. Recalibrated from round 4 onward — review posture should match actual stakes, not
 default to whatever framing was used last.
 
+## Post-forge-gate resolution (2026-08-24)
+
+Frank's forge-gate PASS carried one condition: the two-call cross-edit dodge's disposition was
+undecided and could not ride silently into `main`. Resolved: Danny decided to accept it as
+residual, using the same decision framework already applied to the SLICE-ID-mutation case — match
+effort to actual stakes (self-honesty threat model, not adversarial security), and don't spend more
+closing an easier gap than was spent leaving a harder one open. Recorded in `SPEC.md` §12 item 1
+with full rationale, mirroring item 2's existing decision stamp. Both PASS conditions from the
+forge-gate are now closed; the minor next-revision items (transitions_found semantics, empty
+SLICE-ID token) remain tracked in PROGRESS.md, non-blocking.
+
 ## Forge Gate
-Counter: 0/3
+Counter: 1/3
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
 |---|---|---|---|---|
+| 1 | 2026-08-23 | PASS | Layer 1 PASS: identity-based matching confirmed genuinely non-positional (no array-index comparison anywhere in decide()), AC7b's honest residual behaves as documented (not accidentally over-fixed), hook confirmed not wired into settings.json, both spec-gate Carried Conditions (timeout measurement, Edit-envelope verification) genuinely addressed — Frank independently re-timed the proof command himself (1.87-1.89s, corroborating the ~2.1s claim). Ran all suites himself: 55/55 probe+corpus, 15/15 wrapper. Layer 2 PASS, non-PROVISIONAL. Orchestrator's own independent check (grep for positional len()/index patterns) found none — concurs with PASS. **Two Carried Conditions from this PASS, copied per Frank's own rule:** (1) the two-call cross-edit dodge disposition is still undecided — Danny must record accept-as-residual or close-it before this PR merges, not ride silently into main. (2) minor next-revision items, not re-gate-blocking: transitions_found counts deny/ambiguous events beyond spec §6 step 11's literal definition (track-record semantics only, no decision impact); an empty SLICE-ID: token is accepted as a valid key (no bypass power, worst case is a conservative ambiguous-deny). | n/a |
 
 Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
 Deep-diagnosis evidence:

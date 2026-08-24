@@ -840,6 +840,16 @@ prior hooks in this cluster (which never execute anything) but is stdlib, not a 
      cross-call memory within a turn; closing this requires either persisting cross-call line-state
      within a turn or moving detection to a Stop-hook full-file comparison against turn-start state,
      both larger changes than this revision and both rejected in §3 on other grounds for v1.
+
+     **Decision (2026-08-24, Danny): accept as residual, do not build cross-call state tracking.**
+     Rationale, applying the same decision framework as item 2 below: this hook's threat model is
+     self-honesty, not adversarial security, so fix effort should match that stake, not a default
+     maximum-scrutiny posture. This is in fact the *easier* of the two remaining variants — it needs
+     no special technique, just two ordinary edits — so closing it while item 2 (which requires
+     deliberately mutating multiple fields at once) stays open would spend real design effort
+     (persistent cross-call state, a new artifact to keep in sync) closing the easier gap while
+     leaving the harder one open, which is backwards. Consistent with this spec's posture elsewhere
+     (`Write` gap, `shell=True`, item 2). This is decided, not an open question for forge to resolve.
   2. **Single-call both-fields-mutated dodge — CLOSED, per-slice, for `SLICE-ID`-carrying lines,
      only when the token itself survives the completing edit unchanged; open, unchanged, for lines
      without one; reopened whenever the SLICE-ID token is altered or removed alongside a

@@ -44,5 +44,11 @@ Last updated: 2026-08-23
   2. `Edit`-specific PreToolUse envelope shape — never live-verified (only `Write` was, for the
      sibling hook). Must confirm via the same throwaway-hook live-capture method before wiring
      anything live.
-  3. Open decision for Danny at forge kickoff, not yet decided: the two-call cross-edit dodge —
-     accept as residual (same reasoning as the SLICE-ID-mutation case) or close it.
+  3. **RESOLVED 2026-08-24.** Two-call cross-edit dodge — Danny decided: accept as residual, do not
+     build cross-call state tracking. Same decision framework as the SLICE-ID-mutation case (item
+     4 below): match effort to actual stakes (self-honesty, not adversarial security); don't spend
+     more to close the easier gap than was spent on the harder one. Recorded in SPEC.md §12 item 1
+     with full rationale.
+  4. Next-revision items, non-blocking, from forge-gate PASS: `transitions_found` counts
+     deny/ambiguous events beyond spec §6 step 11's literal allow-only definition (track-record
+     semantics only); an empty `SLICE-ID:` token is accepted as a valid key (no bypass power).
