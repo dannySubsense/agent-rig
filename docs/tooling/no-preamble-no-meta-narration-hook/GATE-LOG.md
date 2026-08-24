@@ -18,11 +18,15 @@ Deep-diagnosis evidence:
 Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
 
 ## Forge Gate
-Counter: {N}/3
+Counter: 1/3
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
 |---|---|---|---|---|
-| 1 | | FAIL | | .gate-snapshots/forge/attempt-1/ |
+| 1 | 2026-08-24 | PASS | Layer 1 PASS (re-verified by direct execution, not by trusting QC/test-runner summaries): all 11 ACs hold, QC's contraction-quote bug independently re-confirmed closed, §14's known false-positive class genuinely present as documented, §12 boundary respected. Layer 2 PASS, no PROVISIONAL (docs/NORTHSTAR.md Established). Two Carried Conditions: (1) SPEC.md §3.1's em-dash worked example contradicts its own enumerated boundary list — the shipped code is correct (faithful to the enumerated list); the example was wrong. Routed to @architect, fixed same session — example rewritten to use an enumerated boundary token, em-dash shape added to §14's fixture-corpus item for future soak measurement. (2) This gate's own test runs wrote synthetic entries with `session_id: "frank-test"` into the live track-record log — **excluded from §6.4's 20-entry evidence-bar denominator during any future human review of that log; these are gate-verification artifacts, not real usage signal.** | .gate-snapshots/forge/attempt-1/ (none needed — PASS on attempt 1, no snapshot-before-retry triggered) |
+
+**Orchestrator's own independent review (post-PASS, per standing procedure)**: reviewed the full implementation diff (scripts/no_preamble_probe.py, reference/no_preamble_probe.py, scripts/no_preamble_reminder.py, .claude/hooks/no-preamble-no-meta-narration.sh, .claude/settings.json, .gitignore, tests/test_no_preamble_probe.py) against SPEC.md directly, not a perfunctory pass. Traced the full QC cycle (round 1 FAIL on 3 findings → 2 real fixes + 1 finding resolved as spec-compliant-as-written on re-read → round 2 PASS with re-execution, not re-reading) and confirmed it in GATE-LOG's own Forge Gate history above. No additional findings beyond what Frank and QC already surfaced. Both Carried Conditions closed same session (§3.1 example fixed by @architect; frank-test exclusion recorded above).
+
+**Verdict, both layers, this attempt: PASS.** Ready for End-of-Feature Tasks (@doc-writer, full suite, PR ready-for-review).
 
 Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
 Deep-diagnosis evidence:

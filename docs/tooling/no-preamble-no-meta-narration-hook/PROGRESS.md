@@ -9,13 +9,14 @@
       over-neutralization on contractions, §3.3(2) structural non-token-scoping [confirmed
       spec-compliant on substance after re-read], wrapper mode-hardcoding), fixed by @code-executor,
       4 regression tests added, @qc-agent round 2 PASS.
-- [ ] **Frank binding forge-gate** — PENDING. Runs once, only after Slice 1 above is checked off.
-      Do not set `Status: COMPLETE` before this line is checked and its verdict is transcribed into
-      `GATE-LOG.md`'s `## Forge Gate` section.
+- [x] **Frank binding forge-gate** — PASS (attempt 1/3, both layers, no PROVISIONAL), 2026-08-24.
+      Verdict transcribed into `GATE-LOG.md`'s `## Forge Gate` section. Two Carried Conditions, both
+      closed same session (SPEC.md §3.1 example fix; frank-test track-record entries excluded from
+      §6.4 denominator, noted in GATE-LOG).
 
 ## Current
 Slice: 1 (only slice — single-slice lite build per forge-start.md's default)
-Step: Frank binding forge-gate, next
+Step: End-of-Feature Tasks — @doc-writer, full suite, PR ready-for-review
 Last updated: 2026-08-24
 
 ## Fix Attempts

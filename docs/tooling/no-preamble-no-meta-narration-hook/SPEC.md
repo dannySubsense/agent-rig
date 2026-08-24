@@ -71,11 +71,22 @@ is not part of a markdown heading label (see §3.4 for the heading-label exempti
 preceded by a comma (`, and`, `, but`, `, so`), or a line break. This mirrors the same "structural
 text matching over substring matching" pattern already validated empirically in
 `first-turn-contract-enforcement` §5.2/§5.3/§10 — clause-level, not full-message-level or
-sentence-level-only, because a single sentence commonly mixes one narrating clause with one
-substantive clause ("Let me check the config — `config.yaml` sets the timeout to 30s." has a
+sentence-level-only, because a single message commonly mixes one narrating clause with one
+substantive clause ("Let me check the config. `config.yaml` sets the timeout to 30s." has a
 flaggable first clause and a clean second clause; message-level scanning would wrongly clear the
-whole sentence on the second clause's concrete noun, clause-level scanning correctly isolates the
+whole message on the second clause's concrete noun, clause-level scanning correctly isolates the
 first).
+
+> **Amendment, 2026-08-24 (post-lock, Carried Condition from Frank's forge-gate PASS, attempt 1)**:
+> the worked example above originally used an em-dash ("Let me check the config —
+> `config.yaml`...") to separate the two clauses. Em-dash is not one of this section's enumerated
+> clause-boundary tokens, so the shipped, already-verified-correct implementation (confirmed by
+> Frank via direct execution) treats an em-dash sentence as a single clause — the backtick code
+> span in the second half neutralizes the whole clause under §3.3(1), and the example's claimed
+> per-clause split never actually occurs in the running code. The example above has been rewritten
+> to use `.` (an enumerated boundary, §3.1) instead of an em-dash, preserving the original teaching
+> point with a construction the code actually produces. See §14 for the em-dash case itself, which
+> is now tracked as a fixture-corpus/soak item rather than asserted as current behavior.
 
 **A sixth boundary type, keyed to verb identity, not punctuation/conjunction tokens**: an
 epistemic-verb match from the closed subset `{I think, I believe, I feel, I realize, I recognize,
@@ -556,3 +567,15 @@ No new third-party library, no network access, no LORE/Postgres dependency — s
   during the soak is a true positive of a known, accepted false-positive class, not noise to be
   silently miscounted or dismissed, and this distinction must be visible in whatever record backs
   the §6.4 20/3/0/5 evidence bar.
+- **Em-dash-separated clause pairs (added 2026-08-24, Frank's forge-gate Carried Condition)**: a
+  message shaped like "Let me check the config — `config.yaml` sets the timeout to 30s." — a
+  flaggable narrating clause immediately followed by an em-dash and a clean, concrete-noun-bearing
+  clause — is currently scanned as **one** clause by the shipped implementation, because em-dash is
+  not in §3.1's enumerated boundary list. The concrete noun in the second half neutralizes the
+  whole clause under §3.3(1), so the narrating first half is never flagged: a known false negative
+  for this specific shape, not a bug (the code correctly follows §3.1 as written). Forge stage's
+  fixture corpus (bullet 1, above) should include real or representative instances of this em-dash
+  shape so §6.4's soak can measure how often it actually occurs in agent-rig transcripts. If the
+  soak shows this shape is common enough to matter, that is the evidence base for a future §11
+  amendment adding em-dash as a seventh clause-boundary token — not authorized by this document as
+  written.
