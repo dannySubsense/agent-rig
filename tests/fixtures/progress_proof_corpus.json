@@ -1,0 +1,281 @@
+{
+  "source": "Self-authored corpus for progress-md-proof-per-slice-hook Slice 3, per docs/tooling/progress-md-proof-per-slice-hook/SPEC.md §6's self-test fixture corpus requirement and §8 AC7/AC7a/AC7b/AC11's named minimum case list. Paired with tests/fixtures/progress_proof_manifest_fixture.json (schemaVersion 1, allowedCommandPrefixes: ['python3 scripts/']). Each case's old_string/new_string may contain the placeholders {CMD}, {CMD_OLD}, {CMD_NEW} -- the test harness (tests/test_progress_proof_per_slice_corpus.py) generates a real, executable dummy python3 script per placeholder per case (per proof_command_kind / proof_command_kind_old / proof_command_kind_new) and substitutes the real 'python3 scripts/<name>.py' command text before invoking the probe. This lets the corpus stay a static, portable JSON file while still exercising real subprocess execution (allowlisted-pass/fail/timeout) end-to-end, same posture as tests/test_progress_proof_per_slice_probe.py's inline fixtures, just corpus-driven per this hook's own §6 component-table deliverable.",
+  "note_naming": "Case ids below are the exact minimum set named in this slice's forge contract (line-count-mismatch-still-detected, reordering-preserves-detection, slice-id-survives-simultaneous-mutation, no-slice-id-falls-back, description-only-mutation, proof-only-mutation, ambiguous-duplicate-description, ambiguous-duplicate-slice-id, adding-proof-on-completion, allowlisted-pass, allowlisted-fail, allowlisted-timeout, non-allowlisted-manual-unverified, no-allowlist-present). Several of these are already covered inline in tests/test_progress_proof_per_slice_probe.py under their AC-numbered names (e.g. AC7a/AC7b) -- this corpus is a second, independent, file-based exercise of the same probe entry point (probe.main()), not a replacement for those inline tests.",
+  "cases": [
+    {
+      "id": "allowlisted-pass",
+      "description": "Matched transition with an allowlisted PROOF: command that exits 0 -> allow, verified_pass.",
+      "old_string": "- [ ] Slice 1: build the thing — PROOF: {CMD}\n",
+      "new_string": "- [x] Slice 1: build the thing — PROOF: {CMD}\n",
+      "proof_command_kind": "pass",
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "transitions_verified": 1,
+        "matched_by": "description",
+        "proof_status": "verified_pass"
+      }
+    },
+    {
+      "id": "allowlisted-fail",
+      "description": "Matched transition with an allowlisted PROOF: command that exits non-zero -> deny, verified_fail.",
+      "old_string": "- [ ] Slice 2: build the other thing — PROOF: {CMD}\n",
+      "new_string": "- [x] Slice 2: build the other thing — PROOF: {CMD}\n",
+      "proof_command_kind": "fail",
+      "expect": {
+        "decision": "deny",
+        "transitions_found": 1,
+        "transitions_verified": 0,
+        "matched_by": "description",
+        "proof_status": "verified_fail"
+      }
+    },
+    {
+      "id": "allowlisted-timeout",
+      "description": "Matched transition with an allowlisted PROOF: command that exceeds the inner timeout -> deny, verified_timeout. Inner timeout is patched down for this case via inner_timeout_override so the test does not take 25s.",
+      "old_string": "- [ ] Slice 3: build a slow thing — PROOF: {CMD}\n",
+      "new_string": "- [x] Slice 3: build a slow thing — PROOF: {CMD}\n",
+      "proof_command_kind": "timeout",
+      "inner_timeout_override": 0.2,
+      "expect": {
+        "decision": "deny",
+        "transitions_found": 1,
+        "transitions_verified": 0,
+        "matched_by": "description",
+        "proof_status": "verified_timeout"
+      }
+    },
+    {
+      "id": "non-allowlisted-manual-unverified",
+      "description": "Matched transition whose PROOF: command's leading substring does not match any allowedCommandPrefixes entry -> allow, manual_unverified, command never executed.",
+      "old_string": "- [ ] Slice 4: ship the doc — PROOF: curl https://example.com/webhook\n",
+      "new_string": "- [x] Slice 4: ship the doc — PROOF: curl https://example.com/webhook\n",
+      "proof_command_kind": null,
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "transitions_verified": 0,
+        "matched_by": "description",
+        "proof_status": "manual_unverified"
+      }
+    },
+    {
+      "id": "no-allowlist-present",
+      "description": "No allowlist file present at all (write_allowlist: false) -> every PROOF: command falls through to manual_unverified, same posture as an unmatched prefix.",
+      "old_string": "- [ ] Slice 5: no allowlist yet — PROOF: python3 scripts/would_normally_match.py\n",
+      "new_string": "- [x] Slice 5: no allowlist yet — PROOF: python3 scripts/would_normally_match.py\n",
+      "proof_command_kind": null,
+      "write_allowlist": false,
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "transitions_verified": 0,
+        "matched_by": "description",
+        "proof_status": "manual_unverified"
+      }
+    },
+    {
+      "id": "line-count-mismatch-still-detected",
+      "description": "old_string/new_string differ in line count (an unrelated line is added in new_string), AND the diff contains a genuine [ ]->[x] transition with a matching PROOF: pair -- asserting the transition is still detected and verified, not allowed-through-unchecked (§8 AC7).",
+      "old_string": "- [ ] Slice 6: the real transition — PROOF: {CMD}\n",
+      "new_string": "- [x] Slice 6: the real transition — PROOF: {CMD}\n- [ ] Slice 7: brand new unrelated slice added this same edit\n",
+      "proof_command_kind": "pass",
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "transitions_verified": 1,
+        "matched_by": "description",
+        "proof_status": "verified_pass"
+      }
+    },
+    {
+      "id": "reordering-preserves-detection",
+      "description": "old_string has two [ ] lines (Slice A with PROOF:, Slice B with no PROOF:); new_string has the same two lines with their relative order swapped AND Slice A flipped to [x] with its PROOF: segment unchanged -- asserting the transition on Slice A is detected and verified regardless of the reordering (§8 AC7).",
+      "old_string": "- [ ] Slice A: has proof — PROOF: {CMD}\n- [ ] Slice B: no proof declared\n",
+      "new_string": "- [ ] Slice B: no proof declared\n- [x] Slice A: has proof — PROOF: {CMD}\n",
+      "proof_command_kind": "pass",
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "transitions_verified": 1,
+        "matched_by": "description",
+        "proof_status": "verified_pass"
+      }
+    },
+    {
+      "id": "slice-id-survives-simultaneous-mutation",
+      "description": "A matched pair carrying an identical SLICE-ID token on both the old-open and new-done candidate is detected and verified even when both the description segment and the PROOF: segment differ between old and new in the same edit -- matched_by: slice_id, no mutation_denied outcome (§8 AC7a).",
+      "old_string": "- [ ] Slice 9: old wording — SLICE-ID: slice-09 — PROOF: {CMD_OLD}\n",
+      "new_string": "- [x] Slice 9: new wording (renamed) — SLICE-ID: slice-09 — PROOF: {CMD_NEW}\n",
+      "proof_command_kind_old": "pass",
+      "proof_command_kind_new": "pass",
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "transitions_verified": 1,
+        "matched_by": "slice_id",
+        "proof_status": "verified_pass"
+      }
+    },
+    {
+      "id": "no-slice-id-falls-back",
+      "description": "A file whose slice lines carry no SLICE-ID segment at all does NOT catch the simultaneous description+PROOF mutation dodge -- the identical mutation pattern as slice-id-survives-simultaneous-mutation, but with SLICE-ID omitted from both candidates, falls through as two unmatched candidates: allow, transitions_found: 0. This is the honestly-stated residual gap this hook accepts (§6/§9/§12) (§8 AC7b).",
+      "old_string": "- [ ] Slice 9: old wording — PROOF: {CMD_OLD}\n",
+      "new_string": "- [x] Slice 9: new wording (renamed) — PROOF: {CMD_NEW}\n",
+      "proof_command_kind_old": "pass",
+      "proof_command_kind_new": "pass",
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 0
+      }
+    },
+    {
+      "id": "no-slice-id-plain-happy-path",
+      "description": "A file whose slice lines carry no SLICE-ID segment at all behaves identically to this hook's pre-SLICE-ID behavior -- description-primary matching still detects and verifies an ordinary completion when description and PROOF: are both unchanged (§8 AC7b regression check). Distinct from no-slice-id-falls-back -- do not conflate the two.",
+      "old_string": "- [ ] Slice 3: stable wording — PROOF: {CMD}\n",
+      "new_string": "- [x] Slice 3: stable wording — PROOF: {CMD}\n",
+      "proof_command_kind": "pass",
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "transitions_verified": 1,
+        "matched_by": "description",
+        "proof_status": "verified_pass"
+      }
+    },
+    {
+      "id": "description-only-mutation",
+      "description": "description segment differs old-to-new, PROOF: segment identical on both -- the secondary proof-identity match in §6 step 6 still recognizes and denies this as mutation_denied, matched_by proof_identity, command never executed (§8 AC11).",
+      "old_string": "- [ ] Slice 11: old description text — PROOF: {CMD}\n",
+      "new_string": "- [x] Slice 11: reworded description text — PROOF: {CMD}\n",
+      "proof_command_kind": "pass",
+      "expect": {
+        "decision": "deny",
+        "transitions_found": 1,
+        "transitions_verified": 0,
+        "matched_by": "proof_identity",
+        "proof_status": "mutation_denied"
+      }
+    },
+    {
+      "id": "proof-only-mutation",
+      "description": "description segment identical old-to-new, PROOF: segment differs -- asserting decision deny, proof_status mutation_denied, matched_by description, command never executed (§8 AC11).",
+      "old_string": "- [ ] Slice 12: identical wording — PROOF: {CMD_OLD}\n",
+      "new_string": "- [x] Slice 12: identical wording — PROOF: {CMD_NEW}\n",
+      "proof_command_kind_old": "pass",
+      "proof_command_kind_new": "pass",
+      "expect": {
+        "decision": "deny",
+        "transitions_found": 1,
+        "transitions_verified": 0,
+        "matched_by": "description",
+        "proof_status": "mutation_denied"
+      }
+    },
+    {
+      "id": "ambiguous-duplicate-description",
+      "description": "old_string contains two [ ] lines with the identical description segment, new_string flips one of them to [x] with the same description -- asserting deny, ambiguous_match_denied, no proof command executed for either candidate (§8 AC11).",
+      "old_string": "- [ ] Slice N: same wording\n- [ ] Slice N: same wording\n",
+      "new_string": "- [x] Slice N: same wording\n",
+      "proof_command_kind": null,
+      "expect": {
+        "decision": "deny",
+        "matched_by": null,
+        "proof_status": "ambiguous_match_denied"
+      }
+    },
+    {
+      "id": "ambiguous-duplicate-slice-id",
+      "description": "old_string contains two [ ] lines sharing the identical SLICE-ID token, new_string flips one of them to [x] with the same token -- asserting deny, ambiguous_match_denied (§6 step 4a).",
+      "old_string": "- [ ] Slice X: a — SLICE-ID: dup-id\n- [ ] Slice Y: b — SLICE-ID: dup-id\n",
+      "new_string": "- [x] Slice X: a — SLICE-ID: dup-id\n",
+      "proof_command_kind": null,
+      "expect": {
+        "decision": "deny",
+        "matched_by": null,
+        "proof_status": "ambiguous_match_denied"
+      }
+    },
+    {
+      "id": "adding-proof-on-completion",
+      "description": "old-open candidate has no PROOF: segment at all; new-done candidate adds one while flipping the checkbox -- asserting the description match still succeeds, the PROOF equality check is skipped on the old side, and step 8 extracts, allowlist-checks, and runs the new-side PROOF: command (§8 AC11 / §6 step 6 note).",
+      "old_string": "- [ ] Slice 13: no proof yet\n",
+      "new_string": "- [x] Slice 13: no proof yet — PROOF: {CMD}\n",
+      "proof_command_kind": "pass",
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "transitions_verified": 1,
+        "matched_by": "description",
+        "proof_status": "verified_pass"
+      }
+    },
+    {
+      "id": "out-of-scope-filename",
+      "description": "The edited file is not the tracked PROGRESS.md path at all -- always allowed regardless of content, file_in_scope: false, no candidate scan performed (§8 AC1).",
+      "file_path": "docs/notes.md",
+      "old_string": "- [ ] Slice 1: thing\n",
+      "new_string": "- [x] Slice 1: thing\n",
+      "proof_command_kind": null,
+      "expect": {
+        "decision": "allow",
+        "file_in_scope": false
+      }
+    },
+    {
+      "id": "no-candidate-lines-in-edit",
+      "description": "Neither old_string nor new_string contains any checkbox-shaped candidate line at all -- allow, transitions_found: 0 (§8 AC2).",
+      "old_string": "Some prose line, not a checkbox.\n",
+      "new_string": "Some prose line, edited.\n",
+      "proof_command_kind": null,
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 0
+      }
+    },
+    {
+      "id": "transition-no-proof-marker",
+      "description": "A matched [ ]->[x] transition whose new-done candidate carries no PROOF: marker at all -- always allowed, proof_status: null (§8 AC3).",
+      "old_string": "- [ ] Slice 1: no proof declared\n",
+      "new_string": "- [x] Slice 1: no proof declared\n",
+      "proof_command_kind": null,
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 1,
+        "proof_status": null
+      }
+    },
+    {
+      "id": "multiple-transitions-mixed-outcomes",
+      "description": "Two independent matched transitions land in the same edit, one with a passing PROOF: command and one with a failing one -- the whole edit is denied, transitions_found: 2 (§8 AC11).",
+      "old_string": "- [ ] Slice 1: passes — PROOF: {CMD_PASS}\n- [ ] Slice 2: fails — PROOF: {CMD_FAIL}\n",
+      "new_string": "- [x] Slice 1: passes — PROOF: {CMD_PASS}\n- [x] Slice 2: fails — PROOF: {CMD_FAIL}\n",
+      "expect": {
+        "decision": "deny",
+        "transitions_found": 2
+      }
+    },
+    {
+      "id": "transition-with-inserted-completion-metadata",
+      "description": "New-done candidate inserts free-text completion metadata (a date and test-count note) between the description and the PROOF: segment -- the transition is still matched and the PROOF: command still verified (§8 AC11).",
+      "old_string": "- [ ] Slice 4: Wrapper wiring — PROOF: {CMD}\n",
+      "new_string": "- [x] Slice 4: Wrapper wiring — COMPLETE 2026-08-22 (15/15 tests) — PROOF: {CMD}\n",
+      "proof_command_kind": "pass",
+      "expect": {
+        "decision": "allow",
+        "proof_status": "verified_pass"
+      }
+    },
+    {
+      "id": "duplicate-description-no-completion-allowed",
+      "description": "old_string and new_string both contain the same two duplicate-description pending lines, unchanged -- non-ambiguous counterpart to ambiguous-duplicate-description: no [x] completion claim exists for that description at all, so it is allowed rather than denied as ambiguous (§8 AC11).",
+      "old_string": "- [ ] Slice N: same wording\n- [ ] Slice N: same wording\n",
+      "new_string": "- [ ] Slice N: same wording\n- [ ] Slice N: same wording\n",
+      "proof_command_kind": null,
+      "expect": {
+        "decision": "allow",
+        "transitions_found": 0
+      }
+    }
+  ]
+}

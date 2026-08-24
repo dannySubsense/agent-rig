@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "allowedCommandPrefixes": [
+    "pytest ",
+    "python3 -m pytest ",
+    "python3 scripts/",
+    "bash tests/",
+    "sh tests/",
+    "npm test",
+    "npm run "
+  ]
+}
