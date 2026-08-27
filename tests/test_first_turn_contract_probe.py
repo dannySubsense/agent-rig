@@ -101,6 +101,22 @@ def _tool_use_record(name, tool_id):
     }
 
 
+def _tool_use_record_with_input(name, tool_id, tool_input):
+    """Same shape as `_tool_use_record`, but carrying a real `input` payload — needed for
+    the C3 claim-subject-matching tests (spec §3.2), which read `tool_use.input`'s
+    target fields. `_tool_use_record` above deliberately omits `input` (it exercises the
+    absent-input fallback, §3.2), so this is a separate builder rather than a change to it."""
+    return {
+        "type": "assistant",
+        "isSidechain": False,
+        "message": {
+            "content": [
+                {"type": "tool_use", "id": tool_id, "name": name, "input": tool_input}
+            ]
+        },
+    }
+
+
 def _tool_result_record(tool_id):
     return {
         "type": "user",
@@ -355,6 +371,259 @@ def test_ac3_qualifying_non_todowrite_tool_call_avoids_c3(monkeypatch, tmp_path)
     assert stdout_text == ""  # silence means allow, §3.2
     assert entries[-1]["decision"] == "allow"
     assert entries[-1]["violations"] == []
+
+
+# ---------------------------------------------------------------------------
+# C3 claim-subject matching — SPEC.md docs/tooling/first-turn-contract-c3-claim-matching §5
+# AC1-AC7. §5 AC3 (un-extractable subject fallback, both sub-cases) is already exercised by
+# test_ac3_pillar_with_zero_tool_calls_blocks_naming_c3 (no qualifying call -> violation) and
+# test_ac3_qualifying_non_todowrite_tool_call_avoids_c3 (qualifying call exists -> pass)
+# above — both use _COMPLIANT_SIGNPOST_THEN_PILLAR, whose Pillar text ("verified this session
+# by method") yields zero extracted claim subjects, so no new test duplicates that coverage
+# here. §5 AC8 (non-C3 regression) is verified by running the full suite, not a new test.
+# ---------------------------------------------------------------------------
+
+def _signpost_then_pillar(pillar_text):
+    return (
+        "**Signpost:** from the queue, not re-checked.\n\n"
+        f"**Pillar:** {pillar_text}\n"
+    )
+
+
+def test_c3_matching_ac1_true_positive_path_match_allows(monkeypatch, tmp_path):
+    """§5 AC1: Pillar section names a file path; a Read call on exactly that path precedes the
+    turn -> C3 passes (whole turn allows, given compliant Signpost-before-Pillar order)."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Read", "toolu_p1", {"file_path": "scripts/foo.py"}),
+        _tool_result_record("toolu_p1"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac1",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "verified `scripts/foo.py` behaves correctly."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    assert stdout_text == ""
+    assert entries[-1]["decision"] == "allow"
+    assert entries[-1]["violations"] == []
+
+
+def test_c3_matching_ac2_true_negative_unrelated_target_blocks_c3(monkeypatch, tmp_path):
+    """§5 AC2 — the exact gap being closed: Pillar section names file path A; a qualifying tool
+    call exists but targets unrelated file path B (no substring/basename overlap, no other
+    subject overlap) -> C3 violates, with the "subject(s) do not match" reason variant."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Read", "toolu_p2", {"file_path": "scripts/bar.py"}),
+        _tool_result_record("toolu_p2"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac2",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "verified `scripts/foo.py` behaves correctly."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert "C3" in entries[-1]["violations"]
+    assert "do not match any qualifying tool" in decision["reason"]
+    assert "scripts/foo.py" in decision["reason"]
+
+
+def test_c3_matching_ac4_pr_number_match_allows(monkeypatch, tmp_path):
+    """§5 AC4: Pillar claims "PR #42 was reviewed"; a Bash call with `gh pr view 42` in its
+    command precedes the turn -> C3 passes."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Bash", "toolu_p4", {"command": "gh pr view 42"}),
+        _tool_result_record("toolu_p4"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac4",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar("PR #42 was reviewed."),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    assert stdout_text == ""
+    assert entries[-1]["decision"] == "allow"
+    assert entries[-1]["violations"] == []
+
+
+def test_c3_matching_ac4_pr_number_mismatch_blocks_c3(monkeypatch, tmp_path):
+    """§5 AC4 (negative half): Pillar claims "PR #42 was reviewed"; the only qualifying call
+    references #7, a different number entirely -> C3 violates."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Bash", "toolu_p4n", {"command": "gh pr view 7"}),
+        _tool_result_record("toolu_p4n"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac4-neg",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar("PR #42 was reviewed."),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert "C3" in entries[-1]["violations"]
+
+
+def test_c3_matching_ac4a_pr_digit_substring_collision_blocks_c3(monkeypatch, tmp_path):
+    """§5 AC4a — the false-positive this fix closes: Pillar claims "PR #4 was reviewed"; the
+    only qualifying call references `gh pr view 42` (digit-substring superset, not an exact
+    match), and no call references #4 exactly -> C3 must VIOLATE, not pass on the substring
+    collision. Verifies §3.3's exact-equality carve-out for PR/issue numbers."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Bash", "toolu_p4a", {"command": "gh pr view 42"}),
+        _tool_result_record("toolu_p4a"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac4a",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar("PR #4 was reviewed."),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert "C3" in entries[-1]["violations"]
+    assert "do not match any qualifying tool" in decision["reason"]
+
+
+def test_c3_matching_ac4a_backtick_gh_command_digit_substring_collision_blocks_c3(
+    monkeypatch, tmp_path
+):
+    """§5 AC4a gap closed: Pillar claims via backtick gh-command form `gh pr view 4`
+    (not prose `#4`); the only qualifying call references `gh pr view 42` (digit-substring
+    superset, not an exact match) -> C3 must VIOLATE. Verifies the backtick-gh-span claim
+    extraction classifies `gh pr view 4` as a `pr` subject (value "4"), not a `command`
+    subject, so it goes through the exact-match PR/issue-number carve-out instead of
+    plain substring containment."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Bash", "toolu_p4b", {"command": "gh pr view 42"}),
+        _tool_result_record("toolu_p4b"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac4a-backtick",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar("reviewed `gh pr view 4`."),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert "C3" in entries[-1]["violations"]
+    assert "do not match any qualifying tool" in decision["reason"]
+
+
+def test_c3_matching_ac5a_partial_coverage_of_two_subjects_blocks_c3(monkeypatch, tmp_path):
+    """§5 AC5a — require-all-subjects: Pillar section names two files; a qualifying tool call
+    matches only one of them -> C3 violates (partial coverage is not enough)."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Read", "toolu_p5a", {"file_path": "scripts/foo.py"}),
+        _tool_result_record("toolu_p5a"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac5a",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "verified `scripts/foo.py` and `scripts/bar.py` both behave correctly."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert "C3" in entries[-1]["violations"]
+    assert "scripts/bar.py" in decision["reason"]
+
+
+def test_c3_matching_ac5b_full_coverage_of_two_subjects_allows(monkeypatch, tmp_path):
+    """§5 AC5b: Pillar section names two files; qualifying tool calls collectively cover both
+    subjects (one call per subject) -> C3 passes."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Read", "toolu_p5b1", {"file_path": "scripts/foo.py"}),
+        _tool_result_record("toolu_p5b1"),
+        _tool_use_record_with_input("Read", "toolu_p5b2", {"file_path": "scripts/bar.py"}),
+        _tool_result_record("toolu_p5b2"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac5b",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "verified `scripts/foo.py` and `scripts/bar.py` both behave correctly."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    assert stdout_text == ""
+    assert entries[-1]["decision"] == "allow"
+    assert entries[-1]["violations"] == []
+
+
+def test_c3_matching_ac6_absolute_vs_relative_path_basename_match_allows(monkeypatch, tmp_path):
+    """§5 AC6: claim quotes a relative path; the tool call's file_path is absolute with the
+    same basename -> C3 passes via the basename fallback."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input(
+            "Read", "toolu_p6", {"file_path": "/home/d-tuned/agent-rig/scripts/foo.py"}
+        ),
+        _tool_result_record("toolu_p6"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac6",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "verified `scripts/foo.py` behaves correctly."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    assert stdout_text == ""
+    assert entries[-1]["decision"] == "allow"
+    assert entries[-1]["violations"] == []
+
+
+def test_c3_matching_ac7_identifier_exact_match_collision_blocks_c3(monkeypatch, tmp_path):
+    """§5 AC7: Pillar section names identifier subject `check_c3`; a qualifying tool call's
+    target text contains the longer identifier `check_c3_violation` (substring-superset, no
+    exact match) and no other qualifying call references `check_c3` exactly -> C3 must
+    VIOLATE, not pass on the substring-containment collision. Verifies §3.3's exact-equality
+    carve-out for identifier/symbol subjects."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input(
+            "Bash", "toolu_p7", {"command": "grep -n check_c3_violation scripts/x.py"}
+        ),
+        _tool_result_record("toolu_p7"),
+    ])
+    stdin_data = {
+        "session_id": "c3m-ac7",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "verified `check_c3` handles this correctly."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert "C3" in entries[-1]["violations"]
+    assert "do not match any qualifying tool" in decision["reason"]
 
 
 # ---------------------------------------------------------------------------
