@@ -76,3 +76,59 @@ Fix/Next-step: none required — no carried conditions. (The three minor items a
 noted for the forge author's awareness; none is a condition of this PASS.)
 Route to: @wright (proceed to lock and forge)
 ═══════════════════════════════════════════════════════════════════
+
+## Forge Gate
+
+═══════════════════════════════════════════════════════════════════
+FRANK'S VERDICT — first-turn-contract-c3-path-query-boundary-matching (forge, attempt 1/3)
+═══════════════════════════════════════════════════════════════════
+
+Findings:
+- Pre-checks: Premise PASS — no new numeric constants or character sets in the diff;
+  boundary logic reuses pre-existing `/` separator and Python's `\w` (already justified
+  via `_WORD_TOKEN_RE`), verified against the actual a4c2867..a3603b1 diff, not the
+  spec's claim. Input PASS — read the live `_subject_matches_target` and both helpers
+  in full; ran the suite myself (32/32, 0.11s); `cmp` confirms reference copy is
+  byte-identical to scripts copy. Evidence independence PASS — I re-derived behavior by
+  executing 11 of my own cases against the live module, not by re-reading forge reports.
+- §2 path alignment: implemented exactly as spec'd (component-list suffix/prefix,
+  basename fallback retained as second check). §3 query boundary: `(?<!\w)...(?!\w)`
+  with `re.escape`, bidirectional, empty-string guarded. §4: command branch is the
+  unchanged bidirectional substring line. §7: diff touches only probe script, reference
+  copy, tests, PROGRESS.md — pr/identifier/extraction/callers untouched.
+- Adversarial probes beyond the 32 tests: `o.py` vs `scripts/foo.py` correctly rejected
+  (the exact collision class being closed); `a+b` query proves `re.escape` works;
+  hyphen-adjacent `c3-helper` correctly matches (hyphen is not `\w`); empty subject and
+  empty target both safely False.
+- One observation, non-blocking: a target path with a trailing slash
+  (`scripts/foo.py/`) no longer matches subject `foo.py` — the trailing `/` produces an
+  empty final component and basename("...py/") is "". Tool-extracted file paths don't
+  carry trailing slashes in practice, and the behavior follows the locked spec's rule
+  by construction. Not a defect against SPEC.md.
+- Layer 1: PASS. Layer 2: PASS — hardening the shared first-turn-contract probe is
+  squarely the workshop's mandate per docs/NORTHSTAR.md (Status: Established, not
+  DRAFT — no PROVISIONAL tag needed); no drift-check trigger applies.
+
+Why:
+The implementation is a faithful transcription of the locked spec's two helper designs
+— near-verbatim, which is fine because the spec-gate already validated the design and
+the orchestrator independently re-ran the worked examples. The zero-fix-round forge is
+consistent with a spec that shipped executable pseudocode; I treated that cleanliness
+as a reason for extra probing, not reassurance, and the module survived cases its own
+suite doesn't cover. The reference/scripts byte-identity check closes the drift risk
+between the two copies. No unsourced constants entered the codebase.
+
+Verdict: PASS
+
+Fix/Next-step: none required — no carried conditions. The trailing-slash observation is
+awareness-only, not a condition of this PASS.
+Route to: @wright (proceed to PR)
+═══════════════════════════════════════════════════════════════════
+
+### Orchestrator's independent post-PASS review (forge-gate, attempt 1)
+
+Ran three additional adversarial cases beyond Frank's own 11 probes: a dot-separated
+non-path string (`"foo.py"` vs `"scripts.foo.py"`, no `/`) correctly does not falsely align;
+case-sensitivity behaves as designed (paths/queries stay case-sensitive, unlike PR numbers);
+nested-path suffix alignment (`"a/b/c.py"` vs `"x/a/b/c.py"`) correctly matches. Re-ran the
+full suite: 32/32. Agree with Frank's PASS — no additional finding.
