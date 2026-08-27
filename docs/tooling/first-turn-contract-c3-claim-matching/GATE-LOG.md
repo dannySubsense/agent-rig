@@ -282,3 +282,76 @@ Fix/Next-step: none — no carried conditions. F-A1 closed; the amendment stands
 confirmed strictly-tightening and internally consistent.
 ═══════════════════════════════════════════════════════════════════
 ```
+
+## Forge Gate
+
+### Attempt 1 — 2026-08-27 — Frank
+
+Snapshot: `.gate-snapshots/forge/attempt-1/` (probe + tests at commit 5a0a193).
+
+```
+═══════════════════════════════════════════════════════════════════
+FRANK'S VERDICT — first-turn-contract-c3-claim-matching (forge-gate, attempt 1)
+═══════════════════════════════════════════════════════════════════
+
+Findings:
+- Pre-checks: Premise PASS — the one chosen constant (file-extension
+  allowlist) is PROVISIONAL-tagged with named owner (wright) in both SPEC §3.1
+  and the code comment at scripts/first_turn_contract_probe.py:251-253; no
+  similarity threshold, score, or fuzzy constant anywhere in the diff
+  (grepped 90a7c5c..5a0a193 myself). Input PASS — read the full probe (649
+  lines), spec, and test file; ran the suite myself: 26/26 pass, including
+  test_reference_copy_matches_executed_copy, and `cmp` confirms
+  reference/ is byte-identical to scripts/. Evidence independence PASS —
+  this review re-derived spec conformance from SPEC.md + source directly,
+  not from @qc-agent's or @test-runner's writeups.
+- Layer 1: PASS. §3.1 extraction (five subject types, backtick/gh/PR/path/
+  query, allowlist degradation to §3.4 fallback), §3.2 target table incl.
+  absent-input→"" rule (still counts toward presence fallback —
+  _collect_qualifying_tool_calls collects regardless of input), §3.3
+  substring+basename with both exact-match carve-outs (PR digits via
+  _pr_number_from_text + gh-command fallback on BOTH claim and target side —
+  the two mid-forge bugs are genuinely fixed, verified in code at lines
+  318-329 and 396-403, and pinned by AC4a's two tests and AC7), §3.4
+  fallback, §4 behavior table incl. require-all (unmatched list
+  comprehension, violation iff any subject unmatched), §4 reason-string
+  variant naming unmatched subjects, §6 boundary (one new arg to
+  check_c3_violation, run() sources section text via existing pillar_idx
+  machinery; C1/C2/first-turn short-circuit untouched). All 8 ACs have
+  corresponding tests; the 16 pre-existing tests are unmodified and pass.
+- One conservative-direction limitation, not a defect: PR-number target
+  matching reads only the FIRST number in a target text
+  (_pr_number_from_text returns the first _PR_NUMBER_RE match), so a
+  single Bash command referencing two PRs matches only the first. Failure
+  direction is false-violation (stricter), spec's wording is singular
+  ("the number extracted from the target text"), and no AC covers
+  multi-number targets. Noting for the record, not blocking.
+- Layer 2: PASS. docs/NORTHSTAR.md exists, Established 2026-07-17, no
+  DRAFT status — no PROVISIONAL stamp needed. Hardening the first-turn
+  contract probe (DDR-004 family) is squarely "orchestration mechanics
+  hardened in one dedicated place"; no drift-check trigger applies.
+
+Why:
+The exact gap named in SPEC §1 — a stale unrelated tool call satisfying C3
+for a claim it never verified — is closed by the require-all match loop,
+and the two deliberate amendments (require-all-subjects, exact-match
+carve-outs for PR numbers and identifiers) are implemented as amended, not
+as the pre-amendment draft. The digit-substring false-positive class
+("#4" vs "gh pr view 42") is dead on both the claim side and the target
+side, which is where both mid-forge defects lived; I verified the fixes in
+source, not by trusting the fix reports. Nothing in the diff invents a
+number, and the one judgment-call constant carries its PROVISIONAL tag and
+owner into the code itself, not just the spec.
+
+Verdict: PASS
+
+Fix/Next-step: none — no carried conditions. The multi-number-target
+limitation above fails strict (false-violation), is consistent with the
+spec's singular wording, and needs no tracking beyond this record; §7's
+existing open questions (#17, #19) already cover the real deferred scope.
+═══════════════════════════════════════════════════════════════════
+```
+
+### Orchestrator's independent post-PASS review (forge-gate, attempt 1)
+
+Confirmed independently, not a rubber stamp: re-ran `python3 -m pytest tests/test_first_turn_contract_probe.py -q` → 26/26 passing. Confirmed diff scope (`git diff 90a7c5c..5a0a193 --stat`) is confined to the four expected files (scripts/reference probe, test file, PROGRESS.md). Grepped the diff for numeric-threshold/similarity-score patterns — none found. Agree with Frank's PASS; no additional finding this round (unlike the spec-gate phase, where the orchestrator's independent review did catch a real defect Frank's own pass missed). Proceeding to End-of-Feature Tasks.

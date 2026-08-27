@@ -1,6 +1,6 @@
 # Progress: first-turn-contract-c3-claim-matching
 
-**Status**: IN_PROGRESS — Slice 1 complete, Frank binding forge-gate pending
+**Status**: FORGE COMPLETE — PR #20 ready for review, DDR-004 status-line update still open (see below)
 
 ---
 
@@ -12,9 +12,11 @@
       self-reported), @test-writer added 10 new tests (26 total, 16 pre-existing unmodified),
       @test-runner confirmed 26/26 independently twice, @qc-agent PASS on full spec-compliance
       re-review. reference/first_turn_contract_probe.py kept byte-identical throughout.
-- [ ] **Frank binding forge-gate** — PENDING. Runs once, only after Slice 1's STAMP: APPROVED.
-      Do not set `Status: COMPLETE` before this line is checked and its verdict is transcribed
-      into `GATE-LOG.md`'s `## Forge Gate` section.
+- [x] **Frank binding forge-gate** — PASS, attempt 1/3, both layers, no carried conditions
+      (2026-08-27). Layer 2 no PROVISIONAL (NORTHSTAR.md Established). Orchestrator's own
+      independent post-PASS review agreed (re-ran 26/26, confirmed diff scope, no fabricated
+      thresholds) — no additional finding this round. Verdict in `GATE-LOG.md`'s `## Forge Gate`
+      section.
 
 ## Post-forge tasks (not blocking forge, must close before this sprint is called complete)
 
