@@ -809,6 +809,63 @@ def test_track_record_entry_shape_on_probe_error_path(monkeypatch, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# C3 path/query boundary matching (spec:
+# docs/tooling/first-turn-contract-c3-path-query-boundary-matching/SPEC.md §6 AC1-AC8) —
+# direct calls to `_subject_matches_target`, per the spec's own AC wording, which states
+# each acceptance criterion as a direct assertion on that function's return value.
+# ---------------------------------------------------------------------------
+
+def test_c3_matching_ac1_bare_filename_non_boundary_offset_rejected():
+    """§6 AC1: short bare filename `c3.py` must NOT match a target where it appears at a
+    non-component-boundary offset (`scripts/legacy_c3.pyx` — the match is mid-component,
+    followed by `x` not `/` or end-of-string)."""
+    assert probe._subject_matches_target(
+        "path", "c3.py", "scripts/legacy_c3.pyx"
+    ) is False
+
+
+def test_c3_matching_ac2_query_word_fragment_inside_longer_word_rejected():
+    """§6 AC2: short query word `c3` must NOT match a target where it appears only as a
+    fragment inside a longer unrelated word (`c3matching-helper`)."""
+    assert probe._subject_matches_target(
+        "query", "c3", "grep -r c3matching-helper"
+    ) is False
+
+
+def test_c3_matching_ac4_partial_query_phrase_spanning_multiple_words_matches():
+    """§6 AC4: a partial query phrase spanning multiple words (with an internal space)
+    still matches when its outer edges land on word boundaries."""
+    assert probe._subject_matches_target(
+        "query", "claim matching", "first-turn-contract claim matching fix"
+    ) is True
+
+
+def test_c3_matching_ac5_command_subject_retains_plain_substring_containment():
+    """§6 AC5: `command`-type subjects keep plain bidirectional substring containment,
+    unchanged — no boundary rule applied, per §4's design decision."""
+    assert probe._subject_matches_target(
+        "command", "pr list", "gh pr list --state open"
+    ) is True
+
+
+def test_c3_matching_ac7_path_directory_component_suffix_alignment_matches():
+    """§6 AC7: a path subject with a directory component that suffix-aligns with a longer
+    target path still matches (`bar/foo.py` inside `x/bar/foo.py`)."""
+    assert probe._subject_matches_target(
+        "path", "bar/foo.py", "x/bar/foo.py"
+    ) is True
+
+
+def test_c3_matching_ac8_path_basename_fallback_reachable_on_non_aligning_dirs():
+    """§6 AC8: a path subject whose basename matches a target's basename, but whose full
+    path does not component-align (distinct, non-overlapping directory trees), still
+    matches via the retained basename fallback (§2)."""
+    assert probe._subject_matches_target(
+        "path", "x/foo.py", "y/foo.py"
+    ) is True
+
+
+# ---------------------------------------------------------------------------
 # Drift guard — reference/ vs scripts/ (spec §10, Slice 2)
 # ---------------------------------------------------------------------------
 

@@ -414,12 +414,54 @@ def _subject_matches_target(subject_type, subject_value, target_text):
         tokens = _WORD_TOKEN_RE.findall(target_text)
         return subject_value in tokens
 
-    # path / command / query — substring containment in either direction, plus basename
-    # fallback for paths.
+    if subject_type == "path":
+        # §2 — boundary-aware path-component alignment, with the basename fallback
+        # retained unchanged as a second check.
+        if _path_components_align(subject_value, target_text):
+            return True
+        if os.path.basename(subject_value) == os.path.basename(target_text):
+            return True
+        return False
+
+    if subject_type == "query":
+        # §3 — word/phrase-boundary-aware match.
+        return _phrase_boundary_match(subject_value, target_text)
+
+    # command — substring containment in either direction, unchanged (§4).
     if subject_value in target_text or target_text in subject_value:
         return True
-    if subject_type == "path":
-        if os.path.basename(subject_value) == os.path.basename(target_text):
+    return False
+
+
+def _path_components_align(subject_value, target_text):
+    """§2 — a match counts only if the shorter path's component list is a contiguous
+    suffix or prefix of the longer path's component list."""
+    subj_parts = subject_value.split("/")
+    targ_parts = target_text.split("/")
+    if len(subj_parts) <= len(targ_parts):
+        shorter, longer = subj_parts, targ_parts
+    else:
+        shorter, longer = targ_parts, subj_parts
+    if not shorter:
+        return False
+    n = len(shorter)
+    # suffix alignment: shorter matches the tail of longer's components
+    if longer[len(longer) - n:] == shorter:
+        return True
+    # prefix alignment: shorter matches the head of longer's components
+    if longer[:n] == shorter:
+        return True
+    return False
+
+
+def _phrase_boundary_match(subject_value, target_text):
+    """§3 — containment counts as a match only at a word/phrase boundary (no
+    alphanumeric character immediately adjacent on either side of the match)."""
+    for shorter, longer in ((subject_value, target_text), (target_text, subject_value)):
+        if not shorter:
+            continue
+        pattern = r"(?<!\w)" + re.escape(shorter) + r"(?!\w)"
+        if re.search(pattern, longer):
             return True
     return False
 
