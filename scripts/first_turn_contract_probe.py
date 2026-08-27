@@ -7,7 +7,11 @@ FOOTER contract):
 
   C1 — Signpost must precede Pillar (order).
   C2 — no forbidden third "not (yet) verified (this session)" section.
-  C3 — a Pillar section must be backed by at least one qualifying tool call.
+  C3 — a Pillar section's claimed subject(s) (file paths, PR/issue numbers, identifiers,
+       commands, quoted queries) must each be backed by a qualifying tool call whose target
+       matches that subject; falls back to presence-only (at least one qualifying tool call
+       exists) when the section yields no extractable subject (see
+       docs/tooling/first-turn-contract-c3-claim-matching/SPEC.md §3-4).
 
 Emits the block/allow decision Claude Code's `Stop` hook understands (top-level
 `{"decision": "block", "reason": ...}`, or nothing/`{}` to allow — see
@@ -248,19 +252,182 @@ def analyze_queue_injection_and_first_turn(records):
     return queue_injected, first_turn, current_turn_index
 
 
-def check_c3_violation(records, current_turn_index, pillar_idx):
-    """§5.4 — applies only if a Pillar heading was asserted (`pillar_idx is not None`).
-    Violates iff no qualifying (non-TodoWrite, completed) tool call precedes the current
-    turn's assistant record."""
-    if pillar_idx is None:
+# §3.1 — file-path extension allowlist. PROVISIONAL — owner: wright; rationale: covers the
+# file types actually touched by this repo's own tooling and test suite as of this spec;
+# extend as needed (see SPEC.md §3.1 for the full degradation-path rationale).
+_FILE_EXTENSION_ALLOWLIST = {
+    ".py", ".md", ".ts", ".tsx", ".json", ".sh", ".yml", ".yaml",
+}
+
+# §3.1 — file path token: backtick- or plain-token substrings containing at least one `/`
+# or a dotted extension. Extension membership in the allowlist above is checked after the
+# regex match (the regex itself is permissive; the allowlist filter narrows it).
+_FILE_PATH_RE = re.compile(r"`?([\w./\-]+\.\w+|[\w\-]+/[\w./\-]+)`?")
+
+# §3.1 — PR/issue number: `#\d+` or `PR\s*#?\d+`, case-insensitive.
+_PR_NUMBER_RE = re.compile(r"PR\s*#?(\d+)|#(\d+)", re.IGNORECASE)
+
+# §3.3/§3.1 — a gh CLI PR/issue subcommand followed by a bare number, e.g.
+# `gh pr view 42`, `gh issue checkout 7`. Used target-side (§3.3) and as a fallback for
+# backtick-gh-span claim-subject classification (§3.1) when `_PR_NUMBER_RE` finds no match.
+_GH_COMMAND_PR_NUMBER_RE = re.compile(
+    r"\bgh\s+(?:pr|issue)\s+\w+\s+(\d+)\b", re.IGNORECASE
+)
+
+# §3.1 — backtick-quoted bare identifier (function/class/var name).
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_]\w*$")
+
+# §3.1 — backtick span contents.
+_BACKTICK_RE = re.compile(r"`([^`]+)`")
+
+# §3.1 — quoted query string following search/query/grep/find (case-insensitive).
+_QUOTED_QUERY_RE = re.compile(
+    r"(?:search|query|grep|find)\s+\"([^\"]+)\"", re.IGNORECASE
+)
+
+# §3.1 — a gh command reference, inside a backtick span.
+_GH_REFERENCE_RE = re.compile(r"\bgh\b")
+
+# §3.3/§3.2 — word-boundary token split used for identifier exact-match-against-free-text.
+_WORD_TOKEN_RE = re.compile(r"[A-Za-z_]\w*")
+
+
+def _pr_number_from_text(text):
+    """First PR/issue number found in `text`, or None. Used both for extraction (§3.1)
+    and for target-side comparison (§3.3)."""
+    m = _PR_NUMBER_RE.search(text)
+    if not m:
+        return None
+    return m.group(1) or m.group(2)
+
+
+def _extract_claim_subjects(pillar_section_text):
+    """§3.1 — extract claim-subject tokens from a Pillar section's text. Returns a list of
+    unique `(subject_type, value)` tuples, `subject_type` in
+    {"path", "pr", "identifier", "command", "query"}. Order is not significant; dedup is
+    by (type, value)."""
+    if not pillar_section_text:
+        return []
+
+    subjects = []
+    seen = set()
+
+    def _add(subject_type, value):
+        key = (subject_type, value)
+        if key not in seen:
+            seen.add(key)
+            subjects.append(key)
+
+    # Backtick spans: gh-command references, bare identifiers.
+    for m in _BACKTICK_RE.finditer(pillar_section_text):
+        content = m.group(1)
+        if _GH_REFERENCE_RE.search(content):
+            num = _pr_number_from_text(content)
+            if num is None:
+                gh_m = _GH_COMMAND_PR_NUMBER_RE.search(content)
+                if gh_m is not None:
+                    num = gh_m.group(1)
+            if num is not None:
+                _add("pr", num)
+            else:
+                _add("command", content)
+        elif _IDENTIFIER_RE.match(content):
+            _add("identifier", content)
+
+    # File paths (backticked or plain), filtered by the extension allowlist for the
+    # dotted-extension branch; the slash-containing branch needs no filtering (§3.1).
+    for m in _FILE_PATH_RE.finditer(pillar_section_text):
+        token = m.group(1)
+        if "/" in token:
+            _add("path", token)
+        else:
+            _, ext = os.path.splitext(token)
+            if ext in _FILE_EXTENSION_ALLOWLIST:
+                _add("path", token)
+
+    # PR/issue numbers anywhere in the section text (prose or backticked).
+    for m in _PR_NUMBER_RE.finditer(pillar_section_text):
+        num = m.group(1) or m.group(2)
+        _add("pr", num)
+
+    # Quoted query strings.
+    for m in _QUOTED_QUERY_RE.finditer(pillar_section_text):
+        _add("query", m.group(1))
+
+    return subjects
+
+
+def _extract_tool_target(tool_name, tool_input):
+    """§3.2 — the target text for a qualifying tool call, by tool name. Absent/None
+    `tool_input` yields the empty string (§3.2's explicit absent-input rule)."""
+    if not isinstance(tool_input, dict):
+        return ""
+    if tool_name in ("Read", "Edit", "Write"):
+        value = tool_input.get("file_path")
+        return value if isinstance(value, str) else ""
+    if tool_name in ("Grep", "Glob"):
+        parts = []
+        path = tool_input.get("path")
+        if isinstance(path, str):
+            parts.append(path)
+        pattern = tool_input.get("pattern")
+        if isinstance(pattern, str):
+            parts.append(pattern)
+        return " ".join(parts)
+    if tool_name == "Bash":
+        value = tool_input.get("command")
+        return value if isinstance(value, str) else ""
+    if tool_name in ("WebSearch", "WebFetch"):
+        value = tool_input.get("query")
+        if isinstance(value, str):
+            return value
+        value = tool_input.get("url")
+        return value if isinstance(value, str) else ""
+    try:
+        return json.dumps(tool_input)
+    except Exception:
+        return ""
+
+
+def _subject_matches_target(subject_type, subject_value, target_text):
+    """§3.3 — the matching algorithm. `target_text == ""` never matches any non-empty
+    subject (§3.2's absent-input rule)."""
+    if not target_text:
         return False
 
-    if current_turn_index is None:
-        preceding = records
-    else:
-        preceding = records[:current_turn_index]
+    if subject_type == "pr":
+        # §3.3 exception: exact numeric equality only, no substring containment.
+        target_num = _pr_number_from_text(target_text)
+        if target_num is None:
+            # Target-side only fallback: `gh pr view 42` style commands, where no
+            # "#" or "PR" token immediately precedes the number.
+            m = _GH_COMMAND_PR_NUMBER_RE.search(target_text)
+            if m:
+                target_num = m.group(1)
+        return target_num is not None and target_num == subject_value
 
-    tool_use_names = {}
+    if subject_type == "identifier":
+        # §3.3 exception: exact equality only (whole target, or a whitespace/word-
+        # boundary-delimited token within free-text targets).
+        if subject_value == target_text:
+            return True
+        tokens = _WORD_TOKEN_RE.findall(target_text)
+        return subject_value in tokens
+
+    # path / command / query — substring containment in either direction, plus basename
+    # fallback for paths.
+    if subject_value in target_text or target_text in subject_value:
+        return True
+    if subject_type == "path":
+        if os.path.basename(subject_value) == os.path.basename(target_text):
+            return True
+    return False
+
+
+def _collect_qualifying_tool_calls(preceding):
+    """Shared collection of completed, non-excluded tool calls from `preceding` records —
+    returns a list of `(name, input)` tuples."""
+    tool_use_info = {}
     tool_result_ids = set()
     for r in preceding:
         message = r.get("message")
@@ -276,21 +443,58 @@ def check_c3_violation(records, current_turn_index, pillar_idx):
             if btype == "tool_use":
                 tool_id = block.get("id")
                 if tool_id:
-                    tool_use_names[tool_id] = block.get("name")
+                    tool_use_info[tool_id] = (block.get("name"), block.get("input"))
             elif btype == "tool_result":
                 tool_id = block.get("tool_use_id")
                 if tool_id:
                     tool_result_ids.add(tool_id)
 
-    qualifying = {
-        tool_id
-        for tool_id, name in tool_use_names.items()
-        if tool_id in tool_result_ids and name not in C3_EXCLUDED_TOOLS
-    }
-    return len(qualifying) == 0
+    return [
+        info
+        for tool_id, info in tool_use_info.items()
+        if tool_id in tool_result_ids and info[0] not in C3_EXCLUDED_TOOLS
+    ]
 
 
-def build_reason(violations, signpost_idx, pillar_idx, pillar_line, c2_line):
+def check_c3_violation(records, current_turn_index, pillar_idx, pillar_section_text):
+    """§5.4/§3.3 — applies only if a Pillar heading was asserted (`pillar_idx is not
+    None`). Returns `(violation: bool, unmatched_subjects: list)`. `unmatched_subjects` is
+    the list of `(subject_type, value)` claim subjects that had no matching qualifying
+    tool call — populated only for the "qualifying calls exist but some subject(s)
+    unmatched" case (§4), empty otherwise (including the pure-absence and presence-only-
+    fallback cases)."""
+    if pillar_idx is None:
+        return False, []
+
+    if current_turn_index is None:
+        preceding = records
+    else:
+        preceding = records[:current_turn_index]
+
+    qualifying = _collect_qualifying_tool_calls(preceding)
+    if not qualifying:
+        return True, []
+
+    subjects = _extract_claim_subjects(pillar_section_text)
+    if not subjects:
+        # §3.4 — presence-only fallback: qualifying calls exist, so C3 passes.
+        return False, []
+
+    targets = [_extract_tool_target(name, tool_input) for name, tool_input in qualifying]
+
+    unmatched = [
+        (subject_type, value)
+        for subject_type, value in subjects
+        if not any(
+            _subject_matches_target(subject_type, value, target) for target in targets
+        )
+    ]
+    return len(unmatched) > 0, unmatched
+
+
+def build_reason(
+    violations, signpost_idx, pillar_idx, pillar_line, c2_line, c3_unmatched_subjects=None
+):
     parts = []
     if "C1" in violations:
         quoted = pillar_line if pillar_line else "(Pillar heading)"
@@ -307,11 +511,21 @@ def build_reason(violations, signpost_idx, pillar_idx, pillar_line, c2_line):
         )
     if "C3" in violations:
         quoted = pillar_line if pillar_line else "(Pillar heading)"
-        parts.append(
-            f"C3 violation: a Pillar heading was asserted (quoted: \"{quoted}\") with no "
-            f"qualifying tool call recorded before it in the transcript. Run the "
-            f"verifying tool call(s) for the Pillar claims before reporting them."
-        )
+        if c3_unmatched_subjects:
+            named = ", ".join(f"`{value}`" for _subject_type, value in c3_unmatched_subjects)
+            parts.append(
+                f"C3 violation: a Pillar heading was asserted (quoted: \"{quoted}\") "
+                f"whose claimed subject(s) ({named}) do not match any qualifying tool "
+                f"call recorded before it — the qualifying call(s) present target "
+                f"something else. Run the verifying tool call(s) for these specific "
+                f"claims before reporting them."
+            )
+        else:
+            parts.append(
+                f"C3 violation: a Pillar heading was asserted (quoted: \"{quoted}\") with "
+                f"no qualifying tool call recorded before it in the transcript. Run the "
+                f"verifying tool call(s) for the Pillar claims before reporting them."
+            )
     return " ".join(parts)
 
 
@@ -380,7 +594,19 @@ def run(stdin_data):
     )
     c2_line = find_c2_heading_line(last_assistant_message)
     c2_violation = c2_line is not None
-    c3_violation = check_c3_violation(records, current_turn_index, pillar_idx)
+    pillar_section_text = None
+    if pillar_idx is not None:
+        lines = last_assistant_message.split("\n")
+        section_end = len(lines)
+        for idx in range(pillar_idx + 1, len(lines)):
+            stripped = strip_leading_markup(lines[idx])
+            if _SIGNPOST_PILLAR_HEADING_RE.match(stripped):
+                section_end = idx
+                break
+        pillar_section_text = "\n".join(lines[pillar_idx:section_end])
+    c3_violation, c3_unmatched_subjects = check_c3_violation(
+        records, current_turn_index, pillar_idx, pillar_section_text
+    )
 
     violations = []
     if c1_violation:
@@ -392,7 +618,10 @@ def run(stdin_data):
 
     if violations:
         pillar_line = find_pillar_heading_line(last_assistant_message, pillar_idx)
-        reason = build_reason(violations, signpost_idx, pillar_idx, pillar_line, c2_line)
+        reason = build_reason(
+            violations, signpost_idx, pillar_idx, pillar_line, c2_line,
+            c3_unmatched_subjects,
+        )
         write_track_record(session_id, False, True, True, "block", violations, reason, None)
         emit_block(reason)
         return
