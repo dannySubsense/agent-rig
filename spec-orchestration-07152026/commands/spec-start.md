@@ -178,10 +178,22 @@ Mode File Layout above:
 ### Lite Step 3: Human Approval
 
 Present the single document plus Frank's verdict to Danny, exactly as Step 9 does for the full
-artifact set. On approval: mark the document's own `Status:` line `LOCKED` (the document is
-self-contained — there is no separate lock artifact) and note "Ready for implementation handoff"
-— `/forge-start` runs the build against it. Lite mode owns nothing past the lock; forge protocol
-is not duplicated or re-specified here.
+artifact set. **Combined with this approval ask, in the same turn** (this is the fix for the
+lite-mode ceremony problem confirmed 2026-08-24, `no-preamble-no-meta-narration-hook` sprint — a
+separate consent prompt later, at `/forge-start`'s Git Flow Determination, for a decision Danny
+could just as easily make right now while the document is already in front of him, was assessed as
+unnecessary ceremony): if `CLAUDE.md`'s `## Git Workflow` section declares PR/feature-branch flow,
+ask the branch/PR consent question alongside the spec approval question, one combined ask —
+"Approve `SPEC.md`? If so, I'll also create `feature/{tool-name}` and open a draft PR to build it."
+On approval of both: mark the document's own `Status:` line `LOCKED` (the document is
+self-contained — there is no separate lock artifact), note "Ready for implementation handoff," and
+record the branch/PR consent in the same approval note so `/forge-start --lite`'s Git Flow
+Determination reads it as already-given (see that document's Lite Mode section) rather than asking
+again. If Danny approves the spec but declines or defers the branch/PR question, `/forge-start
+--lite` still asks it fresh, at Session Start, per its own Git Flow Determination procedure — this
+combining is an opportunity to shorten the path, not a way to force the decision before Danny is
+ready to make it. `/forge-start` runs the build against the locked document either way. Lite mode
+owns nothing past the lock; forge protocol is not duplicated or re-specified here.
 
 ---
 
