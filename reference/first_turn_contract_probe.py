@@ -7,7 +7,11 @@ FOOTER contract):
 
   C1 — Signpost must precede Pillar (order).
   C2 — no forbidden third "not (yet) verified (this session)" section.
-  C3 — a Pillar section must be backed by at least one qualifying tool call.
+  C3 — a Pillar section's claimed subject(s) (file paths, PR/issue numbers, identifiers,
+       commands, quoted queries) must each be backed by a qualifying tool call whose target
+       matches that subject; falls back to presence-only (at least one qualifying tool call
+       exists) when the section yields no extractable subject (see
+       docs/tooling/first-turn-contract-c3-claim-matching/SPEC.md §3-4).
 
 Emits the block/allow decision Claude Code's `Stop` hook understands (top-level
 `{"decision": "block", "reason": ...}`, or nothing/`{}` to allow — see
