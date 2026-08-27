@@ -1,5 +1,9 @@
 # DDR Index — Agent Rig
 
+**What a DDR is, and what a row here may/may not contain: [DDR-DEFINITION.md](DDR-DEFINITION.md).**
+A row states a decision — what/when/why — and links to a sprint's `PROGRESS.md` for anything that
+changes over time. It does not restate or update inline.
+
 | # | Title | Status |
 |---|-------|--------|
 | 001 | Ask-vs-Act Decision Flow | ACCEPTED |
