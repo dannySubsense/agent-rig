@@ -22,13 +22,21 @@ while and something depends on it, re-check live rather than trusting the date.
 | `agent-rig` | Live (`scripts/session_queue_probe.py`) | Live — includes claim-matching (PR #20) + boundary-matching (PR #21) fixes | `no-preamble-no-meta-narration.sh` (DDR-007), `domain-boundary-provenance` (DDR-006), `progress-proof-per-slice` (DDR-008) | 2026-08-28, direct file read + track-record inspection (this session) |
 | `market_data` | Live (`scripts/session_probe.py`, installed 2026-08-12, Slice 10 pilot) | Live — installed 2026-08-28 (this session), current version (post PR #20/#21), smoke-tested via real invocation path, one track-record entry confirmed | None known | 2026-08-28, direct file read on disk + live smoke test (this session) |
 | `department-os` | Unmerged (branch `session-start-hook`) — NOT live on `main` | Not installed | — | 2026-08-21, confirmed absent via `find` (per DDR-004 index history, itself unverified this session — re-check before relying on it) |
-| `electric-blue` | Not installed | Not installed | — | Never checked — roster member, no retrofit attempted |
-| `gap-lens-dilution` | Not installed | Not installed | — | Never checked |
-| `gap-lens-dilution-filter` | Not installed | Not installed | — | Never checked |
-| `ask-edgar-repo` | Not installed | Not installed | — | Never checked |
-| `sonic-store` | Not installed | Not installed | — | Never checked |
-| `quant-foundry` | Not installed | Not installed | — | Never checked |
-| `runtime/agent-lore` | Not installed | Not installed | — | Never checked |
+| `electric-blue` | Not installed | Live — installed 2026-08-28, current version (post PR #20/#21), smoke-tested, settings.json created fresh (had none) | — | 2026-08-28, direct file write + smoke test (this session) |
+| `gap-lens-dilution` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, merged into existing (empty) hooks dict | — | 2026-08-28, direct file write + smoke test (this session) |
+| `gap-lens-dilution-filter` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, merged alongside existing `PreToolUse` hook (untouched) | `PreToolUse` (pre-existing, unrelated) | 2026-08-28, direct file write + smoke test (this session) |
+| `ask-edgar-repo` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, settings.json created fresh | — | 2026-08-28, direct file write + smoke test (this session) |
+| `sonic-store` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, settings.json created fresh | — | 2026-08-28, direct file write + smoke test (this session) |
+| `quant-foundry` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, settings.json created fresh | — | 2026-08-28, direct file write + smoke test (this session) |
+| `runtime/agent-lore` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, settings.json created fresh | — | 2026-08-28, direct file write + smoke test (this session) |
+
+**Note on this batch (2026-08-28):** these 7 installs, plus `market_data`, were done directly by
+agent-rig (wright) reaching into each repo's filesystem — not via each resident agent running
+`RETROFIT-PROCEDURE.md`'s own six-step cutover (no blast-radius audit, no independent Frank gate
+per repo, no `RetrofitAuditRecord` capture). Danny explicitly authorized this direct-deploy
+approach after confirming market_data's install went cleanly. None of these repos got the SessionStart
+probe (Components 4/7) — only the Stop-hook C3 contract. Each resident agent should be notified
+this landed in their repo, since they didn't do the deploying themselves.
 
 **Verification method key**:
 - "Direct file read" = actually opened the file/`settings.json` this session.
