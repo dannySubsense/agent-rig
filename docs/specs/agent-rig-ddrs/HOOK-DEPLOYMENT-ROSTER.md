@@ -35,8 +35,7 @@ agent-rig (wright) reaching into each repo's filesystem — not via each residen
 `RETROFIT-PROCEDURE.md`'s own six-step cutover (no blast-radius audit, no independent Frank gate
 per repo, no `RetrofitAuditRecord` capture). Danny explicitly authorized this direct-deploy
 approach after confirming market_data's install went cleanly. None of these repos got the SessionStart
-probe (Components 4/7) — only the Stop-hook C3 contract. Each resident agent should be notified
-this landed in their repo, since they didn't do the deploying themselves.
+probe (Components 4/7) — only the Stop-hook C3 contract.
 
 **Verification method key**:
 - "Direct file read" = actually opened the file/`settings.json` this session.
