@@ -162,11 +162,31 @@ not one:**
    e.g. a fragment spanning a partial class header with a dangling `:`, or mixed indentation across
    multiple lines) — fall back to a **per-line regex scan restricted to the assignment context
    only**: a line matching
-   `^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*[\w.\[\], ]+)?\s*=\s*(-?\d[\d_]*|True|False)\s*(?:#.*)?$`
+   `^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*[\w.\[\], ]+)?\s*=\s*(-?\d[\d_]*(?:\.\d[\d_]*)?|True|False)\s*(?:#.*)?$`
    (an optionally-annotated `NAME = <literal>`, whole-line match, trailing comment permitted) is
    treated as a fallback `assign_module_or_class` candidate with `target_name` taken from the first
    capture group. This regex fallback exists **only** for context 3 — see the robustness table
    below for why the other two contexts do not get one.
+
+   **Fix applied 2026-09-05, in direct response to a measured gap, not itself re-benchmarked:**
+   the pre-fix pattern (`-?\d[\d_]*|True|False`) matched integers and booleans only. The
+   fragment-shaped rerun (`results-fragment-shaped.md` §2, case `F1`) measured a real MISS against
+   `dilution_pct_min: float = 0.10` on the regex path — a float threshold produces zero candidates
+   under the old pattern. The value group above now also matches an optional `.` plus a second
+   digit run, i.e. `-?\d[\d_]*(?:\.\d[\d_]*)?`. Reasoning for why this doesn't introduce a new
+   false-positive shape (not itself re-run, so stated as reasoning rather than measurement): the
+   added group is anchored to the same whole-line `NAME = <value>` match as before — it only
+   extends what counts as `<value>`, it does not relax the `NAME =` prefix or the trailing
+   `(?:#.*)?$` suffix. A version string (e.g. `VERSION = "1.2.3"`) does not match because the
+   value is quoted, and the pattern has no alternative for a quoted string. A dotted-numeric
+   fragment embedded inside a larger expression (e.g. `x = 1.2.3` — not valid Python, or
+   `x = a.b.c`) does not match because `\.\d[\d_]*` requires a digit immediately after the dot,
+   and the whole-line anchors (`^...$`) still require the entire line to be exactly one
+   assignment with nothing trailing but an optional comment. The regex fallback is unchanged in
+   every other respect (same anchors, same target-name capture, same context-3-only scope); only
+   the shape of literal it accepts is widened. This reasoning has not been validated by a rerun of
+   `results-fragment-shaped.md`'s F1 case against the fixed pattern — that remains open, tracked
+   alongside the rest of §13's precision gap.
 
 **Robustness by context, stated explicitly (required by this correction, not left implicit):**
 
@@ -180,31 +200,34 @@ Contexts 1-2 keep the pre-existing fail-open behavior (an unparsable fragment yi
 from these contexts specifically); context 3 gets the fallback chain because it is both the shape
 that matters most (both ground-truth incidents) and the shape safest to detect textually.
 
-**Status of the 2/2 recall claim after this fix: NOT YET VALIDATED AT THE REAL SCAN SURFACE.**
-`results.md` §4's 2/2 table was measured against whole files. Tracing both incidents through the
-fixed chain above (a logic trace, not a re-run measurement):
-- **I1** (`_HEAD_BYTES = 65_536`, module-level, unindented) — an `Edit` fragment containing just
-  this line parses unchanged under strategy 1. Recall for I1 is expected to hold under fragment
-  input.
-- **I2** (`filing_text_max_bytes: int = 512_000`, class-body, indented) — a single-line `Edit`
-  fragment raises `IndentationError` under strategy 1 and is expected to recover under strategy
-  2's `textwrap.dedent` (a single indented line dedents cleanly). A multi-line fragment that
-  includes a partial class header, or mixed indentation, is not guaranteed to recover under
-  strategy 2 (`dedent` strips a common whitespace prefix; it does not reconstruct a missing `class
-  Foo:` line) and would depend on strategy 3's regex fallback, which recovers a bare `NAME =
-  <literal>` line regardless of surrounding context.
+**Status of the recall claim, fragment-shaped rerun (2026-09-05): CONFIRMED for context 3, at
+realistic fragment shapes, including the worst case.** `results.md` §4's 2/2 whole-file recall
+figure has been superseded for context 3 by a real re-run against fragment-shaped input, cited to
+`docs/research/domain-boundary-hook-benchmark/results-fragment-shaped.md`: 9/9 PASS across both
+ground-truth incidents (I1: 3/3, I2: 6/6), covering single-line, multi-context, and the worst case
+identified in the traced expectation below — I2 sliced with its original 4-space indent and no
+enclosing `class` line, which recovered via strategy 2 (dedent-retry) or strategy 3 (regex
+fallback) depending on exact slice boundaries. This is a real execution against fragments sliced
+live from the working tree and from `git show 7d9fdf5:research/pipeline/config.py`, not a logic
+trace, and it is corroborated by a byte-identical corpus regression (same file referenced above).
 
-**This is a traced expectation, not a measured result.** Per this correction's own required
-follow-up: re-run `results.md` §4's two-incident recall method against **simulated `new_string`-
-style fragments** — for I1 and I2, construct the fragment an `Edit` would actually propose (the
-changed line(s) plus 0, 1, and 3 lines of real surrounding context, at the real file's actual
-indentation, not the whole file), run the fixed three-strategy `detect_threshold_literals` against
-each variant, and record PASS/MISS per variant. This is a small, scoped, re-runnable addition to
-`scan_thresholds.py` (or a sibling script) — precisely specifiable, not requiring a full
-`benchmark`-agent dispatch, but **it has not been run as part of this architecture-fix pass.** Until
-it runs, the 2/2 recall figure must be read as **whole-file recall only**; fragment-level recall
-(the population the hook actually consumes) is **NOT YET VALIDATED** and this document does not
-claim otherwise. Tracked as an open item, §13.
+**Scope of what was confirmed, stated precisely so it is not over-read:** this rerun validates
+**context 3 (module/class-level assignment) only** — both ground-truth incidents are context 3,
+so that is the only context exercised. **Contexts 1 and 2 (comparison operand, slice/truncation
+argument) were NOT covered by this rerun and have no fallback by design** (see the robustness
+table above) — an unparsable fragment still yields zero candidates from those two contexts,
+unchanged from the traced-expectation status. "Fragment-robust" as a claim in this document means
+context 3 only, not the detector as a whole.
+
+**Precision remains unmeasured.** The fragment-shaped rerun measured recall only; no
+false-positive labeling was performed on the regex fallback's output at fragment scale, matching
+the pre-existing precision gap noted in `results.md` §6 and restated in `results-fragment-shaped.md`
+§5. This caveat is not discharged by the recall confirmation above and should not be read as such.
+
+The original traced expectation (I1 expected to hold; I2 expected to hold for single-line
+fragments, uncertain for multi-line fragments spanning a partial class header) is superseded by
+the measured result above wherever the two conflict; retained here only as the reasoning that
+motivated the rerun.
 
 **On keeping contexts 1–2 (comparison, slice/truncation) alongside the new context 3**: kept, not
 dropped. Both incidents are assignment-shaped, so contexts 1–2 add zero incremental recall on the
@@ -910,16 +933,17 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   recall result **against the whole-file corpus**. Not fully resolved as open, per G-1 below — the
   three-context *design* is settled; the *recall figure's applicability to the real scan surface*
   is not yet.
-- **G-1 (`05-REVIEW.md`, CRITICAL) — fragment-vs-whole-file scan surface — PARTIALLY RESOLVED this
-  pass.** §2.1 makes `detect_threshold_literals` fragment-robust (three-strategy parse chain,
-  regex fallback for context 3 only) and traces both incidents through it — I1 expected to hold,
-  I2 expected to hold for single-line fragments, not guaranteed for multi-line fragments spanning a
-  partial class header. **The 2/2 recall claim is NOT YET VALIDATED AT THE REAL SCAN SURFACE** —
-  required forge/benchmark follow-up: re-run `results.md` §4's two-incident method against
-  simulated `new_string`-shaped fragments (changed line(s) + 0/1/3 lines of real context, real
-  indentation) using the fixed three-strategy detector, and record PASS/MISS per fragment variant.
-  Small, precisely-specified, re-runnable — not requiring a full `benchmark`-agent dispatch, but not
-  run as part of this pass. Do not treat 2/2 as validated for `Edit`-fragment input until it runs.
+- **G-1 (`05-REVIEW.md`, CRITICAL) — fragment-vs-whole-file scan surface — RESOLVED for context 3
+  this pass (2026-09-05).** The fragment-shaped rerun (`results-fragment-shaped.md`) executed the
+  fixed three-strategy `detect_threshold_literals` against realistic `new_string`-shaped fragments
+  (changed line(s) + 0/1/3 lines of real context, real indentation, including the worst case: I2
+  indented with no enclosing class line) for both ground-truth incidents and got 9/9 PASS, plus a
+  byte-identical corpus regression. **Contexts 1-2 remain unmeasured by design** — no regex
+  fallback exists for them, so this result does not extend to the whole detector, only to context
+  3. **Precision is still unmeasured** — no false-positive labeling has been done on the regex
+  fallback at fragment or whole-file scale; that remains open. Additionally, the rerun surfaced a
+  regex-fallback gap (float literals not matched) that was fixed in §2.1 above but not itself
+  re-benchmarked — see that fix's note on why it is believed safe without a rerun.
 - **G-2 (`05-REVIEW.md`, CRITICAL) — owner-required contradiction — RESOLVED this pass.** §4's v1
   citation rule now requires either a checkable citation (path/URL/DDR reference) or a named human
   owner (`owner: <name>`, name not a placeholder token) — bare marker presence no longer satisfies
