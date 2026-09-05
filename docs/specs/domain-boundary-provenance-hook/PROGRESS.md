@@ -27,6 +27,7 @@ Last updated: 2026-09-05
 ## Fix Attempts
 | Test/File | Attempts | Last Error |
 |-----------|----------|------------|
+| test_threshold_marker_placeholder_owner_* (Slice 4) | 1 | `owner: N/A` captured as `"N"` (regex char class excluded `/`), not blocklisted — fix routed to @code-executor, widening char class |
 
 ## Spec Gate
 
