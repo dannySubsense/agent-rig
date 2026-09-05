@@ -54,6 +54,31 @@ _MARKER_RE = re.compile(re.escape(MARKER) + r"\s*(\S.*)?$")
 # §5 — PROVISIONAL, owner: wright. Proximity window (lines) above/below a match, inclusive.
 PROXIMITY_WINDOW = 5
 
+# §4 — the new check's citation marker; a qualifying line has this literal string followed
+# by non-whitespace content on the same line. Distinct marker from `DOMAIN-BOUNDARY:` above.
+THRESHOLD_MARKER = "THRESHOLD-PROVENANCE:"
+_THRESHOLD_MARKER_RE = re.compile(re.escape(THRESHOLD_MARKER) + r"\s*(\S.*)?$")
+
+# A 2-line window captures every real citation observed in this corpus (93.5% at distance
+# 1, 100.0% at distance 2, 0 additional at any distance 3-12); wider buys no additional
+# recall. New, second window constant distinct from the incumbent's PROXIMITY_WINDOW = 5
+# above (out of scope — see Architecture §4 for why the two passes now use two
+# independently-justified windows rather than sharing one).
+# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5
+PROXIMITY_WINDOW_THRESHOLD = 2
+
+# §4 — citation-form (a): file-path-shaped token, URL, or DDR-NNNN reference.
+_THRESHOLD_CITATION_RE = re.compile(
+    r"[\w./-]+\.(?:py|md|json|ts|tsx|sh)\b" r"|https?://\S+" r"|DDR-\d+"
+)
+
+# §4 — named-owner form (b): case-insensitive `owner:`/`owner -`/`owner —`, followed by a
+# name token, excluding the placeholder blocklist below (checked separately, case-insensitive).
+_THRESHOLD_OWNER_RE = re.compile(
+    r"owner\s*(?::|-|—)\s*([A-Za-z][A-Za-z0-9_./-]*)", re.IGNORECASE
+)
+_THRESHOLD_OWNER_PLACEHOLDERS = {"todo", "tbd", "unassigned", "unknown", "none", "self", "n/a"}
+
 
 def read_stdin():
     """Best-effort stdin JSON parse. Absence or malformed stdin must not crash the probe;
@@ -234,6 +259,44 @@ def has_qualifying_marker_in_window(lines, match_line_idx):
     for idx in range(start, end + 1):
         m = _MARKER_RE.search(lines[idx])
         if m and m.group(1) and m.group(1).strip():
+            return True
+    return False
+
+
+def _threshold_marker_satisfies(trailing_content):
+    """§4 G-2 resolution — trailing content after `THRESHOLD-PROVENANCE:` satisfies the
+    check only if it matches citation form (a) or named-owner form (b), with the owner
+    name checked against the placeholder blocklist. Bare presence (e.g. `PROVISIONAL` or
+    `TODO` alone) does not satisfy."""
+    if _THRESHOLD_CITATION_RE.search(trailing_content):
+        return True
+    owner_match = _THRESHOLD_OWNER_RE.search(trailing_content)
+    if owner_match and owner_match.group(1).lower() not in _THRESHOLD_OWNER_PLACEHOLDERS:
+        return True
+    return False
+
+
+def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
+    """Uses `PROXIMITY_WINDOW_THRESHOLD = 2` (this file, above), checked against
+    `THRESHOLD-PROVENANCE:` — a distinct constant and a distinct marker string from the
+    incumbent's `has_qualifying_marker_in_window` (which uses `PROXIMITY_WINDOW = 5`
+    against `DOMAIN-BOUNDARY:`). This function does not read or depend on the incumbent's
+    `PROXIMITY_WINDOW`.
+
+    Per Architecture §4's G-2 resolution: marker presence alone is NOT sufficient. Returns
+    True only if a `THRESHOLD-PROVENANCE:` line exists in-window AND its trailing content
+    matches the citation pattern (path/URL/DDR-NNNN) OR the named-owner pattern
+    (`owner: <name>`, name not in the placeholder blocklist {TODO, TBD, unassigned,
+    unknown, none, self, N/A}). A bare `THRESHOLD-PROVENANCE: PROVISIONAL` or `...: TODO`
+    with neither returns False (treated as absent, per 01-REQUIREMENTS.md's Edge Case
+    row)."""
+    start = max(0, match_line_idx - PROXIMITY_WINDOW_THRESHOLD)
+    end = min(len(lines) - 1, match_line_idx + PROXIMITY_WINDOW_THRESHOLD)
+    for idx in range(start, end + 1):
+        m = _THRESHOLD_MARKER_RE.search(lines[idx])
+        if not m or not m.group(1) or not m.group(1).strip():
+            continue
+        if _threshold_marker_satisfies(m.group(1)):
             return True
     return False
 

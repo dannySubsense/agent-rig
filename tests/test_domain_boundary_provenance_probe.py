@@ -720,6 +720,159 @@ def test_fragment_robustness_strategy3_regex_fallback_exercised_end_to_end():
 
 
 # ---------------------------------------------------------------------------
+# Slice 4: has_threshold_provenance_marker()
+# ---------------------------------------------------------------------------
+
+def test_threshold_marker_same_line_with_citation_satisfies():
+    lines = ["FOO = 5  # THRESHOLD-PROVENANCE: docs/research/x/results.md §5"]
+    assert probe.has_threshold_provenance_marker(lines, 0) is True
+
+
+def test_threshold_marker_same_line_with_owner_satisfies():
+    lines = ["FOO = 5  # THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright"]
+    assert probe.has_threshold_provenance_marker(lines, 0) is True
+
+
+def test_threshold_marker_two_lines_above_with_citation_satisfies():
+    lines = [
+        "# THRESHOLD-PROVENANCE: DDR-0014",
+        "",
+        "FOO = 5",
+    ]
+    assert probe.has_threshold_provenance_marker(lines, 2) is True
+
+
+def test_threshold_marker_three_lines_away_does_not_satisfy():
+    lines = [
+        "# THRESHOLD-PROVENANCE: DDR-0014",
+        "",
+        "",
+        "FOO = 5",
+    ]
+    assert probe.has_threshold_provenance_marker(lines, 3) is False
+
+
+def test_threshold_marker_two_lines_below_with_citation_satisfies():
+    """Window-boundary gap: the existing exact-2/exact-3 tests only exercise the marker
+    positioned ABOVE the literal. The window is computed symmetrically (`match_line_idx -
+    PROXIMITY_WINDOW_THRESHOLD` .. `match_line_idx + PROXIMITY_WINDOW_THRESHOLD`) — confirm
+    the below direction independently rather than assuming symmetry from the above-only
+    tests."""
+    lines = [
+        "FOO = 5",
+        "",
+        "# THRESHOLD-PROVENANCE: DDR-0014",
+    ]
+    assert probe.has_threshold_provenance_marker(lines, 0) is True
+
+
+def test_threshold_marker_three_lines_below_does_not_satisfy():
+    lines = [
+        "FOO = 5",
+        "",
+        "",
+        "# THRESHOLD-PROVENANCE: DDR-0014",
+    ]
+    assert probe.has_threshold_provenance_marker(lines, 0) is False
+
+
+def test_threshold_marker_no_trailing_content_does_not_satisfy():
+    lines = ["# THRESHOLD-PROVENANCE:", "FOO = 5"]
+    assert probe.has_threshold_provenance_marker(lines, 1) is False
+
+
+def test_threshold_marker_bare_provisional_does_not_satisfy():
+    lines = ["# THRESHOLD-PROVENANCE: PROVISIONAL", "FOO = 5"]
+    assert probe.has_threshold_provenance_marker(lines, 1) is False
+
+
+def test_threshold_marker_bare_todo_does_not_satisfy():
+    lines = ["# THRESHOLD-PROVENANCE: TODO", "FOO = 5"]
+    assert probe.has_threshold_provenance_marker(lines, 1) is False
+
+
+def test_threshold_marker_placeholder_owner_todo_does_not_satisfy():
+    lines = ["# THRESHOLD-PROVENANCE: PROVISIONAL — owner: TODO", "FOO = 5"]
+    assert probe.has_threshold_provenance_marker(lines, 1) is False
+
+
+def test_threshold_marker_placeholder_owner_all_blocklist_tokens_do_not_satisfy():
+    """Independent-review gap: the prior suite only exercised TODO as a placeholder owner
+    value. A regex-based blocklist can silently miss a token if only one or two examples
+    are tested — probe each of the seven documented placeholders individually
+    (Architecture §4 / roadmap Slice 4)."""
+    for placeholder in ("TODO", "TBD", "unassigned", "unknown", "none", "self", "N/A"):
+        lines = [f"# THRESHOLD-PROVENANCE: PROVISIONAL — owner: {placeholder}", "FOO = 5"]
+        assert probe.has_threshold_provenance_marker(lines, 1) is False, placeholder
+
+
+def test_threshold_marker_placeholder_owner_case_insensitive_do_not_satisfy():
+    """The blocklist check is documented as case-insensitive — confirm mixed-case
+    placeholder tokens (not just the exact-case forms already tested) are still caught."""
+    for placeholder in ("Todo", "tbd", "UNASSIGNED", "Unknown", "NONE", "SELF", "n/a"):
+        lines = [f"# THRESHOLD-PROVENANCE: PROVISIONAL — owner: {placeholder}", "FOO = 5"]
+        assert probe.has_threshold_provenance_marker(lines, 1) is False, placeholder
+
+
+def test_threshold_marker_real_owner_name_satisfies():
+    lines = ["# THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright", "FOO = 5"]
+    assert probe.has_threshold_provenance_marker(lines, 1) is True
+
+
+def test_domain_boundary_marker_or_bare_provisional_does_not_satisfy_threshold_check():
+    lines = ["# DOMAIN-BOUNDARY: docs/foo.md", "FOO = 5"]
+    assert probe.has_threshold_provenance_marker(lines, 1) is False
+    lines2 = ["# PROVISIONAL", "FOO = 5"]
+    assert probe.has_threshold_provenance_marker(lines2, 1) is False
+
+
+def test_incumbent_proximity_window_constant_flagged_on_self_scan():
+    """PROXIMITY_WINDOW = 5 (the incumbent's own existing assignment, unmodified and
+    uncommented by this sprint) IS flagged by the local-threshold pass when this probe
+    file is scanned, with `unmarked` populated and `context: "assign_module_or_class"` —
+    self-scan regression confirming restored assignment-detection behavior."""
+    probe_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "scripts",
+        "domain_boundary_provenance_probe.py",
+    )
+    with open(probe_path, "r") as fh:
+        source = fh.read()
+    lines = source.split("\n")
+    flags = probe.detect_threshold_literals(probe_path, source)
+    incumbent_flag = next(
+        f
+        for f in flags
+        if f["context"] == "assign_module_or_class" and f["literal_repr"] == "5"
+        and "PROXIMITY_WINDOW" in lines[f["line_index"]]
+        and "PROXIMITY_WINDOW_THRESHOLD" not in lines[f["line_index"]]
+    )
+    assert probe.has_threshold_provenance_marker(lines, incumbent_flag["line_index"]) is False
+
+
+def test_new_threshold_window_constant_not_flagged_as_unmarked_on_self_scan():
+    """PROXIMITY_WINDOW_THRESHOLD = 2 (this slice's own new constant) is NOT flagged as
+    unmarked — its accompanying THRESHOLD-PROVENANCE: citation comment satisfies the check
+    within the 2-line window."""
+    probe_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "scripts",
+        "domain_boundary_provenance_probe.py",
+    )
+    with open(probe_path, "r") as fh:
+        source = fh.read()
+    lines = source.split("\n")
+    flags = probe.detect_threshold_literals(probe_path, source)
+    new_flag = next(
+        f
+        for f in flags
+        if f["context"] == "assign_module_or_class" and f["literal_repr"] == "2"
+        and "PROXIMITY_WINDOW_THRESHOLD" in lines[f["line_index"]]
+    )
+    assert probe.has_threshold_provenance_marker(lines, new_flag["line_index"]) is True
+
+
+# ---------------------------------------------------------------------------
 # Plain assert-based runner (used if pytest is not installed)
 # ---------------------------------------------------------------------------
 
