@@ -17,14 +17,14 @@
     },
     {
       "id": "out_of_scope_file",
-      "description": "File does not match any pipelineConfigGlobs entry -> allow, file_in_scope false.",
+      "description": "File does not match any pipelineConfigGlobs entry -> cross_domain allows with file_in_scope false. Since Slice 7 the local-threshold pass ALSO runs on this .py file regardless of manifest scope, and `EXTERNAL_CAP_V1 = 5` is itself an unmarked module-level assignment, so the combined (log_only default) decision is now 'flag', not 'allow' -- correct composed behavior, not a regression.",
       "use_manifest": true,
       "tool_name": "Write",
       "file_path": "src/app.py",
       "is_absolute": false,
       "content": "EXTERNAL_CAP_V1 = 5\n",
       "expect": {
-        "decision": "allow",
+        "decision": "flag",
         "manifest_status": "matched",
         "file_in_scope": false
       }
@@ -62,14 +62,14 @@
     },
     {
       "id": "in_scope_match_uncited",
-      "description": "In-scope match with no qualifying marker anywhere in the window -> deny.",
+      "description": "In-scope match with no qualifying marker anywhere in the window -> flag under the log_only default (this corpus runs with no domain-boundary-mode.json present, so mode is always log_only; an unconditional deny only happens under mode == 'blocking', per Architecture Slice 6's F1 behavior change).",
       "use_manifest": true,
       "tool_name": "Write",
       "file_path": "docs/tooling/pipeline.json",
       "is_absolute": false,
       "content": "EXTERNAL_CAP_V1 = 5\n",
       "expect": {
-        "decision": "deny",
+        "decision": "flag",
         "manifest_status": "matched",
         "file_in_scope": true,
         "matches_found": 1,
@@ -78,14 +78,14 @@
     },
     {
       "id": "marker_just_outside_window",
-      "description": "Marker at distance 6 (lines) from the match -- one line past the inclusive 5-line window -- must deny. AC7 names this 'boundary case at line 6'.",
+      "description": "Marker at distance 6 (lines) from the match -- one line past the inclusive 5-line window -- must flag under the log_only default (no domain-boundary-mode.json present in this corpus; an unconditional deny only happens under mode == 'blocking'). AC7 names this 'boundary case at line 6'.",
       "use_manifest": true,
       "tool_name": "Write",
       "file_path": "docs/tooling/pipeline.json",
       "is_absolute": false,
       "content": "EXTERNAL_CAP_V1 = 5\nfiller line 1\nfiller line 2\nfiller line 3\nfiller line 4\nfiller line 5\n# DOMAIN-BOUNDARY: too far away\n",
       "expect": {
-        "decision": "deny",
+        "decision": "flag",
         "manifest_status": "matched",
         "file_in_scope": true,
         "matches_found": 1,
@@ -125,14 +125,14 @@
     },
     {
       "id": "absolute_path_vs_relative_glob",
-      "description": "A manifest glob written relative to repo root (docs/tooling/*.json) must match a realistic, non-relativized ABSOLUTE tool_input.file_path -- the real PreToolUse envelope shape.",
+      "description": "A manifest glob written relative to repo root (docs/tooling/*.json) must match a realistic, non-relativized ABSOLUTE tool_input.file_path -- the real PreToolUse envelope shape. Resolves to flag, not deny, under this corpus's log_only default (no domain-boundary-mode.json present).",
       "use_manifest": true,
       "tool_name": "Write",
       "file_path": "docs/tooling/foo.json",
       "is_absolute": true,
       "content": "EXTERNAL_CAP_V1 = 5\n",
       "expect": {
-        "decision": "deny",
+        "decision": "flag",
         "manifest_status": "matched",
         "file_in_scope": true,
         "matches_found": 1,

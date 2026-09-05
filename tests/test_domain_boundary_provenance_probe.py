@@ -48,8 +48,8 @@ def _load_probe():
 probe = _load_probe()
 
 TRACK_RECORD_KEYS = {
-    "timestamp", "session_id", "tool_name", "file_path", "manifest_status",
-    "file_in_scope", "matches_found", "matches_cited", "decision", "reason", "probe_error",
+    "timestamp", "session_id", "tool_name", "file_path", "mode",
+    "cross_domain", "local_threshold", "decision", "reason", "probe_error",
 }
 
 
@@ -74,6 +74,19 @@ def _write_manifest(project_dir, globs=None, identifiers=None, raw=None):
         "externalSourceIdentifiers": identifiers if identifiers is not None else DEFAULT_IDENTIFIERS,
     }
     path.write_text(json.dumps(data))
+    return str(path)
+
+
+def _write_mode_config(project_dir, mode):
+    """Slice 6/7 helper: several pre-Slice-6 tests assert genuine `deny`/blocked-stdout
+    behavior, which under the F1 log_only default now downgrades to `flag` (silent). Those
+    tests' actual intent is exercising the deny-reason/blocking path, not mode selection, so
+    they opt into `mode: "blocking"` explicitly rather than relying on the (now log_only)
+    default."""
+    mode_dir = project_dir / "docs" / "tooling"
+    mode_dir.mkdir(parents=True, exist_ok=True)
+    path = mode_dir / "domain-boundary-mode.json"
+    path.write_text(json.dumps({"schemaVersion": 1, "mode": mode}))
     return str(path)
 
 
@@ -131,6 +144,12 @@ def _write_stdin(tool_name="Write", file_path=None, content=None, new_string=Non
 # ---------------------------------------------------------------------------
 
 def test_ac1_out_of_scope_file_allows_with_file_in_scope_false(monkeypatch, tmp_path):
+    """AC1 covers cross_domain's file_in_scope determination only. Since Slice 7, the
+    local-threshold pass ALSO runs on every `.py` file regardless of manifest scope, and this
+    fixture's `EXTERNAL_CAP_V1 = 5` is itself an unmarked module-level assignment — so the
+    combined (log_only default) decision is now "flag", not "allow". This is the correct,
+    designed behavior of composing the two independent passes, not a regression (see
+    Architecture §3/§6/§11 and combine()'s F1 test)."""
     _write_manifest(tmp_path)
     unrelated = tmp_path / "src" / "app.py"
     unrelated.parent.mkdir(parents=True, exist_ok=True)
@@ -139,9 +158,12 @@ def test_ac1_out_of_scope_file_allows_with_file_in_scope_false(monkeypatch, tmp_
     )
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
-    assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["file_in_scope"] is False
-    assert entries[-1]["manifest_status"] == "matched"
+    assert entries[-1]["cross_domain"]["file_in_scope"] is False
+    assert entries[-1]["cross_domain"]["manifest_status"] == "matched"
+    assert entries[-1]["local_threshold"]["file_scanned"] is True
+    assert entries[-1]["local_threshold"]["matches_found"] == 1
+    assert entries[-1]["local_threshold"]["matches_cited"] == 0
+    assert entries[-1]["decision"] == "flag"
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +177,7 @@ def test_ac2_no_manifest_present_allows_with_manifest_status_absent(monkeypatch,
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["manifest_status"] == "absent_or_invalid"
+    assert entries[-1]["cross_domain"]["manifest_status"] == "absent_or_invalid"
 
 
 # ---------------------------------------------------------------------------
@@ -173,9 +195,9 @@ def test_ac3_cited_match_is_allowed(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["file_in_scope"] is True
-    assert entries[-1]["matches_found"] == 1
-    assert entries[-1]["matches_cited"] == 1
+    assert entries[-1]["cross_domain"]["file_in_scope"] is True
+    assert entries[-1]["cross_domain"]["matches_found"] == 1
+    assert entries[-1]["cross_domain"]["matches_cited"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +205,11 @@ def test_ac3_cited_match_is_allowed(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_ac4_uncited_match_is_denied_naming_file_identifier_and_remediation(monkeypatch, tmp_path):
+    """Since Slice 6/7, an unconditional deny only happens under mode == "blocking" (log_only
+    downgrades to a silent "flag" — the F1 behavior change). This test's actual intent is
+    exercising the deny-reason content, so it opts into blocking mode explicitly."""
     _write_manifest(tmp_path)
+    _write_mode_config(tmp_path, "blocking")
     target = tmp_path / "docs" / "tooling" / "pipeline.json"
     content = "EXTERNAL_CAP_V1 = 5\n"
     stdin_data = _write_stdin(file_path=str(target), content=content)
@@ -194,8 +220,8 @@ def test_ac4_uncited_match_is_denied_naming_file_identifier_and_remediation(monk
     assert "EXTERNAL_CAP_V1" in decision["reason"]
     assert "DOMAIN-BOUNDARY:" in decision["reason"]
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["matches_found"] == 1
-    assert entries[-1]["matches_cited"] == 0
+    assert entries[-1]["cross_domain"]["matches_found"] == 1
+    assert entries[-1]["cross_domain"]["matches_cited"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +235,7 @@ def test_ac5_malformed_manifest_json_allows(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["manifest_status"] == "absent_or_invalid"
+    assert entries[-1]["cross_domain"]["manifest_status"] == "absent_or_invalid"
 
 
 def test_ac5_manifest_failing_schema_validation_allows(monkeypatch, tmp_path):
@@ -224,7 +250,7 @@ def test_ac5_manifest_failing_schema_validation_allows(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["manifest_status"] == "absent_or_invalid"
+    assert entries[-1]["cross_domain"]["manifest_status"] == "absent_or_invalid"
 
 
 def test_ac5_probe_crash_allows_and_records_probe_error(monkeypatch, tmp_path):
@@ -251,7 +277,11 @@ def test_ac5_probe_crash_allows_and_records_probe_error(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_ac6_track_record_is_append_only_across_invocations(monkeypatch, tmp_path):
+    """Opts into blocking mode (see test_ac4's note) so the second invocation's fixture still
+    produces a genuine "deny" entry, preserving this test's actual intent (append-only across
+    invocations), independent of the log_only-vs-blocking mode question."""
     _write_manifest(tmp_path)
+    _write_mode_config(tmp_path, "blocking")
     target = tmp_path / "docs" / "tooling" / "pipeline.json"
     stdin_data_allow = _write_stdin(
         file_path=str(target), content="nothing interesting here\n", session_id="s-a"
@@ -271,8 +301,10 @@ def test_ac6_track_record_is_append_only_across_invocations(monkeypatch, tmp_pat
 def test_ac6_track_record_write_failure_does_not_change_decision(monkeypatch, tmp_path):
     """A write_track_record() failure (e.g. permission error, disk full) must not alter the
     already-computed allow/deny decision emitted to Claude Code — the log is an audit trail,
-    not a gate, per write_track_record()'s own docstring."""
+    not a gate, per write_track_record()'s own docstring. Opts into blocking mode (see
+    test_ac4's note) so this fixture still produces a genuine "deny" to prove the point."""
     _write_manifest(tmp_path)
+    _write_mode_config(tmp_path, "blocking")
     target = tmp_path / "docs" / "tooling" / "pipeline.json"
     stdin_data = _write_stdin(file_path=str(target), content="EXTERNAL_CAP_V1 = 5\n")
 
@@ -373,14 +405,16 @@ def test_ac7_in_scope_no_match_allows(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["file_in_scope"] is True
-    assert entries[-1]["matches_found"] == 0
+    assert entries[-1]["cross_domain"]["file_in_scope"] is True
+    assert entries[-1]["cross_domain"]["matches_found"] == 0
 
 
 def test_ac7_marker_just_outside_window_denies(monkeypatch, tmp_path):
     """§5 PROXIMITY_WINDOW = 5 (inclusive). A marker at exactly line 7 relative to a match on
-    line 1 (index 0) is 6 lines away — outside the window — and must deny."""
+    line 1 (index 0) is 6 lines away — outside the window — and must deny. Opts into blocking
+    mode (see test_ac4's note) so the window-boundary miss still surfaces as a genuine deny."""
     _write_manifest(tmp_path)
+    _write_mode_config(tmp_path, "blocking")
     target = tmp_path / "docs" / "tooling" / "pipeline.json"
     filler = "\n".join(f"filler line {i}" for i in range(1, 6))  # 5 filler lines
     content = "EXTERNAL_CAP_V1 = 5\n" + filler + "\n# DOMAIN-BOUNDARY: too far away\n"
@@ -418,7 +452,7 @@ def test_ac7_pre_existing_uncited_match_unrelated_edit_not_denied(monkeypatch, t
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["matches_found"] == 0
+    assert entries[-1]["cross_domain"]["matches_found"] == 0
 
 
 def test_ac7_absolute_path_matches_relative_glob(monkeypatch, tmp_path):
@@ -426,6 +460,7 @@ def test_ac7_absolute_path_matches_relative_glob(monkeypatch, tmp_path):
     repo root (docs/tooling/*.json) must match a realistic, non-relativized ABSOLUTE
     tool_input.file_path — the real envelope shape, per §7's live-verified capture."""
     _write_manifest(tmp_path)
+    _write_mode_config(tmp_path, "blocking")
     absolute_target = tmp_path / "docs" / "tooling" / "foo.json"
     stdin_data = _write_stdin(
         file_path=str(absolute_target), content="EXTERNAL_CAP_V1 = 5\n"
@@ -434,7 +469,7 @@ def test_ac7_absolute_path_matches_relative_glob(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
-    assert entries[-1]["file_in_scope"] is True
+    assert entries[-1]["cross_domain"]["file_in_scope"] is True
 
 
 def test_ac7_absolute_path_outside_project_dir_allows(monkeypatch, tmp_path):
@@ -452,7 +487,7 @@ def test_ac7_absolute_path_outside_project_dir_allows(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["file_in_scope"] is False
+    assert entries[-1]["cross_domain"]["file_in_scope"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -1092,6 +1127,113 @@ def test_combine_constructs_at_most_one_deny_payload_structural():
     assert source_text.count('"decision": "deny"') == 1
     assert source_text.count('"decision": "flag"') == 1
     assert source_text.count('"decision": "allow"') == 1
+
+
+# ---------------------------------------------------------------------------
+# Slice 7 — restructured run(): single write_track_record, both passes always run,
+# nested cross_domain/local_threshold track-record shape (Architecture §6).
+# ---------------------------------------------------------------------------
+
+def test_run_writes_track_record_exactly_once_per_invocation(monkeypatch, tmp_path):
+    """Objective 3: the whole point of the run() restructure — one write_track_record()
+    call per invocation, not one per pass."""
+    _write_manifest(tmp_path)
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+    stdin_data = _write_stdin(file_path=str(target), content="MAX_RETRIES = 500\n")
+
+    calls = []
+    real_write = probe.write_track_record
+
+    def _counting_write(project_dir, entry):
+        calls.append(entry)
+        return real_write(project_dir, entry)
+
+    monkeypatch.setattr(probe, "write_track_record", _counting_write)
+    _run_probe(monkeypatch, tmp_path, stdin_data)
+    assert len(calls) == 1
+
+
+def test_run_entry_has_nested_cross_domain_and_local_threshold_and_mode(monkeypatch, tmp_path):
+    """Objective 5 / Architecture §6: a fixture that trips BOTH passes (an in-scope,
+    uncited manifest identifier AND an uncited threshold literal in the same content)
+    produces a single track-record entry with both nested sub-dicts populated and a
+    top-level mode field, per the restructured build_track_record_entry() shape.
+
+    Target file is `.py` (the local-threshold pass is `.py`-only by design) and the manifest
+    glob is widened to match `.py` so the cross-domain pass can also fire on the same file.
+    The cross-domain identifier appears in a comment rather than an assignment so it isn't
+    ALSO picked up as a module-level-assignment threshold literal by the local-threshold
+    pass — keeping each pass's matches_found at exactly 1, as originally intended."""
+    _write_manifest(tmp_path, globs=["docs/tooling/*.py"])
+    target = tmp_path / "docs" / "tooling" / "pipeline.py"
+    content = "# note: EXTERNAL_CAP_V1 legacy behavior\nMAX_RETRIES = 500\n"
+    stdin_data = _write_stdin(file_path=str(target), content=content)
+    _, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    entry = entries[-1]
+    assert entry["mode"] == "log_only"
+    assert entry["cross_domain"]["matches_found"] == 1
+    assert entry["cross_domain"]["matches_cited"] == 0
+    assert entry["local_threshold"]["matches_found"] == 1
+    assert entry["local_threshold"]["matches_cited"] == 0
+    assert entry["decision"] == "flag"
+
+
+def test_run_only_cross_domain_pass_trips(monkeypatch, tmp_path):
+    """Objective 5: only the cross-domain pass finds an unmarked match; the
+    local-threshold pass runs (file_scanned: True) but finds nothing to flag.
+
+    Target file must be `.py` (Category B fix): the local-threshold pass never scans a
+    `.json` file, so `file_scanned` would always be False regardless of content, which would
+    contradict what this test is proving. The manifest glob is widened to `docs/tooling/*.py`
+    so the cross-domain pass can still fire on the same `.py` path. The identifier appears in
+    a comment (not an assignment) so the local-threshold pass has nothing to flag."""
+    _write_manifest(tmp_path, globs=["docs/tooling/*.py"])
+    target = tmp_path / "docs" / "tooling" / "pipeline.py"
+    content = "# note: EXTERNAL_CAP_V1 legacy behavior\n"
+    stdin_data = _write_stdin(file_path=str(target), content=content)
+    _, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    entry = entries[-1]
+    assert entry["cross_domain"]["matches_found"] == 1
+    assert entry["cross_domain"]["matches_cited"] == 0
+    assert entry["local_threshold"]["file_scanned"] is True
+    assert entry["local_threshold"]["matches_found"] == 0
+    assert entry["decision"] == "flag"
+
+
+def test_run_only_local_threshold_pass_trips(monkeypatch, tmp_path):
+    """Objective 5: only the local-threshold pass finds an unmarked literal; the
+    cross-domain pass runs (in scope) but finds no identifier match.
+
+    Target file must be `.py` (Category B fix, same reasoning as the sibling test above) —
+    the manifest glob is widened to `docs/tooling/*.py` so the cross-domain pass has an
+    opportunity to fire (and correctly find nothing) on the same path."""
+    _write_manifest(tmp_path, globs=["docs/tooling/*.py"])
+    target = tmp_path / "docs" / "tooling" / "pipeline.py"
+    content = "MAX_RETRIES = 500\n"
+    stdin_data = _write_stdin(file_path=str(target), content=content)
+    _, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    entry = entries[-1]
+    assert entry["cross_domain"]["file_in_scope"] is True
+    assert entry["cross_domain"]["matches_found"] == 0
+    assert entry["local_threshold"]["matches_found"] == 1
+    assert entry["local_threshold"]["matches_cited"] == 0
+    assert entry["decision"] == "flag"
+
+
+def test_run_both_passes_always_invoked_regardless_of_cross_domain_outcome(monkeypatch, tmp_path):
+    """Objective 2: run_local_threshold_pass must fire even when the cross-domain pass
+    early-returns ran=False (out-of-scope file) — confirming the two passes are truly
+    independent, not short-circuited off each other."""
+    _write_manifest(tmp_path)
+    unrelated = tmp_path / "src" / "app.py"
+    unrelated.parent.mkdir(parents=True, exist_ok=True)
+    content = "MAX_RETRIES = 500\n"
+    stdin_data = _write_stdin(file_path=str(unrelated), content=content)
+    _, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    entry = entries[-1]
+    assert entry["cross_domain"]["file_in_scope"] is False
+    assert entry["local_threshold"]["file_scanned"] is True
+    assert entry["local_threshold"]["matches_found"] == 1
 
 
 # ---------------------------------------------------------------------------

@@ -493,26 +493,71 @@ def build_track_record_entry(
     session_id,
     tool_name,
     file_path,
-    manifest_status,
-    file_in_scope,
-    matches_found,
-    matches_cited,
+    mode,
+    cross_domain,
+    local_threshold,
     decision,
     reason,
     probe_error,
 ):
+    """Architecture §6 — nested `cross_domain`/`local_threshold` shape (breaking, clean
+    cutover migration, Slice 7). `cross_domain` and `local_threshold` are already-shaped
+    dicts (see `_cross_domain_entry`/`_local_threshold_entry` and their `_default_*`
+    counterparts below), not `PassResult`s — callers build the entry-shaped dict first."""
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": session_id,
         "tool_name": tool_name,
         "file_path": file_path,
-        "manifest_status": manifest_status,
-        "file_in_scope": file_in_scope,
-        "matches_found": matches_found,
-        "matches_cited": matches_cited,
+        "mode": mode,
+        "cross_domain": cross_domain,
+        "local_threshold": local_threshold,
         "decision": decision,
         "reason": reason,
         "probe_error": probe_error,
+    }
+
+
+def _cross_domain_entry(result):
+    """Maps a `run_cross_domain_pass` `PassResult` to §6's `cross_domain` nested shape."""
+    detail = result["detail"]
+    return {
+        "manifest_status": detail["manifest_status"],
+        "file_in_scope": detail["file_in_scope"],
+        "matches_found": result["matches_found"],
+        "matches_cited": result["matches_cited"],
+    }
+
+
+def _local_threshold_entry(result):
+    """Maps a `run_local_threshold_pass` `PassResult` to §6's `local_threshold` nested
+    shape."""
+    detail = result["detail"]
+    return {
+        "file_scanned": detail["file_scanned"],
+        "matches_found": result["matches_found"],
+        "matches_cited": result["matches_cited"],
+    }
+
+
+def _default_cross_domain_entry():
+    """§6 nested defaults for invocations where the cross-domain pass never ran (early
+    non-Edit/Write allow, probe_error)."""
+    return {
+        "manifest_status": "absent_or_invalid",
+        "file_in_scope": None,
+        "matches_found": None,
+        "matches_cited": None,
+    }
+
+
+def _default_local_threshold_entry():
+    """§6 nested defaults for invocations where the local-threshold pass never ran (early
+    non-Edit/Write allow, probe_error)."""
+    return {
+        "file_scanned": False,
+        "matches_found": None,
+        "matches_cited": None,
     }
 
 
@@ -767,14 +812,20 @@ def combine(cross_domain: PassResult, local_threshold: PassResult, mode: str) ->
 
 
 def run(stdin_data):
+    """Architecture §3's restructured procedure (Slice 7): extract tool_name/tool_input/
+    project_dir -> early-allow on non-Edit/Write -> get_scan_surface (unchanged) -> both
+    passes -> combine() -> single write_track_record(combined) -> emit. `mode` is read
+    once, here, via `load_mode_config()`, and passed as a plain argument into `combine()` —
+    it is not re-read anywhere else (Architecture §8's disposition of G-7)."""
     session_id = stdin_data.get("session_id")
     tool_name = stdin_data.get("tool_name")
     tool_input = stdin_data.get("tool_input") or {}
     if not isinstance(tool_input, dict):
         tool_input = {}
     project_dir = get_project_dir(stdin_data)
+    mode = load_mode_config(project_dir)
 
-    # §6 step 1.
+    # §6 step 1 (incumbent doc) / Architecture §3 pseudocode.
     if tool_name not in ("Edit", "Write"):
         write_track_record(
             project_dir,
@@ -782,10 +833,9 @@ def run(stdin_data):
                 session_id,
                 tool_name,
                 None,
-                "absent_or_invalid",
-                None,
-                None,
-                None,
+                mode,
+                _default_cross_domain_entry(),
+                _default_local_threshold_entry(),
                 "allow",
                 None,
                 None,
@@ -796,73 +846,37 @@ def run(stdin_data):
 
     raw_file_path = tool_input.get("file_path")
 
-    # §6 step 4 (scan surface must be computed before the cross-domain pass runs, since it
-    # takes `scan_surface` as an argument, per Architecture §7's signature).
+    # Scan surface computed once, reused by both passes (unchanged helper).
     scan_surface = get_scan_surface(tool_name, tool_input)
 
-    result = run_cross_domain_pass(project_dir, tool_input, scan_surface)
-    detail = result["detail"]
-    relative_path = detail["relative_path"]
-    manifest_status = detail["manifest_status"]
-    file_in_scope = detail["file_in_scope"]
+    cross_domain_result = run_cross_domain_pass(project_dir, tool_input, scan_surface)
+    local_threshold_result = run_local_threshold_pass(tool_name, raw_file_path, scan_surface, mode)
 
-    if not result["ran"]:
-        write_track_record(
-            project_dir,
-            build_track_record_entry(
-                session_id,
-                tool_name,
-                relative_path if relative_path is not None else raw_file_path,
-                manifest_status,
-                file_in_scope,
-                result["matches_found"],
-                result["matches_cited"],
-                "allow",
-                None,
-                None,
-            ),
-        )
-        emit_allow()
-        return
+    combined = combine(cross_domain_result, local_threshold_result, mode)
 
-    unmarked = result["unmarked"]
-
-    if unmarked:
-        reason = build_deny_reason(relative_path, unmarked)
-        write_track_record(
-            project_dir,
-            build_track_record_entry(
-                session_id,
-                tool_name,
-                relative_path,
-                manifest_status,
-                file_in_scope,
-                result["matches_found"],
-                result["matches_cited"],
-                "deny",
-                reason,
-                None,
-            ),
-        )
-        emit_block(reason)
-        return
+    cd_detail = cross_domain_result["detail"]
+    relative_path = cd_detail.get("relative_path")
+    file_path = relative_path if relative_path is not None else raw_file_path
 
     write_track_record(
         project_dir,
         build_track_record_entry(
             session_id,
             tool_name,
-            relative_path,
-            manifest_status,
-            file_in_scope,
-            result["matches_found"],
-            result["matches_cited"],
-            "allow",
-            None,
+            file_path,
+            mode,
+            _cross_domain_entry(cross_domain_result),
+            _local_threshold_entry(local_threshold_result),
+            combined["decision"],
+            combined["reason"],
             None,
         ),
     )
-    emit_allow()
+
+    if combined["decision"] == "deny":
+        emit_block(combined["reason"])
+    else:
+        emit_allow()
 
 
 def main():
@@ -877,10 +891,9 @@ def main():
                 stdin_data.get("session_id"),
                 stdin_data.get("tool_name"),
                 None,
-                "absent_or_invalid",
-                None,
-                None,
-                None,
+                load_mode_config(project_dir),
+                _default_cross_domain_entry(),
+                _default_local_threshold_entry(),
                 "probe_error",
                 None,
                 f"{exc.__class__.__name__}: {exc}",

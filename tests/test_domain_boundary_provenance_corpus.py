@@ -111,8 +111,16 @@ def _run_case(monkeypatch, project_dir, case):
 
 
 def _assert_case(case, stdout_text, entries):
+    """Since Slice 7, track-record entries nest cross_domain/local_threshold fields
+    (Architecture §6) rather than exposing them at the top level, and an unmarked match only
+    ever resolves to a stdout "block" under mode == "blocking" — under the default
+    (unconfigured) log_only mode it downgrades to a silent "flag" (Architecture §3's F1
+    behavior change). This corpus runs with no domain-boundary-mode.json present, so every
+    case exercises log_only: expected "deny" decisions in the fixture were downgraded to
+    "flag" accordingly, and only a literal "deny" here would assert a stdout block."""
     expect = case["expect"]
     entry = entries[-1]
+    cross_domain = entry["cross_domain"]
     if expect["decision"] == "deny":
         assert stdout_text != "", f"{case['id']}: expected a block decision on stdout"
         decision = json.loads(stdout_text)
@@ -121,13 +129,13 @@ def _assert_case(case, stdout_text, entries):
         assert stdout_text == "", f"{case['id']}: expected silent allow, got {stdout_text!r}"
     assert entry["decision"] == expect["decision"], case["id"]
     if "manifest_status" in expect:
-        assert entry["manifest_status"] == expect["manifest_status"], case["id"]
+        assert cross_domain["manifest_status"] == expect["manifest_status"], case["id"]
     if "file_in_scope" in expect:
-        assert entry["file_in_scope"] == expect["file_in_scope"], case["id"]
+        assert cross_domain["file_in_scope"] == expect["file_in_scope"], case["id"]
     if "matches_found" in expect:
-        assert entry["matches_found"] == expect["matches_found"], case["id"]
+        assert cross_domain["matches_found"] == expect["matches_found"], case["id"]
     if "matches_cited" in expect:
-        assert entry["matches_cited"] == expect["matches_cited"], case["id"]
+        assert cross_domain["matches_cited"] == expect["matches_cited"], case["id"]
 
 
 if HAVE_PYTEST:
