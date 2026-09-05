@@ -69,7 +69,11 @@ def _run_case(monkeypatch, project_dir, case):
     if case.get("use_manifest", True):
         manifest_dir = project_dir / "docs" / "tooling"
         manifest_dir.mkdir(parents=True, exist_ok=True)
-        (manifest_dir / "domain-boundary-manifest.json").write_text(json.dumps(MANIFEST_FIXTURE))
+        manifest_to_write = MANIFEST_FIXTURE
+        if "manifest_globs_override" in case:
+            manifest_to_write = dict(MANIFEST_FIXTURE)
+            manifest_to_write["pipelineConfigGlobs"] = case["manifest_globs_override"]
+        (manifest_dir / "domain-boundary-manifest.json").write_text(json.dumps(manifest_to_write))
 
     if case.get("is_absolute_outside_root"):
         outside_root = project_dir.parent / "outside_project"
@@ -86,12 +90,18 @@ def _run_case(monkeypatch, project_dir, case):
         target.parent.mkdir(parents=True, exist_ok=True)
         file_path = str(target)
 
+    if case.get("content_source") == "self_probe_source":
+        with open(PROBE_PATH, "r") as fh:
+            resolved_content = fh.read()
+    else:
+        resolved_content = case.get("content", "")
+
     tool_input = {"file_path": file_path}
     tool_name = case["tool_name"]
     if tool_name == "Write":
-        tool_input["content"] = case.get("content", "")
+        tool_input["content"] = resolved_content
     elif tool_name == "Edit":
-        tool_input["new_string"] = case.get("new_string", "")
+        tool_input["new_string"] = case.get("new_string", resolved_content)
 
     stdin_data = {
         "session_id": f"corpus-{case['id']}",
@@ -121,6 +131,7 @@ def _assert_case(case, stdout_text, entries):
     expect = case["expect"]
     entry = entries[-1]
     cross_domain = entry["cross_domain"]
+    local_threshold = entry["local_threshold"]
     if expect["decision"] == "deny":
         assert stdout_text != "", f"{case['id']}: expected a block decision on stdout"
         decision = json.loads(stdout_text)
@@ -136,6 +147,30 @@ def _assert_case(case, stdout_text, entries):
         assert cross_domain["matches_found"] == expect["matches_found"], case["id"]
     if "matches_cited" in expect:
         assert cross_domain["matches_cited"] == expect["matches_cited"], case["id"]
+    # Slice 9 — local_threshold (Slices 4-7) corpus-level assertions.
+    if "local_threshold_file_scanned" in expect:
+        assert (
+            local_threshold["file_scanned"] == expect["local_threshold_file_scanned"]
+        ), case["id"]
+    if "local_threshold_matches_found" in expect:
+        assert (
+            local_threshold["matches_found"] == expect["local_threshold_matches_found"]
+        ), case["id"]
+    if "local_threshold_matches_cited" in expect:
+        assert (
+            local_threshold["matches_cited"] == expect["local_threshold_matches_cited"]
+        ), case["id"]
+    if "local_threshold_matches_found_min" in expect:
+        assert (
+            local_threshold["matches_found"] >= expect["local_threshold_matches_found_min"]
+        ), case["id"]
+    if "local_threshold_has_unmarked" in expect:
+        has_unmarked = (
+            local_threshold["matches_found"] is not None
+            and local_threshold["matches_cited"] is not None
+            and local_threshold["matches_found"] > local_threshold["matches_cited"]
+        )
+        assert has_unmarked == expect["local_threshold_has_unmarked"], case["id"]
 
 
 if HAVE_PYTEST:
@@ -143,6 +178,38 @@ if HAVE_PYTEST:
     def test_corpus_case(monkeypatch, tmp_path, case):
         stdout_text, entries = _run_case(monkeypatch, tmp_path, case)
         _assert_case(case, stdout_text, entries)
+
+    def test_self_scan_flags_proximity_window_specifically_not_proximity_window_threshold():
+        """Corpus-level (end-to-end through detect_threshold_literals, the same function
+        run_local_threshold_pass() calls internally) confirmation that the aggregate
+        `self_scan_proximity_window_flagged` corpus case's flag/allow-per-line specificity
+        matches Architecture §8/§13's G-9 finding: `PROXIMITY_WINDOW = 5` IS flagged as
+        unmarked, `PROXIMITY_WINDOW_THRESHOLD = 2` is NOT (its own THRESHOLD-PROVENANCE:
+        citation satisfies the check). The parametrized `test_corpus_case` run for this
+        fixture id only confirms the AGGREGATE decision/counts via the track-record entry
+        (which has no per-literal detail); this test confirms WHICH literal drove it,
+        against the real, current probe source (not a duplicated literal snapshot)."""
+        with open(PROBE_PATH, "r") as fh:
+            source = fh.read()
+        lines = source.split("\n")
+        flags = probe.detect_threshold_literals(PROBE_PATH, source)
+        incumbent_flag = next(
+            f
+            for f in flags
+            if f["context"] == "assign_module_or_class"
+            and f["literal_repr"] == "5"
+            and "PROXIMITY_WINDOW" in lines[f["line_index"]]
+            and "PROXIMITY_WINDOW_THRESHOLD" not in lines[f["line_index"]]
+        )
+        new_flag = next(
+            f
+            for f in flags
+            if f["context"] == "assign_module_or_class"
+            and f["literal_repr"] == "2"
+            and "PROXIMITY_WINDOW_THRESHOLD" in lines[f["line_index"]]
+        )
+        assert probe.has_threshold_provenance_marker(lines, incumbent_flag["line_index"]) is False
+        assert probe.has_threshold_provenance_marker(lines, new_flag["line_index"]) is True
 
 
 def _run_without_pytest():

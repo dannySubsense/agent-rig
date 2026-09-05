@@ -140,6 +140,168 @@
       }
     },
     {
+      "id": "local_threshold_uncited_comparison_flags",
+      "description": "Slice 9 — local-threshold pass, context 1 (comparison operand), end-to-end through run()/combine(). No manifest present, so cross_domain is absent_or_invalid; local_threshold finds one uncited comparison literal -> flag under log_only.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "src/module.py",
+      "is_absolute": false,
+      "content": "if retries > 3:\n    pass\n",
+      "expect": {
+        "decision": "flag",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found": 1,
+        "local_threshold_matches_cited": 0
+      }
+    },
+    {
+      "id": "local_threshold_uncited_slice_truncation_flags",
+      "description": "Slice 9 — local-threshold pass, context 2 (slice/truncation argument), end-to-end.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "src/module.py",
+      "is_absolute": false,
+      "content": "x = data[:50000]\n",
+      "expect": {
+        "decision": "flag",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found": 1,
+        "local_threshold_matches_cited": 0
+      }
+    },
+    {
+      "id": "local_threshold_uncited_assignment_flags",
+      "description": "Slice 9 — local-threshold pass, context 3 (module/class-level named assignment), end-to-end.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "src/module.py",
+      "is_absolute": false,
+      "content": "MAX_RETRIES = 500\n",
+      "expect": {
+        "decision": "flag",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found": 1,
+        "local_threshold_matches_cited": 0
+      }
+    },
+    {
+      "id": "local_threshold_cited_via_path_citation_allows",
+      "description": "Slice 9 — citation-satisfying form (a): a file-path-shaped THRESHOLD-PROVENANCE: token within the 2-line window -> allow, end-to-end.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "src/module.py",
+      "is_absolute": false,
+      "content": "# THRESHOLD-PROVENANCE: docs/tooling/foo.md\nMAX_RETRIES = 500\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found": 1,
+        "local_threshold_matches_cited": 1
+      }
+    },
+    {
+      "id": "local_threshold_cited_via_named_owner_allows",
+      "description": "Slice 9 — citation-satisfying form (b): a named-owner THRESHOLD-PROVENANCE: owner: <name> within the 2-line window, name not on the placeholder blocklist -> allow, end-to-end.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "src/module.py",
+      "is_absolute": false,
+      "content": "# THRESHOLD-PROVENANCE: owner: wright\nMAX_RETRIES = 500\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found": 1,
+        "local_threshold_matches_cited": 1
+      }
+    },
+    {
+      "id": "local_threshold_unowned_provisional_still_flags",
+      "description": "Slice 9 / G-2 resolution (05-REVIEW.md, CRITICAL) — a THRESHOLD-PROVENANCE: marker present but bearing only bare 'PROVISIONAL' text (no citation, no owner:) must resolve to unmarked/flagged end-to-end through run_local_threshold_pass()/combine(), not merely at the unit level. Prior to this pass's owner-required fix, this exact fixture would have incorrectly passed as cited.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "src/module.py",
+      "is_absolute": false,
+      "content": "# THRESHOLD-PROVENANCE: PROVISIONAL\nMAX_RETRIES = 500\n",
+      "expect": {
+        "decision": "flag",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found": 1,
+        "local_threshold_matches_cited": 0
+      }
+    },
+    {
+      "id": "local_threshold_test_path_component_excluded",
+      "description": "Slice 9 — test-path-component exclusion, end-to-end: file_path has a 'tests' path component, so the local-threshold pass never scans it (file_scanned false), regardless of content.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "tests/fixtures/module.py",
+      "is_absolute": false,
+      "content": "MAX_RETRIES = 500\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": false
+      }
+    },
+    {
+      "id": "local_threshold_non_slice_stop_index_not_flagged",
+      "description": "Slice 9 — non-slice-stop-index exclusion, end-to-end: a plain subscript index (data[i], not a Slice node) produces no flags; file is scanned but finds nothing.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "src/module.py",
+      "is_absolute": false,
+      "content": "x = data[i]\n",
+      "expect": {
+        "decision": "allow",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found": 0,
+        "local_threshold_matches_cited": 0
+      }
+    },
+    {
+      "id": "combined_pass_both_cross_domain_and_local_threshold_flag",
+      "description": "Slice 9 — combination-rule corpus case: an in-scope .py file (manifest glob widened to *.py) with an uncited cross-domain identifier in a comment (so it isn't also picked up as a threshold assignment) AND a separate uncited threshold-shaped assignment -> both passes flag, single combined 'flag' decision under log_only.",
+      "use_manifest": true,
+      "manifest_globs_override": ["docs/tooling/*.py"],
+      "tool_name": "Write",
+      "file_path": "docs/tooling/pipeline.py",
+      "is_absolute": false,
+      "content": "# note: EXTERNAL_CAP_V1 legacy behavior\nMAX_RETRIES = 500\n",
+      "expect": {
+        "decision": "flag",
+        "manifest_status": "matched",
+        "file_in_scope": true,
+        "matches_found": 1,
+        "matches_cited": 0,
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found": 1,
+        "local_threshold_matches_cited": 0
+      }
+    },
+    {
+      "id": "self_scan_proximity_window_flagged",
+      "description": "Architecture §8/§13, G-9 (reopened and resolved this pass) — scanning this probe's OWN current source (read live from scripts/domain_boundary_provenance_probe.py at test-run time via content_source: self_probe_source, never a duplicated literal snapshot that could drift) through run()/combine() end-to-end. PROXIMITY_WINDOW = 5 is a module-level named assignment with no THRESHOLD-PROVENANCE: comment, so it IS flagged as unmarked; PROXIMITY_WINDOW_THRESHOLD = 2 carries its own citation and is NOT flagged. This is a confirmed self-scan finding (reported to Danny for routing per Architecture §11), not silently fixed here. The track-record entry only carries aggregate counts (matches_found > matches_cited proves SOMETHING is unmarked); test_self_scan_flags_proximity_window_specifically_not_proximity_window_threshold (in this same test file) separately confirms WHICH literal.",
+      "use_manifest": false,
+      "tool_name": "Write",
+      "file_path": "scripts/domain_boundary_provenance_probe.py",
+      "is_absolute": false,
+      "content_source": "self_probe_source",
+      "expect": {
+        "decision": "flag",
+        "manifest_status": "absent_or_invalid",
+        "local_threshold_file_scanned": true,
+        "local_threshold_matches_found_min": 1,
+        "local_threshold_has_unmarked": true
+      }
+    },
+    {
       "id": "absolute_path_outside_project_dir",
       "description": "Absolute tool_input.file_path resolving outside $CLAUDE_PROJECT_DIR entirely -> allow, file_in_scope false, no glob match attempted (the step 3 fail-open edge case). is_absolute_outside_root signals the harness to build this path against a sibling directory of the fixture project root, not under it.",
       "use_manifest": true,

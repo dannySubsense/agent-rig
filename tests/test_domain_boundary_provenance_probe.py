@@ -24,6 +24,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import sys
 import textwrap
 from contextlib import redirect_stdout
@@ -1234,6 +1235,173 @@ def test_run_both_passes_always_invoked_regardless_of_cross_domain_outcome(monke
     assert entry["cross_domain"]["file_in_scope"] is False
     assert entry["local_threshold"]["file_scanned"] is True
     assert entry["local_threshold"]["matches_found"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Slice 9 — G-4/US-4 AC2: no soundness-implying language in reason/log strings.
+# ---------------------------------------------------------------------------
+
+_SOUNDNESS_IMPLYING_PATTERNS = [
+    "verified correct",
+    "is correct",
+    "is sound",
+    "is valid",
+    "validated",
+    "confirmed correct",
+    "confirmed sound",
+    "confirmed accurate",
+]
+
+# QC mutation gap (2026-09-05): the phrase-only substrings above miss bare word-forms like
+# "this threshold is verified" / "citation verified" / "sound citation" — the soundness claim
+# doesn't require a fixed surrounding phrase. These are checked as whole-word regexes (\b...\b)
+# rather than substrings so "invalid" (negates soundness, must NOT trigger) and "validate"/
+# "validation" (mechanical-process verbs, e.g. "validate the JSON schema", legitimate and must
+# NOT trigger) are excluded by construction.
+#
+# QC fix (2026-09-05, round 2): \bvalid\b was both too broad and too narrow. Too broad — it
+# matched legitimate structural-validity language in real source (e.g. "valid JSON", "valid by
+# construction" in domain-boundary-provenance.sh), which are not soundness claims and must NOT
+# trigger. Too narrow — "provenance validated" contains no bare "valid" word (the word boundary
+# after "valid" fails inside "validated"), so \bvalid\b never actually caught the mutation case
+# it was added for. Replaced with \bvalidated\b, which matches "provenance validated" / "citation
+# validated" (genuine soundness claims) while leaving "valid JSON" / "valid by construction" /
+# "validate the JSON schema" unmatched (legitimate, must PASS).
+_SOUNDNESS_IMPLYING_WORD_PATTERNS = [
+    r"\bsound\b",
+    r"\bverified\b",
+    r"\bvalidated\b",
+]
+
+# QC fix (2026-09-05, round 3): bare word-boundary matching against *every* string literal in
+# the file (round 2) still false-positived on real source, because it scanned surfaces AC2 was
+# never about. AC2's own text scopes this check to "no acceptance criterion, log message, or
+# user-facing hook output" — i.e. the reason/message strings a human or Claude Code actually
+# sees at runtime. Docstrings (module and function `"""..."""` blocks) and, in the shell
+# wrapper, `#`-comment lines are neither: they are authored explanatory text for maintainers,
+# never emitted as hook output or track-record content. Both real false positives traced back
+# to exactly these two surfaces — "live-verified" in the probe's module docstring (a factual
+# claim about how the deny *shape* was tested, describing methodology, not asserting citation
+# soundness) and "valid by construction" / "valid manifest" in the wrapper's `#`-comments.
+#
+# Rather than add proximity/context logic on top of a still-overbroad surface, this round
+# narrows the SURFACE itself to match AC2's actual scope: exclude docstrings from the Python
+# AST scan, and exclude comment lines from the shell-script text scan. Grepping the probe's
+# non-docstring string literals (reason-building code: `build_deny_reason`,
+# `build_local_threshold_deny_reason`, `combine`, `emit_block`, the `TrackRecordEntry` field
+# literals) confirms none of them contain any soundness-implying word today — every existing
+# occurrence in the file is docstring-only — so this narrowing introduces no coverage gap
+# against the real source, while the direct-string regression test below
+# (`test_soundness_word_pattern_regex_catches_mutation_cases_and_spares_legitimate_uses`)
+# continues to exercise the mutation-injected reason-string cases directly, independent of
+# what happens to be in the file today.
+
+
+def _is_docstring_node(node, parent_body):
+    """True if `node` is the docstring `ast.Expr` of a module/function/class body — i.e. it is
+    the first statement in `parent_body` and its value is a bare string constant."""
+    return (
+        parent_body
+        and parent_body[0] is node
+        and isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    )
+
+
+def _string_literals_from_source(source_text):
+    """Non-docstring string-literal contents from a Python source file's AST — the literal
+    string templates a reader would see as actual reason/log/hook-output content, excluding
+    module/function/class docstrings (maintainer-facing explanatory text, never emitted as
+    hook output or track-record content — out of AC2's scope) and comments (never part of the
+    AST at all)."""
+    tree = ast.parse(source_text)
+    docstring_value_ids = set()
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if isinstance(body, list) and body:
+            first = body[0]
+            if _is_docstring_node(first, body):
+                docstring_value_ids.add(id(first.value))
+    literals = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if id(node) in docstring_value_ids:
+                continue
+            literals.append(node.value)
+    return literals
+
+
+def _strip_shell_comment_lines(text):
+    """Drop every line whose first non-whitespace character is `#` — shell comments are
+    maintainer-facing explanatory text (AC2's "user-facing hook output" scope excludes them),
+    and unlike Python they have no AST to separate them from executable/literal content."""
+    return "\n".join(
+        line for line in text.splitlines() if not line.strip().startswith("#")
+    )
+
+
+def test_no_soundness_implying_language_in_probe_string_literals():
+    """G-4/US-4 AC2 (Architecture §8): no track-record reason string, hook output string, or
+    user-facing log message in the probe's source implies a citation's correctness — only
+    that a marker/citation is PRESENT, never that what it cites is TRUE. Checked against every
+    string literal in the file's AST (covers f-string static segments and plain literals
+    alike), not just a runtime sample."""
+    with open(PROBE_PATH, "r") as fh:
+        source = fh.read()
+    literals = _string_literals_from_source(source)
+    offenders = [
+        (literal, pattern)
+        for literal in literals
+        for pattern in _SOUNDNESS_IMPLYING_PATTERNS
+        if pattern in literal.lower()
+    ]
+    offenders += [
+        (literal, pattern)
+        for literal in literals
+        for pattern in _SOUNDNESS_IMPLYING_WORD_PATTERNS
+        if re.search(pattern, literal.lower())
+    ]
+    assert offenders == [], f"soundness-implying language found: {offenders}"
+
+
+def test_soundness_word_pattern_regex_catches_mutation_cases_and_spares_legitimate_uses():
+    """Direct regression for the QC mutation-testing gap: bare word-forms of the soundness
+    claim must fail, while "invalid" (negation) and "validate"/"validation" (mechanical
+    process verbs) must not."""
+
+    def _flags(text):
+        lowered = text.lower()
+        return any(re.search(p, lowered) for p in _SOUNDNESS_IMPLYING_WORD_PATTERNS) or any(
+            p in lowered for p in _SOUNDNESS_IMPLYING_PATTERNS
+        )
+
+    # Previously-passing mutation cases (phrase forms) — must still fail.
+    assert _flags("the citation is sound") is True
+    assert _flags("provenance validated") is True
+
+    # QC-flagged mutation gaps (bare word forms) — must now fail.
+    assert _flags("this threshold is verified") is True
+    assert _flags("citation verified") is True
+    assert _flags("sound citation") is True
+
+    # Legitimate uses that must NOT trigger.
+    assert _flags("invalid manifest schema") is False
+    assert _flags("validate the JSON schema") is False
+    assert _flags("schema validation failed") is False
+
+
+def test_no_soundness_implying_language_in_wrapper_hook_source():
+    """Same check (G-4/US-4 AC2), applied to the wrapper shell script's literal text — the
+    other place a user-facing string could be authored."""
+    wrapper_path = os.path.join(REPO_ROOT, ".claude", "hooks", "domain-boundary-provenance.sh")
+    with open(wrapper_path, "r") as fh:
+        wrapper_text = _strip_shell_comment_lines(fh.read()).lower()
+    offenders = [pattern for pattern in _SOUNDNESS_IMPLYING_PATTERNS if pattern in wrapper_text]
+    offenders += [
+        pattern for pattern in _SOUNDNESS_IMPLYING_WORD_PATTERNS if re.search(pattern, wrapper_text)
+    ]
+    assert offenders == [], f"soundness-implying language found in wrapper: {offenders}"
 
 
 # ---------------------------------------------------------------------------
