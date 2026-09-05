@@ -294,6 +294,73 @@ def test_ac6_track_record_write_failure_does_not_change_decision(monkeypatch, tm
 
 
 # ---------------------------------------------------------------------------
+# Slice 2 — load_mode_config (fail-safe mode config loader, §5)
+# ---------------------------------------------------------------------------
+
+def test_mode_config_absent_file_defaults_to_log_only(tmp_path):
+    assert probe.load_mode_config(str(tmp_path)) == "log_only"
+
+
+def test_mode_config_malformed_json_defaults_to_log_only(tmp_path):
+    mode_path = tmp_path / "docs" / "tooling" / "domain-boundary-mode.json"
+    mode_path.parent.mkdir(parents=True, exist_ok=True)
+    mode_path.write_text("{not valid json")
+    assert probe.load_mode_config(str(tmp_path)) == "log_only"
+
+
+def test_mode_config_missing_mode_key_defaults_to_log_only(tmp_path):
+    mode_path = tmp_path / "docs" / "tooling" / "domain-boundary-mode.json"
+    mode_path.parent.mkdir(parents=True, exist_ok=True)
+    mode_path.write_text(json.dumps({"schemaVersion": 1}))
+    assert probe.load_mode_config(str(tmp_path)) == "log_only"
+
+
+def test_mode_config_invalid_mode_value_defaults_to_log_only(tmp_path):
+    mode_path = tmp_path / "docs" / "tooling" / "domain-boundary-mode.json"
+    mode_path.parent.mkdir(parents=True, exist_ok=True)
+    mode_path.write_text(json.dumps({"schemaVersion": 1, "mode": "strict"}))
+    assert probe.load_mode_config(str(tmp_path)) == "log_only"
+
+
+def test_mode_config_valid_blocking_returns_blocking(tmp_path):
+    mode_path = tmp_path / "docs" / "tooling" / "domain-boundary-mode.json"
+    mode_path.parent.mkdir(parents=True, exist_ok=True)
+    mode_path.write_text(json.dumps({"schemaVersion": 1, "mode": "blocking"}))
+    assert probe.load_mode_config(str(tmp_path)) == "blocking"
+
+
+def test_mode_config_valid_json_non_dict_defaults_to_log_only(tmp_path):
+    """Independent gap: valid JSON that parses to a non-dict (e.g. a bare list) must not reach
+    data.get("mode") — the isinstance(data, dict) guard (line 138) is exercised by none of the
+    other five cases, which all pass a dict (or fail parsing entirely)."""
+    mode_path = tmp_path / "docs" / "tooling" / "domain-boundary-mode.json"
+    mode_path.parent.mkdir(parents=True, exist_ok=True)
+    mode_path.write_text(json.dumps(["blocking"]))
+    assert probe.load_mode_config(str(tmp_path)) == "log_only"
+
+
+def test_mode_config_valid_log_only_returns_log_only(tmp_path):
+    mode_path = tmp_path / "docs" / "tooling" / "domain-boundary-mode.json"
+    mode_path.parent.mkdir(parents=True, exist_ok=True)
+    mode_path.write_text(json.dumps({"schemaVersion": 1, "mode": "log_only"}))
+    assert probe.load_mode_config(str(tmp_path)) == "log_only"
+
+
+def test_mode_config_wrong_schema_version_defaults_to_log_only(tmp_path):
+    mode_path = tmp_path / "docs" / "tooling" / "domain-boundary-mode.json"
+    mode_path.parent.mkdir(parents=True, exist_ok=True)
+    mode_path.write_text(json.dumps({"schemaVersion": 99, "mode": "blocking"}))
+    assert probe.load_mode_config(str(tmp_path)) == "log_only"
+
+
+def test_mode_config_missing_schema_version_defaults_to_log_only(tmp_path):
+    mode_path = tmp_path / "docs" / "tooling" / "domain-boundary-mode.json"
+    mode_path.parent.mkdir(parents=True, exist_ok=True)
+    mode_path.write_text(json.dumps({"mode": "blocking"}))
+    assert probe.load_mode_config(str(tmp_path)) == "log_only"
+
+
+# ---------------------------------------------------------------------------
 # AC7 — self-test fixture set (minimum named cases)
 # ---------------------------------------------------------------------------
 

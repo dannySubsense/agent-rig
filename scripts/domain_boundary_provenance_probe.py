@@ -42,6 +42,7 @@ TRACK_RECORD_RELATIVE_PATH = os.path.join(
     "docs", "tooling", "domain-boundary-provenance-track-record.jsonl"
 )
 MANIFEST_RELATIVE_PATH = os.path.join("docs", "tooling", "domain-boundary-manifest.json")
+MODE_CONFIG_RELATIVE_PATH = os.path.join("docs", "tooling", "domain-boundary-mode.json")
 
 # §5 — the citation marker; a qualifying line has this literal string followed by
 # non-whitespace content on the same line.
@@ -116,6 +117,32 @@ def validate_manifest_shape(data):
     if not isinstance(identifiers, list) or not all(isinstance(i, str) for i in identifiers):
         return False
     return True
+
+
+def load_mode_config(project_dir):
+    """§5 — load the mode config, sibling to the manifest, same discovery convention
+    (relative to `project_dir`, itself resolved from `$CLAUDE_PROJECT_DIR` by
+    `get_project_dir`). Fail-safe default: any absence, read failure, or schema-invalid
+    content -> "log_only" (an uninstalled/unconfigured mode file must never default to
+    blocking). Only a valid `{"schemaVersion": 1, "mode": "blocking"}` yields "blocking"."""
+    mode_path = os.path.join(project_dir, MODE_CONFIG_RELATIVE_PATH)
+    try:
+        with open(mode_path, "r") as fh:
+            raw = fh.read()
+    except Exception:
+        return "log_only"
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return "log_only"
+    if not isinstance(data, dict):
+        return "log_only"
+    if data.get("schemaVersion") != 1:
+        return "log_only"
+    mode = data.get("mode")
+    if mode not in ("log_only", "blocking"):
+        return "log_only"
+    return mode
 
 
 def normalize_file_path(project_dir, file_path):
