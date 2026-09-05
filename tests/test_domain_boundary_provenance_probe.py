@@ -19,11 +19,13 @@ Runnable two ways:
     python3 tests/test_domain_boundary_provenance_probe.py   (falls back to a plain assert-based runner)
 """
 
+import ast
 import importlib.util
 import io
 import json
 import os
 import sys
+import textwrap
 from contextlib import redirect_stdout
 
 try:
@@ -551,6 +553,170 @@ def test_cross_domain_pass_match_with_no_citation(tmp_path):
     assert result["matches_cited"] == 0
     assert len(result["unmarked"]) == 1
     assert result["unmarked"][0][1] == "EXTERNAL_CAP_V1"
+
+
+# ---------------------------------------------------------------------------
+# Slice 3 — detect_threshold_literals()
+# ---------------------------------------------------------------------------
+# Spec: docs/specs/domain-boundary-provenance-hook/04-ROADMAP.md "### Slice 3", Architecture
+# §2/§2.1/§7. Three syntactic contexts (comparison, slice_truncation,
+# assign_module_or_class), no vocabulary/case gate on context 3, no literal-value
+# exclusion set ({0,1,-1,2} removed 2026-09-05), a 3-strategy fragment-robust parse chain
+# for context 3 (ast.parse -> dedent retry -> per-line regex fallback).
+
+
+def test_context1_comparison_operand_flagged():
+    flags = probe.detect_threshold_literals("app.py", "if retries > 3:\n    pass\n")
+    assert [f for f in flags if f["context"] == "comparison" and f["literal_repr"] == "3"]
+
+
+def test_context2_slice_truncation_flagged():
+    flags = probe.detect_threshold_literals("app.py", "x = data[:50000]\n")
+    assert [
+        f for f in flags if f["context"] == "slice_truncation" and f["literal_repr"] == "50000"
+    ]
+
+
+def test_context3_module_level_assignment_flagged():
+    flags = probe.detect_threshold_literals("app.py", "MAX_RETRIES = 500\n")
+    assert [
+        f
+        for f in flags
+        if f["context"] == "assign_module_or_class" and f["literal_repr"] == "500"
+    ]
+
+
+def test_context3_class_level_assignment_flagged():
+    source = "class Config:\n    filing_text_max_bytes: int = 512_000\n"
+    flags = probe.detect_threshold_literals("app.py", source)
+    assert [
+        f
+        for f in flags
+        if f["context"] == "assign_module_or_class" and f["literal_repr"] == "512000"
+    ]
+
+
+def test_non_slice_stop_index_not_flagged():
+    flags = probe.detect_threshold_literals("app.py", "x = data[i]\n")
+    assert flags == []
+
+
+def test_slice_stop_is_flagged():
+    flags = probe.detect_threshold_literals("app.py", "x = data[:50000]\n")
+    assert any(f["literal_repr"] == "50000" for f in flags)
+
+
+def test_small_idiomatic_literals_are_flagged_no_exclusion():
+    # 2026-09-05: {0,1,-1,2} exclusion REMOVED — these must now be flagged like any other
+    # threshold-shaped literal, direction-reversed from the prior draft.
+    source = "\n".join(
+        [
+            "if retries > 0:",
+            "    pass",
+            "y = data[:1]",
+            "class C:",
+            "    FLAG = -1",
+            "    OTHER = 2",
+        ]
+    )
+    flags = probe.detect_threshold_literals("app.py", source)
+    literal_reprs = {f["literal_repr"] for f in flags}
+    assert {"0", "1", "-1", "2"} <= literal_reprs
+
+
+def test_test_path_component_produces_no_flags():
+    for path in ("tests/foo.py", "src/test/bar.py", "fixtures/baz.py"):
+        flags = probe.detect_threshold_literals(path, "MAX_RETRIES = 500\n")
+        assert flags == [], path
+
+
+def test_lowercase_module_level_assignment_flagged_context_assign():
+    flags = probe.detect_threshold_literals("app.py", "filing_text_max_bytes = 512_000\n")
+    assert any(
+        f["context"] == "assign_module_or_class" and f["literal_repr"] == "512000"
+        for f in flags
+    )
+
+
+def test_no_import_graph_check_in_detect_threshold_literals():
+    # Structural test (G-4-adjacent): no domain-crossing/import-graph check exists in this
+    # function — grep the source for import-related AST node types; none gate a decision.
+    import inspect
+
+    source_text = inspect.getsource(probe.detect_threshold_literals)
+    source_text += inspect.getsource(probe._walk_comparison_and_slice_contexts)
+    source_text += inspect.getsource(probe._walk_assignment_context)
+    source_text += inspect.getsource(probe._regex_fallback_assignment_context)
+    for forbidden in ("ast.Import", "ast.ImportFrom", "import_graph", "ImportFrom"):
+        assert forbidden not in source_text
+
+
+def test_syntax_error_input_unrecoverable_returns_empty_list():
+    # A fragment that fails all three parse strategies (no assignment-shaped line for the
+    # regex fallback to recover) must return [] rather than raise.
+    source = "def foo(:\n    this is not python at all *&^%\n"
+    flags = probe.detect_threshold_literals("app.py", source)
+    assert flags == []
+
+
+def test_fragment_robustness_indented_class_body_recovers_via_dedent_or_regex():
+    # I2's real shape: an indented class-body line, no enclosing `class Foo:` in the
+    # fragment — raises IndentationError under a bare ast.parse.
+    source = "    filing_text_max_bytes: int = 512_000\n"
+    flags = probe.detect_threshold_literals("app.py", source)
+    assert any(
+        f["context"] == "assign_module_or_class" and f["literal_repr"] == "512000"
+        for f in flags
+    )
+
+
+def test_fragment_robustness_module_level_single_line_flagged_via_strategy1():
+    # I1's shape: a bare module-level assignment fragment, valid standalone at column 0 —
+    # recovered by strategy 1 (plain ast.parse), unchanged.
+    source = "_HEAD_BYTES = 65_536\n"
+    flags = probe.detect_threshold_literals("app.py", source)
+    assert any(
+        f["context"] == "assign_module_or_class" and f["literal_repr"] == "65536"
+        for f in flags
+    )
+
+
+def test_fragment_regex_fallback_widened_for_float_literal():
+    # A fragment shaped so all three ast strategies fail to parse it as-is but that IS a
+    # bare top-level assignment line — still recoverable via strategy 1 directly since a
+    # single well-formed top-level float assignment already parses. Exercise the regex
+    # fallback function directly for the float-widening fix (Architecture §2.1).
+    flags = probe._regex_fallback_assignment_context("    dilution_pct_min: float = 0.10\n")
+    assert flags == [(0, "assign_module_or_class", "0.1")]
+
+
+def test_fragment_robustness_strategy3_regex_fallback_exercised_end_to_end():
+    # Distinct-path regression: strategy 1 (plain ast.parse) fails with IndentationError
+    # (indented first line); strategy 2 (dedent retry) also fails, because after dedent
+    # the second line is still genuinely invalid syntax (not merely a leftover indent
+    # problem) — so only strategy 3 (per-line regex fallback) can recover the assignment.
+    # This exercises the fallback through the real `detect_threshold_literals` entry
+    # point, not by calling the private regex helper directly (which strategy-1/2 tests
+    # already do implicitly and would falsely appear to "cover" strategy 3 otherwise).
+    source = "    MAX_ITEMS = 999\n    def broken(:\n"
+    # Sanity: confirm strategy 1 and strategy 2 really do fail on this fragment, so the
+    # only way a flag can appear is via strategy 3.
+    try:
+        ast.parse(source)
+        assert False, "expected strategy 1 to fail on this fragment"
+    except IndentationError:
+        pass
+    try:
+        ast.parse(textwrap.dedent(source))
+        assert False, "expected strategy 2 (dedent) to also fail on this fragment"
+    except SyntaxError:
+        pass
+
+    flags = probe.detect_threshold_literals("app.py", source)
+    assert any(
+        f["context"] == "assign_module_or_class" and f["literal_repr"] == "999"
+        for f in flags
+    )
 
 
 # ---------------------------------------------------------------------------

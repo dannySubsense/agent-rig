@@ -30,11 +30,13 @@ exception here is caught and treated as an allow, with a `probe_error` track-rec
 probe's inner one, per first_turn_contract_probe.py's convention).
 """
 
+import ast
 import fnmatch
 import json
 import os
 import re
 import sys
+import textwrap
 from datetime import datetime, timezone
 from typing import TypedDict
 
@@ -234,6 +236,182 @@ def has_qualifying_marker_in_window(lines, match_line_idx):
         if m and m.group(1) and m.group(1).strip():
             return True
     return False
+
+
+TEST_PATH_COMPONENTS = {"test", "tests", "fixtures"}
+
+_COMPARISON_OPS = (ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq)
+_TRUNCATION_METHODS = {"ljust", "rjust", "zfill", "truncate", "read", "head"}
+
+# §2.1 strategy 3 — per-line regex fallback, context 3 (module/class-level assignment)
+# ONLY. Whole-line match: an optionally type-annotated `NAME = <numeric/bool literal>`,
+# trailing comment permitted. Contexts 1-2 have no regex fallback (fail-open by design).
+_FRAGMENT_ASSIGN_RE = re.compile(
+    r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*[\w.\[\], ]+)?\s*=\s*"
+    r"(-?\d[\d_]*(?:\.\d[\d_]*)?|True|False)\s*(?:#.*)?$"
+)
+
+
+class FlaggedLiteral(TypedDict):
+    line_index: int  # 0-based, within scan_surface
+    context: str  # "comparison" | "slice_truncation" | "assign_module_or_class"
+    literal_repr: str  # e.g. "50000", "True"
+
+
+def _is_test_or_fixture_path(file_path):
+    """§2 exclusion — any `test`/`tests`/`fixtures` path component, checked
+    component-wise on the POSIX-normalized path, not a bare substring match."""
+    if not isinstance(file_path, str) or not file_path:
+        return False
+    normalized = file_path.replace(os.sep, "/")
+    components = normalized.split("/")
+    return any(component in TEST_PATH_COMPONENTS for component in components)
+
+
+def _literal_value_and_repr(node):
+    """Numeric/bool literal, including unary +/-. Returns (value, repr_str, ok)."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float, bool)):
+        return node.value, repr(node.value), True
+    if (
+        isinstance(node, ast.UnaryOp)
+        and isinstance(node.op, (ast.USub, ast.UAdd))
+        and isinstance(node.operand, ast.Constant)
+        and isinstance(node.operand.value, (int, float))
+        and not isinstance(node.operand.value, bool)
+    ):
+        value = node.operand.value
+        if isinstance(node.op, ast.USub):
+            value = -value
+        return value, repr(value), True
+    return None, None, False
+
+
+def _walk_comparison_and_slice_contexts(tree):
+    """Contexts 1-2 (§2): comparison operand, slice/truncation argument. Extracted via
+    `ast.walk` over an already-parsed tree — strategies 1/2 only (no regex fallback for
+    these two contexts, per §2.1's robustness table)."""
+    flagged = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare) and any(
+            isinstance(op, _COMPARISON_OPS) for op in node.ops
+        ):
+            for operand in [node.left, *node.comparators]:
+                value, value_repr, ok = _literal_value_and_repr(operand)
+                if ok and not isinstance(value, bool):
+                    flagged.append((operand.lineno - 1, "comparison", value_repr))
+        elif isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Slice):
+            for part in (node.slice.lower, node.slice.upper, node.slice.step):
+                if part is None:
+                    continue
+                value, value_repr, ok = _literal_value_and_repr(part)
+                if ok and not isinstance(value, bool):
+                    flagged.append((part.lineno - 1, "slice_truncation", value_repr))
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr in _TRUNCATION_METHODS:
+                for arg in node.args:
+                    value, value_repr, ok = _literal_value_and_repr(arg)
+                    if ok and not isinstance(value, bool):
+                        flagged.append((arg.lineno - 1, "slice_truncation", value_repr))
+    return flagged
+
+
+def _walk_assignment_context(tree):
+    """Context 3 (§2): module-level or class-level `NAME = <literal>` /
+    `NAME: T = <literal>`, numeric or boolean, no vocabulary gate, no case restriction.
+    Pure-shape rule — module/class body scope only, never inside a function body."""
+    flagged = []
+
+    def handle(body):
+        for stmt in body:
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        value, value_repr, ok = _literal_value_and_repr(stmt.value)
+                        if ok:
+                            flagged.append(
+                                (stmt.value.lineno - 1, "assign_module_or_class", value_repr)
+                            )
+            elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                if stmt.value is not None:
+                    value, value_repr, ok = _literal_value_and_repr(stmt.value)
+                    if ok:
+                        flagged.append(
+                            (stmt.value.lineno - 1, "assign_module_or_class", value_repr)
+                        )
+            elif isinstance(stmt, ast.ClassDef):
+                handle(stmt.body)
+
+    handle(tree.body)
+    return flagged
+
+
+def _regex_fallback_assignment_context(scan_surface):
+    """§2.1 strategy 3 — per-line regex fallback, context 3 only. Used only once both
+    `ast.parse(scan_surface)` and the dedent retry raise `SyntaxError`."""
+    flagged = []
+    for idx, line in enumerate(scan_surface.split("\n")):
+        match = _FRAGMENT_ASSIGN_RE.match(line)
+        if not match:
+            continue
+        raw = match.group(2)
+        if raw == "True":
+            value_repr = "True"
+        elif raw == "False":
+            value_repr = "False"
+        else:
+            try:
+                value_repr = repr(float(raw)) if "." in raw else repr(int(raw))
+            except ValueError:
+                continue
+        flagged.append((idx, "assign_module_or_class", value_repr))
+    return flagged
+
+
+def detect_threshold_literals(file_path: str, scan_surface: str) -> list[FlaggedLiteral]:
+    """AD-1 detection (Architecture §2/§2.1) — three shape-based contexts: comparison
+    operand, slice/truncation argument, and module/class-level named assignment (any
+    target name, no vocabulary or case gate). `file_path` is used only for the
+    test/fixture path exclusion — never read from disk; operates on `scan_surface` text
+    only.
+
+    Parsing (§2.1, fragment-robust, not a single `ast.parse` call):
+      1. `ast.parse(scan_surface)`.
+      2. On `IndentationError` only: retry `ast.parse(textwrap.dedent(scan_surface))`.
+      3. On any remaining `SyntaxError`: fall back to a per-line regex scan for context 3
+         (module/class-level assignment) ONLY — contexts 1-2 have no regex fallback and
+         yield no candidates for an unparsable fragment (fail-open).
+
+    No literal-value exclusion set exists in this design (removed 2026-09-05, §2
+    disposition) — all threshold-shaped literals from all three contexts, including
+    0/1/-1/2, are flagged unfiltered.
+    """
+    if _is_test_or_fixture_path(file_path):
+        return []
+    if not scan_surface:
+        return []
+
+    tree = None
+    try:
+        tree = ast.parse(scan_surface)
+    except IndentationError:
+        try:
+            tree = ast.parse(textwrap.dedent(scan_surface))
+        except SyntaxError:
+            tree = None
+    except SyntaxError:
+        tree = None
+
+    if tree is not None:
+        raw_flags = _walk_comparison_and_slice_contexts(tree)
+        raw_flags += _walk_assignment_context(tree)
+    else:
+        raw_flags = _regex_fallback_assignment_context(scan_surface)
+
+    flagged = [
+        FlaggedLiteral(line_index=line_index, context=context, literal_repr=literal_repr)
+        for line_index, context, literal_repr in raw_flags
+    ]
+    return flagged
 
 
 def write_track_record(project_dir, entry):
