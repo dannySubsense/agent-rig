@@ -1002,6 +1002,42 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 - **`01-REQUIREMENTS.md` and `04-ROADMAP.md` corrections (§12, items 7–8)** — reported, not
   applied by this document; see accompanying report for the exact line/slice list.
 
+## 14. Slice 12 Findings (forge, 2026-09-05)
+
+**1. Composed hook probe runtime, measured.** `run()` (both passes + `combine()`) invoked 20x via
+direct Python import (not through the wrapper's subprocess) against a realistic `Edit` payload
+(5000 bytes of the probe's own source as `new_string`): median 1.15ms, p95 1.21ms, max 1.75ms, min
+1.12ms. This measures probe-only cost, consistent with how §5.1's incumbent 60ms/140ms
+probe-only/wrapper-total split was reported — comparable methodology, not a mixed number. Result is
+>2500x under the 5s timeout budget (§5.1): massive headroom confirmed, no re-measurement urgency for
+the timeout-adequacy conclusion.
+
+**2. Correction to Slice 10's assumption.** Slice 10's QC review assumed a fresh Claude Code
+session restart was required for `.claude/settings.json`'s newly-added `PreToolUse` entry to take
+effect. **This was wrong.** Slice 12's own live-fire evidence disproves it directly: this same forge
+session (`session_id f1f6bf60-282d-4129-94d7-928b0fd45f5b`) fired real `Edit` tool calls that
+triggered the hook successfully after Slice 10 wired it, with zero session restart, producing
+schema-valid `"allow"`-decision track-record entries with no session block. A future reader should
+not inherit the restart assumption from Slice 10 — it does not hold.
+
+**3. Live wiring confirmed end-to-end.** `docs/tooling/domain-boundary-mode.json` confirmed
+`log_only` directly. Multiple real `Edit`-triggered track-record entries confirmed schema-valid,
+matching the nested `cross_domain`/`local_threshold`/`mode` shape from Slice 7's migration (§6).
+
+**4. Stretch item explicitly deferred, not failed.** The Roadmap's Slice 12 Done-When anticipates
+the `PROXIMITY_WINDOW` self-scan `"flag"` finding (§8/§11's reopened self-scan disposition) will
+surface naturally "when `scripts/domain_boundary_provenance_probe.py` itself is next edited." This
+sprint correctly did not force that with an artificial edit to the probe file during verification.
+It remains open, by design, for the next real edit to that file — not a gap in this sprint's
+verification.
+
+**5. No false-positive classes or lookback-window misses observed.** Across this sprint's live-fire
+sample (9 real track-record entries total, across the sprint), no false-positive class and no
+lookback-window (`PROXIMITY_WINDOW_THRESHOLD`, §4) miss was observed. This is a small sample and is
+not a substitute for the broader benchmark evidence already on record in
+`docs/research/domain-boundary-hook-benchmark/` (§2, §4, §11) — stated here as a live-fire spot
+check, not as corroborating or superseding that benchmark.
+
 ---
 
 *This document does not self-lock. Per this repo's workflow, it proceeds to Frank's binding
