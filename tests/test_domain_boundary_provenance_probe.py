@@ -947,7 +947,7 @@ def test_run_local_threshold_pass_manifest_present_produces_identical_result(tmp
         "matches_found": 1,
         "matches_cited": 0,
         "unmarked": [(0, "500")],
-        "detail": {"file_scanned": True},
+        "detail": {"file_scanned": True, "file_path": "app.py"},
     }
 
 
@@ -961,6 +961,137 @@ def test_run_local_threshold_pass_mode_parameter_does_not_affect_output():
     result_blocking = probe.run_local_threshold_pass("Write", "app.py", source, "blocking")
     result_other = probe.run_local_threshold_pass("Write", "app.py", source, "not-a-real-mode")
     assert result_log_only == result_blocking == result_other
+
+
+# ---------------------------------------------------------------------------
+# Slice 6 — combine()
+# ---------------------------------------------------------------------------
+# Spec: docs/specs/domain-boundary-provenance-hook/04-ROADMAP.md "### Slice 6", Architecture
+# §3/§5/§6/§7. mode-gated single-decision combination of the two passes.
+
+_ALLOW_PASS = {
+    "ran": True,
+    "matches_found": 0,
+    "matches_cited": 0,
+    "unmarked": [],
+    "detail": {"relative_path": "app.py", "file_path": "app.py"},
+}
+
+
+def _denying_pass(unmarked, path="app.py"):
+    return {
+        "ran": True,
+        "matches_found": len(unmarked),
+        "matches_cited": 0,
+        "unmarked": unmarked,
+        "detail": {"relative_path": path, "file_path": path},
+    }
+
+
+def test_both_passes_allow_regardless_of_mode():
+    for mode in ("log_only", "blocking"):
+        result = probe.combine(_ALLOW_PASS, _ALLOW_PASS, mode)
+        assert result["decision"] == "allow"
+        assert result["reason"] is None
+
+
+def test_cross_domain_pass_flag_under_log_only(tmp_path):
+    """Named test F1 (Frank spec-gate attempt 1, required). A fixture that would deny under
+    the incumbent's unmodified cross-domain logic (an unmarked in-scope manifest match, the
+    exact LOCKED-doc §6 step 6 / AC4 scenario) resolves to combined decision "flag", not
+    "deny", when mode == "log_only". This is the direct regression test for the LOCKED-doc
+    behavior-change note in Architecture §3/§6/§11."""
+    _write_manifest(tmp_path)
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+    content = "EXTERNAL_CAP_V1 = 5\n"
+    cross_domain_result = probe.run_cross_domain_pass(
+        str(tmp_path), {"file_path": str(target)}, content
+    )
+    # Sanity: this fixture really would deny under the incumbent's unconditional logic.
+    assert cross_domain_result["unmarked"] != []
+
+    local_threshold_result = probe.run_local_threshold_pass(
+        "Write", str(target), content, "log_only"
+    )
+
+    combined = probe.combine(cross_domain_result, local_threshold_result, "log_only")
+    assert combined["decision"] == "flag"
+    assert combined["reason"] is None
+
+
+def test_cross_domain_pass_denies_under_blocking_same_fixture(tmp_path):
+    """Companion to F1: proves the F1 fixture is a genuine mode-dependent behavior change,
+    not just an assertion of "flag" on something that was never going to deny. Same fixture
+    as test_cross_domain_pass_flag_under_log_only, run through combine() under
+    mode="blocking" instead — must resolve to "deny", confirming the log_only case above
+    really did downgrade a real deny, not merely restate an allow."""
+    _write_manifest(tmp_path)
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+    content = "EXTERNAL_CAP_V1 = 5\n"
+    cross_domain_result = probe.run_cross_domain_pass(
+        str(tmp_path), {"file_path": str(target)}, content
+    )
+    local_threshold_result = probe.run_local_threshold_pass(
+        "Write", str(target), content, "blocking"
+    )
+    combined = probe.combine(cross_domain_result, local_threshold_result, "blocking")
+    assert combined["decision"] == "deny"
+    assert "[domain-boundary]" in combined["reason"]
+
+
+def test_local_threshold_pass_flags_under_log_only():
+    unmarked_local = _denying_pass([(0, "500")])
+    combined = probe.combine(_ALLOW_PASS, unmarked_local, "log_only")
+    assert combined["decision"] == "flag"
+    assert combined["reason"] is None
+
+
+def test_blocking_cross_domain_denies_alone():
+    unmarked_cross = _denying_pass([(0, "EXTERNAL_CAP_V1")])
+    combined = probe.combine(unmarked_cross, _ALLOW_PASS, "blocking")
+    assert combined["decision"] == "deny"
+    assert "[domain-boundary]" in combined["reason"]
+    assert "[threshold-provenance]" not in combined["reason"]
+
+
+def test_blocking_local_threshold_denies_alone():
+    unmarked_local = _denying_pass([(0, "500")])
+    combined = probe.combine(_ALLOW_PASS, unmarked_local, "blocking")
+    assert combined["decision"] == "deny"
+    assert "[threshold-provenance]" in combined["reason"]
+    assert "[domain-boundary]" not in combined["reason"]
+
+
+def test_blocking_both_passes_deny_reason_concatenates_both_labeled():
+    unmarked_cross = _denying_pass([(0, "EXTERNAL_CAP_V1")])
+    unmarked_local = _denying_pass([(1, "500")])
+    combined = probe.combine(unmarked_cross, unmarked_local, "blocking")
+    assert combined["decision"] == "deny"
+    assert "[domain-boundary]" in combined["reason"]
+    assert "[threshold-provenance]" in combined["reason"]
+    assert "EXTERNAL_CAP_V1" in combined["reason"]
+    assert "500" in combined["reason"]
+
+
+def test_combine_constructs_at_most_one_deny_payload_structural():
+    """Done-When structural check: no code path in combine() allows more than one deny
+    payload to be constructed for emission. Verified two ways: (1) combine() always returns
+    exactly one CombinedResult dict — a single object, never a list/tuple of payloads or a
+    second call-site; (2) the source of combine() contains exactly one literal construction
+    of a "deny" decision (one `return {"decision": "deny", ...}` site), so there is no
+    duplicate/parallel deny-payload builder to drift out of sync with it."""
+    import inspect
+
+    result = probe.combine(
+        _denying_pass([(0, "X")]), _denying_pass([(1, "Y")]), "blocking"
+    )
+    assert isinstance(result, dict)
+    assert set(result.keys()) == {"decision", "reason"}
+
+    source_text = inspect.getsource(probe.combine)
+    assert source_text.count('"decision": "deny"') == 1
+    assert source_text.count('"decision": "flag"') == 1
+    assert source_text.count('"decision": "allow"') == 1
 
 
 # ---------------------------------------------------------------------------

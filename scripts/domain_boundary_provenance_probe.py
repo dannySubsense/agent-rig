@@ -667,7 +667,7 @@ def run_local_threshold_pass(tool_name, raw_file_path, scan_surface, mode) -> Pa
             "matches_found": None,
             "matches_cited": None,
             "unmarked": [],
-            "detail": {"file_scanned": False},
+            "detail": {"file_scanned": False, "file_path": raw_file_path},
         }
 
     if _is_test_or_fixture_path(raw_file_path):
@@ -676,7 +676,7 @@ def run_local_threshold_pass(tool_name, raw_file_path, scan_surface, mode) -> Pa
             "matches_found": None,
             "matches_cited": None,
             "unmarked": [],
-            "detail": {"file_scanned": False},
+            "detail": {"file_scanned": False, "file_path": raw_file_path},
         }
 
     flagged = detect_threshold_literals(raw_file_path, scan_surface)
@@ -686,7 +686,7 @@ def run_local_threshold_pass(tool_name, raw_file_path, scan_surface, mode) -> Pa
             "matches_found": 0,
             "matches_cited": 0,
             "unmarked": [],
-            "detail": {"file_scanned": True},
+            "detail": {"file_scanned": True, "file_path": raw_file_path},
         }
 
     lines = scan_surface.split("\n")
@@ -701,8 +701,69 @@ def run_local_threshold_pass(tool_name, raw_file_path, scan_surface, mode) -> Pa
         "matches_found": len(flagged),
         "matches_cited": len(flagged) - len(unmarked),
         "unmarked": unmarked,
-        "detail": {"file_scanned": True},
+        "detail": {"file_scanned": True, "file_path": raw_file_path},
     }
+
+
+def build_local_threshold_deny_reason(file_path, unmarked_matches):
+    """Local-threshold-pass analog of `build_deny_reason` (§7) — reason lists every unmarked
+    threshold-shaped literal (line, literal text) and the exact remediation."""
+    lines_desc = ", ".join(
+        f'line {idx + 1} (literal "{literal_repr}")' for idx, literal_repr in unmarked_matches
+    )
+    return (
+        f"Threshold-provenance violation in {file_path}: {lines_desc} — no qualifying "
+        f"`THRESHOLD-PROVENANCE:` marker with a citation or named owner within "
+        f"{PROXIMITY_WINDOW_THRESHOLD} lines. Add a `THRESHOLD-PROVENANCE: <citation or "
+        f"owner: name>` comment within {PROXIMITY_WINDOW_THRESHOLD} lines of the flagged literal."
+    )
+
+
+class CombinedResult(TypedDict):
+    decision: str  # "allow" | "flag" | "deny"
+    reason: str | None
+
+
+def combine(cross_domain: PassResult, local_threshold: PassResult, mode: str) -> CombinedResult:
+    """Architecture §3's combination rule.
+
+    `mode="log_only"`: any pass that would otherwise deny (has unmarked matches) is downgraded
+    to a track-record `decision: "flag"` entry; the `PreToolUse` call always emits allow
+    (nothing) — this is the F1 behavior change (Frank spec-gate attempt 1): the incumbent's
+    LOCKED doc's unconditional cross-domain "deny" now only actually denies under
+    `mode == "blocking"`.
+
+    `mode="blocking"`: denies if EITHER pass has unmarked matches. If both passes deny, the
+    `reason` string concatenates both, each clearly labeled (`[domain-boundary]` /
+    `[threshold-provenance]`) so remediation is unambiguous about which marker is missing
+    where. If only one pass denies, that pass's reason is used — labeled for consistency with
+    the two-pass-deny case, rather than switching format based on how many passes fired
+    (Architecture §3's own note: "flag choice in code comment, not a spec deviation" when the
+    exact wording is ambiguous between labeled/unlabeled for the single-deny case).
+    """
+    cross_domain_denies = bool(cross_domain.get("unmarked"))
+    local_threshold_denies = bool(local_threshold.get("unmarked"))
+
+    if not cross_domain_denies and not local_threshold_denies:
+        return {"decision": "allow", "reason": None}
+
+    # Fail-safe default (QC advisory): any mode other than exactly "blocking" — including
+    # unrecognized/typo'd values — is treated as "log_only", not the blocking branch.
+    if mode != "blocking":
+        return {"decision": "flag", "reason": None}
+
+    # mode == "blocking" from here.
+    reasons = []
+    if cross_domain_denies:
+        cd_file_path = cross_domain.get("detail", {}).get("relative_path")
+        cd_reason = build_deny_reason(cd_file_path, cross_domain["unmarked"])
+        reasons.append(f"[domain-boundary] {cd_reason}")
+    if local_threshold_denies:
+        lt_file_path = local_threshold.get("detail", {}).get("file_path")
+        lt_reason = build_local_threshold_deny_reason(lt_file_path, local_threshold["unmarked"])
+        reasons.append(f"[threshold-provenance] {lt_reason}")
+
+    return {"decision": "deny", "reason": "\n".join(reasons)}
 
 
 def run(stdin_data):
