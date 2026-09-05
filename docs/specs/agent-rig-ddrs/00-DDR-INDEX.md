@@ -46,6 +46,8 @@ urgency, not a standing change to the cluster's rollout policy.
 
 Ideas surfaced during other work, worth preserving but not yet written up as a DDR. Promote to a numbered DDR above before spec'ing.
 
+- **Benchmark agent as a standing gate step in `/spec-start` and `/forge-start`, before QC; revisit `benchmark`'s own brief** — surfaced 2026-09-05 (Danny, via a department-os/ledger Switchboard correction). A `PROVISIONAL — owner: X` tag survived 4 rounds of Frank's spec-gate in department-os before `benchmark` (dispatched only on suspicion, not structurally) found a fabricated citation underneath it; the same session found agent-rig's own domain-boundary-provenance-hook sprint had self-assigned `owner: wright` tags — invalid per Danny's ruling (an agent can't name itself owner, `unassigned` is not a valid fourth option; every constant needs a real citation, a concrete benchmarking plan, or redesign — no resting state). GitHub issue: `dannySubsense/agent-rig#23`. Needs Intake before spec — not yet decided whether this folds into the DDR-005/006/008/009 hook cluster or stands alone.
+
 **Session queue, 2026-08-10 close-out — priority order for next session, none blocking:**
 1. **Slice 10 check-in** (`market_data` retrofit pilot) — quick poll of Switchboard/LORE for alpha's response; no action possible until they report back.
 2. **`ponytail` / `/frank` / Frank's-Lessons / no-hedge-gate / research-spec-start / LICENSE / senior-qc reference** (items below) — all dormant, no urgency signal since last touched; revisit only if Danny raises one directly.
