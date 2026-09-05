@@ -9,8 +9,8 @@
 - [x] Slice 4: `has_threshold_provenance_marker()` — COMPLETE (2026-09-05, commit `b21fd11`). Real bug found (N/A owner regex bypass) + annotation fix, both re-verified PASS. 202/202 tests passing.
 - [x] Slice 5: `run_local_threshold_pass()` — COMPLETE (2026-09-05, commit `b05bd46`). Clean PASS, no fix cycle. No-manifest-coupling and mode-no-op verified by direct execution. 209/209 tests passing.
 - [x] Slice 6: `combine()` — COMPLETE (2026-09-05, commit `e090723`). Real bug found (signature drift causing "violation in None") + mode fail-safe hardening, both re-verified PASS. F1 named regression test (Frank attempt-1 finding) + blocking-mode companion confirmed real. 217/217 tests passing.
-- [ ] Slice 7: `TrackRecordEntry` Schema Migration + `run()` Restructure — IN_PROGRESS
-- [ ] Slice 8: Wrapper Updates — PENDING
+- [x] Slice 7: `TrackRecordEntry` Schema Migration + `run()` Restructure — COMPLETE (2026-09-05, commit `09e2569`). 19 test failures diagnosed as stale expectations/wrong fixtures (not implementation bugs), fixed and QC-verified by direct execution — no weakened assertions. Both passes + combine() now genuinely wired into run(). 222/222 tests passing.
+- [ ] Slice 8: Wrapper Updates — IN_PROGRESS
 - [ ] Slice 9: Test Corpus Additions — PENDING
 - [ ] Slice 10: Live Wiring — PENDING
 - [ ] Slice 11: Documentation — PENDING
@@ -20,7 +20,7 @@
       transcribed into this file's `## Forge Gate` section — "all slices done" is not "sprint done."
 
 ## Current
-Slice: 7
+Slice: 8
 Step: @code-executor
 Last updated: 2026-09-05
 
