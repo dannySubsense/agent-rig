@@ -32,6 +32,19 @@ This resolves review Open Questions OQ-A (extend, not replace/coexist-as-second-
 correct and un-redesigned for its own scope; the new check does not use a manifest because its
 whole purpose is same-file literals a manifest author cannot pre-declare).
 
+### 0.1 Benchmark Audit Correction Notice (this revision)
+
+A `benchmark` agent audit (2026-09-05) ran actual measurements against this repo's own codebase
+and found several constants below were not just unlabeled — they were wrong, with measured
+false-positive/false-negative evidence, and one section (§7's original marker-comment text)
+contained a genuine self-refuting bug (a 5-line comment block prescribed to satisfy a 3-line
+detection window). This revision applies every finding. Per this repo's binding rule (CLAUDE.md
+Decision Discipline), no constant in this document rests on a self-assigned or unassigned
+`owner:` tag anymore — each one now carries either a real citation, a fully-stated executable
+benchmarking plan with an explicit "not yet validated" disposition, or a redesign that removes the
+need for it. The specific corrections are documented inline at each affected section (§2, §4, §5,
+§7, §8, §13) rather than summarized here, so a reader hits the reasoning at the point of use.
+
 ## 1. What Changes and What Doesn't
 
 | Surface | Incumbent (unchanged) | New (this document) |
@@ -48,36 +61,87 @@ Nothing below re-litigates §2–§13 of `docs/tooling/domain-boundary-provenanc
 manifest-gated check. That document's decision procedure, schemas, and rationale stand as-is and
 are cited by reference, not restated.
 
-## 2. Detection Rule for the New Check (AD-1, resolved for the local-literal case)
+## 2. Detection Rule for the New Check (AD-1, resolved for the local-literal case — REDESIGNED per benchmark audit)
 
-**Decision: fixed set of syntactic contexts, Python-only, name-gated on one context** — this is
-the same rule shape the prior (discarded) architecture pass selected for AD-1, and nothing in
-G-1's finding invalidates the *rule itself* — only the trigger surface, scan-surface framing, and
-citation marker it was wired to. Re-adopted here unchanged in substance, re-hosted on the correct
-trigger/surface/marker.
+**Decision, revised this pass: drop the name-gated context entirely; flag on syntactic shape
+alone.** The prior draft's AD-1 kept a name-gated "default-kwarg/assignment" context (matching
+target names against a 10-word list: `limit, cap, threshold, cutoff, retry, retries, budget,
+timeout, max, min`). The benchmark audit measured this against this repo's own code and found it
+does not work as designed:
+
+- **8 of the 10 words never fire at all** in this repo (`limit, cap, threshold, cutoff, retry,
+  retries, budget, min` — zero hits). Only `timeout` and `max` ever match (5 hits each).
+- **Substring matching produces real false positives** — 11 measured in this repo alone: `cap`
+  matches inside `escaped_rest`, and `min` matches inside `REMINDER_PATH`, `REMINDER_TEXT`, and
+  `_load_reminder`.
+
+The benchmark's recommendation is redesign, not re-tuning, and this document adopts it: **context
+2 (name-gated assignment/default) is removed.** Detection now runs only on the two
+shape-based contexts, which need no vocabulary and therefore have no substring-false-positive
+failure mode:
 
 **Contexts that count as "threshold-shaped":**
 1. **Comparison operand**: a numeric literal appearing as either operand of a comparison
    (`<`, `<=`, `>`, `>=`, `==`, `!=`) — e.g. `if retries > 3:`.
-2. **Default-kwarg / assignment whose target name matches a threshold-word pattern**: a numeric
-   or boolean literal assigned to a name, or passed as a default parameter value, where the
-   target/parameter name (case-insensitive substring match) contains one of: `limit`, `cap`,
-   `threshold`, `cutoff`, `retry`, `retries`, `budget`, `timeout`, `max`, `min`. This is the only
-   context gated on a name match — contexts 1 and 3 fire on syntactic shape alone, independent of
-   naming.
-3. **Slice/truncation argument**: a numeric literal used as a slice bound (`x[:50000]`) or as an
+2. **Slice/truncation argument**: a numeric literal used as a slice bound (`x[:50000]`) or as an
    argument to a truncation-shaped call (`str[:N]`, `.ljust(N)`, `[:N]` generally).
 
+Both remaining contexts fire on syntactic shape alone, independent of naming — there is no
+name-gated context left in this design. The `log_only` mode (§5) and the `THRESHOLD-PROVENANCE:`
+citation convention (§4) absorb whatever additional volume this produces, per the benchmark's own
+recommendation ("let `log_only` volume and the citation convention absorb the rest").
+
+**A direct consequence of this redesign**: because no context is name-gated anymore, no assignment
+statement (e.g. `PROXIMITY_WINDOW = 5`) is ever flagged by this check purely because of its
+variable name — only literals that are themselves comparison operands or slice/truncation
+arguments are in scope. This resolves the self-scan question the prior draft raised in §7/§8
+(there is no name-gate left to fire on the probe's own constants); see §7 and §8's updated
+disposition.
+
 **Explicit exclusions** (never flagged, regardless of context match):
-- `range()` call bounds (first, second, or third positional argument).
+- **`range()` call bounds (first, second, or third positional argument) — LANGUAGE FACT, not a
+  benchmarked value.** Python's `range()` accepts exactly one, two, or three positional arguments
+  (`stop`; or `start, stop`; or `start, stop, step`) — this is definitional per the Python
+  Language Reference (`range` built-in function,
+  https://docs.python.org/3/library/functions.html#func-range), not an empirical claim, and
+  carries no PROVISIONAL tag because there is nothing to measure: a fourth positional argument to
+  `range()` is a `TypeError` at the language level, so "any of the first three positional
+  arguments to `range()`" is a closed, syntactically-checkable set.
 - A non-slice-stop index into a sequence (`x[i]`, not `x[:i]`).
 - Files under any `test`/`tests`/`fixtures` path component.
-- The literal values `{0, 1, -1, 2}` — idiomatic loop/sentinel/increment values.
+- **The literal values `{0, 1, -1, 2}`** — see disposition immediately below. **NOT YET
+  BENCHMARKED. Do not treat as validated until the stated plan runs.**
 
-**PROVISIONAL — owner: wright.** The `{0, 1, -1, 2}` exclusion set and the context-2 name-word
-list are not derived from an external benchmark; they are a first-pass value for this sprint,
-same status the prior architecture pass gave them (`05-REVIEW.md` confirmed this compliant under
-the prior framing and nothing about re-hosting the rule changes that disposition).
+**Disposition of the `{0, 1, -1, 2}` exclusion set (benchmark audit finding, highest-leverage
+constant in this design).** The benchmark agent measured this set directly against this repo: 61
+of 72 threshold-shaped literal candidates (84.7%) fall inside `{0, 1, -1, 2}`. This makes it the
+single highest-impact value in the entire detection rule, and it was chosen with zero measurement
+in the prior draft. Per this repo's binding rule, it cannot ship with a bare `owner:` tag. The
+disposition is: **this value is not yet benchmarked, and carries the following executable plan as
+its validation path (Roadmap concern, not yet run):**
+
+1. Run the local-threshold detection pass **unfiltered** (i.e. with the `{0, 1, -1, 2}` exclusion
+   temporarily disabled) against a defined corpus: this repo (`agent-rig`) plus the seven repos
+   currently listed in `HOOK-DEPLOYMENT-ROSTER.md`, plus `market_data`.
+2. Dump every resulting candidate (file, line, literal value, context) to a JSONL file.
+3. Draw a stratified random sample of 200 rows from that JSONL (stratified by literal value, so
+   `0`, `1`, `-1`, `2`, and non-excluded values are all represented rather than dominated by
+   whichever value is most common).
+4. Hand-label each sampled row true-positive ("this literal genuinely needed a provenance
+   citation") or false-positive ("this is an idiomatic loop/sentinel/increment value that citation
+   would not meaningfully improve").
+5. For each candidate value in `{0, 1, -1, 2}` (and any other value considered for exclusion),
+   compute its measured precision as a true positive across the labeled sample. **Exclude a value
+   from flagging only if its measured precision falls below 5%.** Values at or above that
+   threshold stay in scope for flagging even if they are numerically small.
+6. Until this run happens, the current `{0, 1, -1, 2}` exclusion set ships as an inherited,
+   unvalidated default — not a validated design decision. Any false negative it produces (a real
+   unsourced threshold at exactly `0`, `1`, `-1`, or `2` that goes unflagged) is a known, named risk
+   of shipping ahead of the benchmark, not a silent gap.
+
+This is a Roadmap-tracked open item (§13), not resolved by this architecture document — the
+benchmarking run itself requires the corpus scan described above, which is out of scope for an
+architecture-fix task and belongs to implementation/forge follow-up.
 
 **AST-based, Python-only, no regex fallback** — same posture as the prior pass: syntactic
 detection needs a real parse tree to reliably distinguish "is this a comparison operand" from
@@ -182,8 +246,8 @@ slice for the corrected instruction — it no longer forbids saying what changed
 **Rationale, following the incumbent's own §5 reasoning pattern (not re-litigating it, applying
 it to a third case):**
 - **Not `PROVISIONAL` alone** — same objection the incumbent's §5 already establishes: a bare
-  `PROVISIONAL — owner: X` tag asserts "not yet validated," which is one of the amendment's three
-  satisfying conditions (option b) but not the only one. A citation to a reproducible source
+  `PROVISIONAL — [disposition]` tag asserts "not yet validated," which is one of the amendment's
+  three satisfying conditions (option b) but not the only one. A citation to a reproducible source
   (option a) is a different, stronger claim than PROVISIONAL and needs a marker that doesn't
   presuppose "unvalidated." Reusing bare `PROVISIONAL` as the universal marker would make option
   (a)'s citations indistinguishable from option (b)'s admissions in a mechanical text-presence
@@ -199,35 +263,41 @@ it to a third case):**
   review has no reason to look at, diluting the marker's own signal value for its original
   purpose (cross-repo/cross-module retrofit triage, per DDR-0014's retrofit section).
 - **`THRESHOLD-PROVENANCE:` accepts any of the three amendment-satisfying forms on one marker
-  line**: a citation (option a), an explicit named-owner PROVISIONAL tag (option b) — the
-  existing `PROVISIONAL — owner: X` string is still what appears, just now recognized by this
-  marker rather than required to double as the marker itself — or is simply absent because the
-  literal was removed (option c, which trivially satisfies the check by there being no literal
-  left to flag). Concretely: `# THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright, unmeasured` is
-  a valid, complete citation line satisfying option (b); `# THRESHOLD-PROVENANCE: see DDR-0014
-  §Amendment for why 5s is reused from first-turn-contract.sh's measured bound` satisfies (a).
+  line**: a citation (option a), an explicit PROVISIONAL disposition naming what would validate it
+  (option b) — the existing `PROVISIONAL — ...` string is still what appears, just now recognized
+  by this marker rather than required to double as the marker itself — or is simply absent because
+  the literal was removed (option c, which trivially satisfies the check by there being no literal
+  left to flag). Concretely: `# THRESHOLD-PROVENANCE: PROVISIONAL — not yet benchmarked, see
+  02-ARCHITECTURE.md §2 for the exclusion-set validation plan` is a valid, complete citation line
+  satisfying option (b); `# THRESHOLD-PROVENANCE: see DDR-0014 §Amendment for why 5s is reused
+  from first-turn-contract.sh's measured bound` satisfies (a).
 
 **v1 citation rule for the new check** (deliberately mirrors the incumbent's §5 shape for
 consistency, values re-justified independently, not copied):
 - A citation is a comment line containing the literal marker `THRESHOLD-PROVENANCE:`
   (case-sensitive, exact string) followed by non-whitespace content on the same line.
-- The marker must appear within **3 lines** (inclusive) above or below the line containing the
-  flagged literal, counted within the same scan surface (`tool_input.content`/`new_string`) — not
-  the incumbent's 5-line window. The window bound is held in a new constant,
-  `PROXIMITY_WINDOW_THRESHOLD = 3` (§7), named distinctly from the incumbent's own
-  `PROXIMITY_WINDOW = 5` (probe L51) so the two module-level constants do not collide (§7's
-  addition rationale). **PROVISIONAL — owner: wright.** A tighter window than the incumbent's is
-  deliberate, not arbitrary-different-for-its-own-sake: threshold literals are typically
-  single-line assignments or comparisons with no natural multi-line block the way a cross-domain
-  read's surrounding context often has, so a tighter default is being tried first; like the
-  incumbent's window, this is unmeasured and owned by wright for revision once real
-  false-positive/negative data exists (Roadmap Slice 10, unchanged from prior pass's plan).
-  **Self-scan consequence of this name (resolved, see §8 G-4 disposition):** because
-  `PROXIMITY_WINDOW_THRESHOLD` contains the name-gate word `threshold`, the constant's own
-  assignment line is itself a "named threshold" match under §2 context 2 once the local-threshold
-  pass goes live and scans this probe file. It must therefore carry a real
-  `THRESHOLD-PROVENANCE:` marker line (not a bare `PROVISIONAL` comment) within 3 lines of its
-  assignment. The required comment text is specified exactly in §7.
+- **The marker must appear within 5 lines (inclusive) above or below the line containing the
+  flagged literal — the incumbent's own `PROXIMITY_WINDOW` constant (probe L51, value 5) is reused
+  as-is for this check; no second window constant is introduced.** This corrects the prior draft
+  of this document, which specified a new, tighter `PROXIMITY_WINDOW_THRESHOLD = 3` constant. That
+  value has been dropped for two independent reasons, both from the benchmark audit:
+  1. **It was empirically wrong.** The benchmark agent measured real commented constants in this
+     repo and found 13 of 40 (32.5%) have their comment starting 4–5 lines above the assignment
+     line — a 3-line window would miss a third of the real citations already in this codebase's
+     own style, producing false "unmarked" flags against genuinely-cited code.
+  2. **It was internally self-contradictory (self-refuting bug, benchmark finding #1).** The prior
+     draft's §7 prescribed an exact 5-line comment block as the *only* acceptable
+     `THRESHOLD-PROVENANCE:` marker text for `PROXIMITY_WINDOW_THRESHOLD`'s own assignment, while
+     this same section required the marker to land within 3 lines of the literal it cites. A
+     5-line comment cannot land within a 3-line window of the line it sits beside — the prescribed
+     fix would have caused the probe to flag its own source line, undetected across two prior gate
+     rounds because neither checked distance, only marker-string content.
+  Reusing the incumbent's existing 5-line `PROXIMITY_WINDOW` resolves both problems at once: it
+  matches the measured 32.5% long-comment population, and it removes the need to maintain two
+  different window constants for two passes of the same hook — simpler, and no separate constant
+  means no separate distance-vs-comment-length arithmetic to get wrong a second time. See §7 for
+  the corresponding function-signature update and §8 for the self-scan disposition this also
+  simplifies.
 - Same location rule as the incumbent: citation lives in the same file as the flagged literal, not
   a separate doc.
 
@@ -303,6 +373,33 @@ pointing at `.claude/hooks/domain-boundary-provenance.sh` (unchanged path), with
 `docs/tooling/domain-boundary-mode.json` shipped at `{"schemaVersion": 1, "mode": "log_only"}` as
 the initial committed value — satisfying `01-REQUIREMENTS.md`'s Must: "No repo's hook installation
 ships in `blocking` mode as its initial configuration."
+
+### 5.1 Re-justification of the Inherited 5s Probe Timeout (benchmark audit finding #5)
+
+The wrapper's existing `5s` timeout budget (`.claude/hooks/domain-boundary-provenance.sh`, marked
+`PROVISIONAL — owner: wright... reused as a starting value from first-turn-contract.sh's own
+measured-and-cited 5s bound`) was measured for the cross-domain pass, which per the LOCKED doc
+never calls `ast.parse` on the file content. This sprint adds a full `ast.parse(scan_surface, ...)`
+call on every `.py` `Edit`/`Write` (§2, §7) — a materially different cost profile under the same
+inherited bound, and the benchmark audit is correct that this cannot be silently inherited without
+re-justification.
+
+**Disposition: verified directly against this repo, not left as an unvalidated inheritance.**
+Measured 2026-09-05, reproducible via `python3 -c "import ast, time; ..."` against this repo's own
+files:
+- `ast.parse()` against this repo's actual largest `.py` file (`tests/test_first_turn_contract_probe.py`,
+  949 lines) took **~8ms** average over 50 runs.
+- `ast.parse()` against a synthetic 10,010-line file (well beyond any single file currently in this
+  repo or the roster corpus) took **~76ms** average over 20 runs.
+
+Both figures are more than **two orders of magnitude below the 5,000ms budget** (76ms is 1.5% of
+the budget even at 10x this repo's largest real file). This is a citable, reproducible measurement
+against this repo (not a back-of-envelope guess and not a claim about "commodity hardware" in the
+abstract) — `ast.parse`'s cost is negligible relative to the existing 5s bound for any file size
+plausible in this codebase or the roster corpus. **The 5s timeout is re-justified as-is for this
+sprint's addition; no re-measurement Roadmap slice is required for the `ast.parse` cost
+specifically.** The timeout constant's own PROVISIONAL/owner framing in the wrapper file is a
+pre-existing artifact outside this sprint's file-touch scope (see report) and is not edited here.
 
 ## 6. Data Schema Changes
 
@@ -393,41 +490,31 @@ def load_mode_config(project_dir: str) -> str:
     read failure, or schema-invalid content (fail-safe default, §5)."""
 
 def detect_threshold_literals(file_path: str, scan_surface: str) -> list[FlaggedLiteral]:
-    """AD-1 detection (§2). file_path used only to apply the test/fixture path exclusion and
-    the .py extension gate — never read from disk; operates on scan_surface text only, parsed
-    via ast.parse(scan_surface, ...) with a syntax-error -> return [] (fail-open: an
-    unparsable partial-edit fragment is not flagged, not crashed on)."""
+    """AD-1 detection (§2, redesigned this pass — two shape-based contexts only, no name-gated
+    context). file_path used only to apply the test/fixture path exclusion and the .py extension
+    gate — never read from disk; operates on scan_surface text only, parsed via
+    ast.parse(scan_surface, ...) with a syntax-error -> return [] (fail-open: an unparsable
+    partial-edit fragment is not flagged, not crashed on)."""
 
 class FlaggedLiteral(TypedDict):
     line_index: int         # 0-based, within scan_surface
-    context: str            # "comparison" | "named_threshold" | "slice_truncation"
+    context: str            # "comparison" | "slice_truncation" — no "named_threshold" value;
+                             # the name-gated context (§2) was removed this pass
     literal_repr: str       # e.g. "50000", "True"
 
-# THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright, unmeasured. Proximity window (lines)
-# above/below a match, for the local-threshold pass only (§2/§4). Independent of the incumbent's
-# PROXIMITY_WINDOW (probe L51, value 5, cross-domain purpose) — named PROXIMITY_WINDOW_THRESHOLD,
-# not PROXIMITY_WINDOW, to avoid a module-level name collision (two constants of the same name in
-# the same file is a Python bug: the second assignment would silently shadow the first).
-PROXIMITY_WINDOW_THRESHOLD = 3
-# ^ This comment is deliberately written as the exact text to land in
-#   scripts/domain_boundary_provenance_probe.py (Roadmap Slice 4). It is required to start with
-#   the literal marker `THRESHOLD-PROVENANCE:` (not a bare `PROVISIONAL —` line) because the
-#   constant's own name contains the name-gate word "threshold" (§2 context 2) — once the local-
-#   threshold pass is live, an edit to this file that assigns `PROXIMITY_WINDOW_THRESHOLD` is
-#   itself a context-2 match, and the required qualifying marker for that check's own detection
-#   rule (§4) is `THRESHOLD-PROVENANCE:`, not `PROVISIONAL —` (that string alone does not contain
-#   the marker and would not satisfy `has_threshold_provenance_marker`, causing the probe to flag
-#   its own source line). See §8 G-4 for the full self-scan resolution and why the incumbent's
-#   `PROXIMITY_WINDOW = 5` (probe L51) does NOT need the same treatment.
+# No new module-level constant is introduced by this pass (§4). The proximity window for
+# THRESHOLD-PROVENANCE: reuses the incumbent's existing PROXIMITY_WINDOW = 5 (probe L51,
+# unchanged) rather than defining a second, independently-tuned window — see §4 for why the
+# prior draft's PROXIMITY_WINDOW_THRESHOLD = 3 constant and its prescribed comment block have
+# been dropped (empirically wrong per measurement, and internally self-contradictory: a
+# 5-line-minimum comment block cannot satisfy a 3-line detection window).
 
 def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
-    """3-line window (§4), same shape as the incumbent's has_qualifying_marker_in_window but
-    against THRESHOLD-PROVENANCE: and PROXIMITY_WINDOW_THRESHOLD (=3, above), kept as a separate
-    function/constant rather than parameterizing the incumbent's (`PROXIMITY_WINDOW`, probe
-    L51) — the two windows are independently PROVISIONAL and must be revisable independently
-    without an accidental shared-constant coupling. Verified by direct read of the live file
-    (2026-09-05) that `PROXIMITY_WINDOW_THRESHOLD` does not collide with any other existing name
-    in `scripts/domain_boundary_provenance_probe.py`."""
+    """5-line window (§4), same shape and same PROXIMITY_WINDOW constant (probe L51, value 5) as
+    the incumbent's has_qualifying_marker_in_window, checked against THRESHOLD-PROVENANCE: instead
+    of DOMAIN-BOUNDARY:. Implemented as a distinct function (different marker string) but the same
+    window value, not a second constant — kept as one shared PROXIMITY_WINDOW so the two passes of
+    the same hook do not require independently maintaining two window bounds."""
 
 def run_cross_domain_pass(project_dir, tool_input, scan_surface) -> PassResult:
     """Incumbent's existing steps 2-7 (manifest load, normalize, glob match, identifier scan,
@@ -460,14 +547,14 @@ design — see §8 for per-item disposition.
 | **G-6** (`base_ref` undefined) | The discarded design's Stop-hook trigger needed a git base ref to find "session-changed files." | **Moot.** This design keeps `PreToolUse` on `Edit`/`Write` (the incumbent's trigger) — there is no "changed files since session start" concept at all; the scan surface is the single tool call's own `content`/`new_string`, exactly as the incumbent already does. No base-ref resolution is needed anywhere in this document. |
 | **G-7** (`run()` takes `mode` as param AND reads config) | Same ambiguity risk exists in principle. | **Addressed directly**, not just moot: §7 specifies `run()` calls `load_mode_config()` itself, once, at the top, then passes the resulting `mode` string into `combine()` as a plain argument — config is read exactly once, by `run()`, never re-read or re-passed ambiguously. |
 | **G-8** (`ProbeResult.decision` can't express `probe_error`) | The discarded design's `ProbeResult` type omitted `probe_error`. | **Addressed.** §6's `TrackRecordEntry.decision` explicitly lists `"allow" \| "flag" \| "deny" \| "probe_error"` as one flat union, matching the incumbent's own existing pattern (its `TrackRecordEntry.decision` already includes `probe_error`) — no separate `ProbeResult` type with a narrower union is introduced by this design; `PassResult`/`CombinedResult` (§7) are per-pass/pre-decision structures, not the final logged decision. |
-| **G-9 / G-4** (self-scan, and 05-REVIEW.md's G-3/G-4 rename consequence) | Whether the new probe's own PROVISIONAL constants get scanned by its own detection rule once live, and — per 05-REVIEW.md G-4 — whether renaming the new constant away from `PROXIMITY_WINDOW` to satisfy G-3 (name-collision fix) silently flips this row's original "false negative" conclusion into a false positive on the *new* constant. | **Resolved with two distinct, definite answers — one per constant, since after the G-3 rename they are no longer analogous cases:** (1) **The incumbent's `PROXIMITY_WINDOW = 5` (probe L51, unchanged by this sprint)** — its name contains no name-gate word (`limit`/`cap`/`threshold`/`cutoff`/`retry`/`retries`/`budget`/`timeout`/`max`/`min`), so §2 context 2 does NOT match it. This is an accepted v1 detection gap (a threshold by role, not by name) exactly as originally found — **unaffected by the rename**, because this constant was never renamed. Its existing `# §5 — PROVISIONAL, owner: wright` comment (probe L50) needs no change and does not need to contain `THRESHOLD-PROVENANCE:`, because context 2 never fires on it in the first place. (2) **The new constant, renamed to `PROXIMITY_WINDOW_THRESHOLD = 3` per G-3 (§7)** — its name DOES contain `threshold`, so §2 context 2 fires on its own assignment line once the local-threshold pass scans this probe file (self-scan, per G-9's original question). This is the opposite situation from case (1) and requires an actual qualifying marker, not just an accepted gap: the comment immediately above the assignment (§7) is written to start with the literal string `THRESHOLD-PROVENANCE:` (not a bare `PROVISIONAL —` line) specifically so it satisfies `has_threshold_provenance_marker`'s check within the 3-line window (§4). A bare `# PROVISIONAL — owner: wright` comment, as this document's prior draft used, does NOT contain the required marker string and would NOT have satisfied the check — that was this document's own error, corrected in §7's exact comment text. Roadmap Slice 4's Done-When must require the comment be written verbatim as specified in §7, and Slice 9's fixture corpus must add a case for `PROXIMITY_WINDOW_THRESHOLD`'s own assignment resolving to "cited" (not "flagged"), distinct from the existing `PROXIMITY_WINDOW` false-negative fixture case (which remains, unchanged, for case (1)). |
+| **G-9 / G-4** (self-scan) | Whether the new probe's own PROVISIONAL constants get scanned by its own detection rule once live. | **Simplified and resolved this revision, superseding the prior draft's two-case analysis.** The prior draft's self-scan concern existed only because of the now-removed name-gated context (§2): a constant literally named `PROXIMITY_WINDOW_THRESHOLD` would have matched on its own name. That context is gone. Under the redesigned rule (§2: comparison operand or slice/truncation argument only), **no module-level constant assignment is ever flagged purely by name** — `PROXIMITY_WINDOW = 5` (incumbent, unchanged) is not a comparison operand or slice bound, so it was never in scope for the local-threshold pass under either the old or new design, and no new window constant is introduced by this pass (§4/§7) for the same question to apply to. The self-scan question therefore has one answer instead of two: **the local-threshold pass does not flag either window constant**, and no comment-text obligation is created for `PROXIMITY_WINDOW` beyond what the incumbent already carries. Roadmap Slice 9's fixture corpus should still include one case verifying this directly (an assignment like `PROXIMITY_WINDOW = 5` in a scanned file resolves to "not flagged," not "flagged and cited") so the absence of a self-scan false-positive is a tested claim, not an inferred one. |
 | **G-4** (US-4 AC2 no verification path) | "No log message implies soundness" has no test. | **Still applies, unchanged from before** — this is a requirements-level testability gap independent of which design implements it. Not this document's to resolve; flagged to Roadmap the same way the review already did (a grep-based test asserting the deny/flag `reason` string template contains no soundness-implying language, e.g. no "verified correct"/"sound"/"validated" claims beyond presence-check wording). |
 
 ## 9. Dependencies
 
 | Dependency | Version | Purpose |
-|---|---|---|
-| Python 3 stdlib `ast` | matches existing interpreter (no new requirement) | `detect_threshold_literals` (§2) — parses `scan_surface` to find comparison/assignment/slice nodes. New import for this probe file, but stdlib, zero new third-party dependency. |
+|------------|---------|---------|
+| Python 3 stdlib `ast` | matches existing interpreter (no new requirement) | `detect_threshold_literals` (§2) — parses `scan_surface` to find comparison/slice nodes. New import for this probe file, but stdlib, zero new third-party dependency. Cost re-justified directly against this repo, §5.1. |
 | Python 3 stdlib (`json`, `re`, `os`, `sys`, `fnmatch`, `datetime`) | unchanged | Reused from the incumbent, no change. |
 
 No new third-party dependency. Consistent with the incumbent's own zero-third-party posture
@@ -476,16 +563,20 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 ## 10. Patterns (delta from incumbent's §11)
 
 | Pattern | Usage | Rationale |
-|---|---|---|
+|---------|-------|-----------|
 | Two independent detection passes, one combined decision | `run()` (§3) | Composes cleanly without duplicating the wrapper/probe/hook-registration machinery for a second hook entry; keeps one `PreToolUse` call, one track-record entry, one deny-schema emission per Claude Code's own one-decision-per-call constraint. |
 | Fail-safe config default (absent mode file → `log_only`, never `blocking`) | `load_mode_config` (§5) | Mirrors the incumbent's "absent manifest → allow" fail-safe posture — an unconfigured or partially-installed hook must always default toward the less disruptive behavior, never the more disruptive one. |
 | AST-based syntactic detection over regex | `detect_threshold_literals` (§2) | Reliably distinguishes "literal is a comparison operand" from "literal merely appears near a comparison token" — same rationale the discarded design already established for this specific sub-decision, unaffected by the trigger-surface correction. |
+| Shape-only detection, no name-vocabulary gate | `detect_threshold_literals` (§2) | Benchmark-measured: an English-word name gate produces both false negatives (8/10 words never fire in this repo) and false positives (substring matches inside unrelated identifiers). Removing it and relying on `log_only` + citation convention to absorb volume avoids maintaining an unvalidated word list at all. |
 
-**Anti-patterns (do not use), unchanged from incumbent plus one addition:**
+**Anti-patterns (do not use), unchanged from incumbent plus two additions:**
 - General static import/reference analysis for either check — rejected (incumbent §4, unaffected).
 - Reusing `DOMAIN-BOUNDARY:` or bare `PROVISIONAL` as the new check's marker — rejected, §4.
-- **New**: a second, independent hook registration/process for the local-threshold check — rejected,
+- A second, independent hook registration/process for the local-threshold check — rejected,
   §3 (violates task instruction 3's explicit "same wrapper... not duplicated").
+- **New**: a name/vocabulary-gated detection context for local thresholds — rejected, §2 (measured
+  false-negative and false-positive rate too high in this repo to justify the added detection
+  surface; shape-based contexts alone are simpler and better-measured).
 
 ## 11. Integration Points
 
@@ -499,6 +590,13 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   "denied" instead resolves to `decision: "flag"` and the call is allowed — a real behavior change
   to this LOCKED doc's stated outcome, named here rather than left implicit. This is what §5's
   pointer to this bullet resolves to.
+
+  **Separately (not this sprint's file-touch scope, reported for Danny's routing):** this LOCKED
+  doc's own §5/§6 and AC4 currently institutionalize the exact "PROVISIONAL — owner: X" bare-tag
+  pattern that this revision removes from every doc it touches. That LOCKED doc and the live probe
+  script (`scripts/domain_boundary_provenance_probe.py`, `.claude/hooks/domain-boundary-provenance.sh`)
+  are out of this sprint's file-touch scope and are not edited here — see the accompanying report
+  for the exact instances and a recommended separate correction pass.
 - **`docs/tooling/domain-boundary-manifest.json`** (F2 correction, Frank spec-gate attempt 1):
   **this file does not exist and has never been tracked in this repo** — confirmed by direct
   check. No repo-root manifest exists in agent-rig; this is deliberate, not an oversight — the
@@ -533,20 +631,35 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
    **Applied**, with Danny's personal sign-off obtained per this repo's Decision Discipline for
    North Star doc edits. Confirmed by the same `grep -n "Stop-hook"` check above: no remaining
    references.
+6. **`01-REQUIREMENTS.md` L110** (benchmark audit, this revision) — the bare `PROVISIONAL (owner:
+   wright, unmeasured)` tag on the exclusion-set/name-list disclosure is **Applied/corrected**:
+   replaced with the disposition-based language matching this document's §2 (not-yet-benchmarked,
+   executable plan cited, and the name-word list itself removed per the §2 redesign rather than
+   re-tagged).
 
 ## 13. Open Items Carried to Forge
 
-- **§2's exclusion set and name-word list** — PROVISIONAL, owner wright, unmeasured (unchanged
-  disposition from the prior pass, re-hosted here).
-- **§4's 3-line window** — PROVISIONAL, owner wright, unmeasured, deliberately independent from
-  the incumbent's 5-line window.
-- **§8's self-scan disposition (two constants, two outcomes)** — the incumbent's
-  `PROXIMITY_WINDOW = 5` remains an accepted, explicitly documented v1 detection gap (threshold by
-  role, not by name; unaffected by this sprint). The new `PROXIMITY_WINDOW_THRESHOLD = 3` (§7) is
-  a name-gate match and must carry the exact `THRESHOLD-PROVENANCE:`-prefixed comment specified in
-  §7 to avoid self-flagging. Both must be captured as distinct named fixture cases in the
-  roadmap's test corpus (Slice 9), not silently absent from it.
+- **§2's `{0, 1, -1, 2}` exclusion set** — NOT YET BENCHMARKED. Carries the full executable
+  validation plan stated in §2 (unfiltered scan of the roster corpus, JSONL dump, 200-row
+  stratified hand-labeled sample, 5%-precision exclusion threshold). Not to be treated as
+  validated until that plan runs; running it is Roadmap/forge follow-up, not resolved here.
+- **§2's name-gated context** — REMOVED, not carried forward. The redesign (drop context 2,
+  flag on shape alone) is adopted in this document; there is no name-word list left to
+  benchmark or re-tag.
+- **§4's proximity window** — RESOLVED, not carried forward as open. Reuses the incumbent's
+  existing, already-5-line `PROXIMITY_WINDOW` constant; no second window constant, no separate
+  PROVISIONAL tag needed for this value going forward.
+- **§5.1's 5s timeout** — RESOLVED for this sprint's `ast.parse` addition specifically (measured
+  directly against this repo, see §5.1); the timeout constant's pre-existing PROVISIONAL/owner
+  framing in the wrapper file itself is unchanged and out of this sprint's file-touch scope.
+- **§8's self-scan disposition** — RESOLVED, simplified from the prior draft's two-case analysis
+  to one outcome: no window constant is flagged by the local-threshold pass under the redesigned
+  shape-only rule. Roadmap Slice 9 should still add one explicit fixture case asserting this
+  ("not flagged") so it is a tested claim.
 - **§11's roster/LOCKED-doc addendum updates** — Roadmap-level housekeeping, not architecture.
+- **LOCKED doc / live probe self-assigned-owner pattern** — out of this sprint's file-touch scope;
+  reported to Danny for separate routing (see accompanying report and §11's integration-point
+  note).
 
 ---
 

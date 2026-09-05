@@ -54,9 +54,9 @@ so that soundness judgment stays the job of `benchmark`, Frank, and a human, per
 
 **US-1**
 - [ ] Given a code change introducing a numeric or boolean literal that matches the detection rule
-      for "threshold-shaped" (rule finalized in `02-ARCHITECTURE.md` §2 — fixed syntactic
-      contexts, Python-only, name-gated on one context; see that section for the exact contexts
-      and exclusions), when the hook runs, then the hook flags the literal if no citation,
+      for "threshold-shaped" (rule finalized in `02-ARCHITECTURE.md` §2 — two shape-based
+      syntactic contexts only, Python-only, no name-gating; see that section for the exact
+      contexts and exclusions), when the hook runs, then the hook flags the literal if no citation,
       PROVISIONAL-with-owner tag, or evidence of removal is present at or adjacent to its
       definition.
 - [ ] Given a threshold-shaped literal that already carries a citation or a PROVISIONAL tag
@@ -102,12 +102,17 @@ so that soundness judgment stays the job of `benchmark`, Frank, and a human, per
 ## Detection Rule Pointer
 
 The detection rule for "threshold-shaped literal" (previously an open architecture-level design
-question in this document) is finalized in `02-ARCHITECTURE.md` §2: a fixed set of syntactic
-contexts (comparison operand, name-gated default-kwarg/assignment, slice/truncation argument),
-Python-only, AST-based, with explicit exclusions (`range()` bounds, non-slice indexing, test/
-fixture paths, the literal set `{0, 1, -1, 2}`). This document does not restate that rule's
-substance — see Architecture §2 for the authoritative definition, including which parts are
-PROVISIONAL (owner: wright, unmeasured) and carried forward to Roadmap.
+question in this document) is finalized in `02-ARCHITECTURE.md` §2 (revised per benchmark audit,
+2026-09-05): two shape-based syntactic contexts only (comparison operand, slice/truncation
+argument) — the name-gated default-kwarg/assignment context was removed, measured to produce both
+false negatives (8/10 candidate words never fire in this repo) and false positives (substring
+matches inside unrelated identifiers). Detection is Python-only, AST-based, with explicit
+exclusions: `range()` bounds (a Python language fact, cited to the language reference, not a
+benchmarked value), non-slice indexing, test/fixture paths, and the literal set `{0, 1, -1, 2}`
+(NOT YET BENCHMARKED — ships with a fully-specified executable validation plan in Architecture §2;
+not to be treated as validated until that plan runs). This document does not restate that rule's
+substance — see Architecture §2 for the authoritative definition and disposition of every
+constant.
 
 The incumbent's existing manifest-gated cross-domain check (schema, trigger, scan surface,
 `DOMAIN-BOUNDARY:` marker) is untouched by this sprint — see `02-ARCHITECTURE.md` §1. Only the new
