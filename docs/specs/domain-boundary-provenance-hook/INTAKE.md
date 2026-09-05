@@ -1,19 +1,42 @@
-# Intake: domain-boundary-provenance-hook
+# Intake: unsourced-threshold-provenance-hook (renamed 2026-09-05, was domain-boundary-provenance-hook)
 
-**Status**: APPROVED (2026-08-22, Danny)
+**Status**: APPROVED (2026-08-22, Danny; scope-broaden amendment 2026-09-05, Danny direct approval)
 
-**Date**: 2026-08-22
+**Date**: 2026-08-22 (original), amended 2026-09-05
 **Author**: wright
 **Mode**: spec-lite (recommended) — same shape as `first-turn-contract-enforcement`
 (`docs/specs/first-turn-contract-enforcement/INTAKE.md`): one blocking checker script/hook, no UI,
 no product surface, no multi-stakeholder scope. Requirements/UI-spec/roadmap layering is skipped
 because there's no UI to spec and the build is too small to split across three documents; Frank's
 binding gate and human approval are NOT skipped. Danny's call to confirm or override at approval.
-**DDR**: `docs/specs/agent-rig-ddrs/DDR-006-domain-boundary-provenance-hook.md`
+**DDR**: `docs/specs/agent-rig-ddrs/DDR-006-domain-boundary-provenance-hook.md` (row renamed to
+"Unsourced-Threshold Provenance Hook", 2026-09-05)
 
 ---
 
-## Problem Statement
+## Amendment, 2026-09-05 (Danny, direct approval — no per-repo gate ceremony)
+
+**Scope broadened from domain-crossing to all unsourced thresholds.** The original Problem
+Statement/Open Questions below only mechanized the sub-case of PROMOTED DEFAULT
+(`~/.claude/CLAUDE.md` rule 1) where a value happens to cross an ownership boundary between
+pipelines — and required an unoperationalizable "did this cross a domain" judgment call (never
+resolved into a checkable rule; see former Open Question 1). PROMOTED DEFAULT does not require a
+boundary crossing: a single pipeline can promote its own same-file, same-module scaffolding
+default into a load-bearing parameter with zero import involved. Full amendment text on the
+spec-of-record: `gap-lens-dilution-filter/docs/DDR/DDR-0014-DOMAIN-BOUNDARY-PROVENANCE-CHECK.md`
+§"Amendment, 2026-09-05" (commit `6b1c63a`, that repo). Read it directly rather than restated here.
+
+**Amended Problem Statement (replaces the original below):** for any numeric or boolean literal
+used in code as a threshold, cap, limit, cutoff, retry count, or budget — regardless of whether it
+was defined locally or imported/read from elsewhere — the codebase must carry, at or adjacent to
+that value's definition, a citation, an explicit `PROVISIONAL — unvalidated` marker naming a human
+owner, or the value must be removed. Absence of all three is a flagged finding. This drops the
+domain-crossing trigger entirely — it becomes one flagged case among all threshold-shaped
+literals, not the precondition for the check to fire. This is simpler to detect, not harder: "is
+this literal threshold-shaped, does it have a citation nearby" is answerable from syntax/context
+alone; the domain-boundary judgment call was not.
+
+**Original Problem Statement, 2026-08-22 (superseded, kept for incident history):**
 
 A numeric constant, cap, threshold, or boolean flag can be correct and load-bearing in the system
 it was born in, cross into a different pipeline uninspected, and never be re-justified at the new
@@ -23,11 +46,6 @@ reading the bytes it cut (2026-07-13 postmortem, 99 days void); and a market-cap
 `market_data` for its own domain was silently carried into `gap-lens-dilution-filter`'s research-
 population inclusion criterion, dropping exactly the issuers where the hypothesized effect should
 be strongest (OQ-5, found 2026-08-20, ruled/removed 2026-08-22).
-
-This sprint builds the mechanism to catch the *next* instance before it reaches that cost: for any
-constant/cap/flag a pipeline reads from outside its own config/spec, require a citation at the
-consuming site for why that value is correct for that use. Absence of citation is a flagged
-finding, not a silent pass.
 
 ## Context
 
@@ -62,13 +80,15 @@ finding, not a silent pass.
 
 ## What Is Missing
 
-1. **A hook that detects a cross-domain value read with no citation at the consuming site.**
+1. **A hook that detects a threshold-shaped literal with no citation at its definition.**
    Currently nothing exists — the check is entirely a documented convention (CLAUDE.md Rule 1,
    the `benchmark` agent) that depends on someone remembering to run it. Both source incidents
    were caught by audit/measurement after the fact, not by anything running unattended.
-2. **A definition of "outside this pipeline's own config/spec."** DDR-0014 gives two clear positive
-   examples (a DB column owned by a different domain; an imported module's constant) but the
-   general detection rule is not yet specified — this is the sprint's core design problem.
+2. **A definition of "threshold-shaped literal."** (Amended 2026-09-05 — was "outside this
+   pipeline's own config/spec," dropped with the domain-crossing trigger.) Needs a general,
+   checkable rule for which numeric/boolean literals count as thresholds/caps/limits/cutoffs
+   worth flagging vs. ordinary values (loop bounds, array indices, etc.) — this is the sprint's
+   core design problem now.
 3. **A citation convention the hook checks against.** Likely reuses this repo's existing
    PROVISIONAL-tag convention (CLAUDE.md Decision Discipline) rather than inventing a new format,
    but that reuse is not yet confirmed as sufficient for this check's needs.
@@ -102,14 +122,14 @@ finding, not a silent pass.
 
 ## Open Questions
 
-1. **Detection rule for "outside this pipeline's own config/spec."** DDR-0014's two examples (DB
-   column from another domain; imported module constant) are clear but not exhaustive — needs a
-   general, checkable rule before architecture can be written. Candidate approaches (static import/
-   reference analysis vs. an explicit manifest of "external sources" per pipeline) should be
-   compared at spec time, not decided here.
+1. **Detection rule for "threshold-shaped literal."** (Amended 2026-09-05 — replaces the dropped
+   domain-crossing detection question.) Candidate approaches (a fixed set of syntactic contexts —
+   comparison operands, default kwargs named like limits/caps/thresholds, slice/truncation
+   arguments — vs. a naming-convention heuristic vs. an explicit per-file manifest) should be
+   compared at spec time. Needs a general, checkable rule before architecture can be written.
 2. **Citation format and location.** Inline comment, a docs file, or a structured tag — likely reuse
-   the PROVISIONAL-tag convention, but not yet confirmed sufficient for a cross-domain-value use
-   case specifically (vs. its original unsourced-number use case).
+   the PROVISIONAL-tag convention; now applies uniformly regardless of domain-crossing, so this
+   question is unchanged by the amendment but slightly simplified (one use case, not two).
 3. **Trigger surface.** PreToolUse (on Edit/Write to pipeline config/data files), a pre-commit-style
    check, or a scheduled/on-demand scan — needs the same design rigor
    `first-turn-contract-enforcement` went through (live-verified field/event claims, not assumed).
