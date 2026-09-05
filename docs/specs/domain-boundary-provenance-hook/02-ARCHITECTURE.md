@@ -1,350 +1,451 @@
-# Architecture: Unsourced-Threshold Provenance Hook
+# Architecture: Unsourced-Threshold Provenance Hook — Extension of the Incumbent
 
-**Status**: Draft (awaiting Frank's spec-gate + human approval)
+**Status**: DRAFT (revision pass — supersedes this document's prior version in full)
 **Date**: 2026-09-05
 **Author**: wright
-**Traces to**: `01-REQUIREMENTS.md` (US-1..US-4), `NORTH-STAR.md`, `INTAKE.md` amendment
-(2026-09-05), DDR-0014 (spec-of-record, `gap-lens-dilution-filter`).
 
----
+## 0. Correction Notice (read first)
 
-## 0. Scope Reminder
+The prior version of this document designed a brand-new Stop-hook with syntactic AST-based
+detection, on the premise "currently nothing exists." That premise was false, per
+`05-REVIEW.md` G-1 (Critical): a complete, Frank-forge-gate-PASSED implementation of DDR-006
+already exists — `.claude/hooks/domain-boundary-provenance.sh`,
+`scripts/domain_boundary_provenance_probe.py`, LOCKED spec
+`docs/tooling/domain-boundary-provenance-hook.md` — merged via PR #11, listed in
+`HOOK-DEPLOYMENT-ROSTER.md`, unwired from `.claude/settings.json`.
 
-This document resolves AD-1 (detection rule), confirms/extends the citation convention, specifies
-the Stop-hook wrapper (reusing `first-turn-contract-enforcement`'s shape verbatim, not
-redesigning it), and specifies the `log_only`/`blocking` mode switch. No domain-crossing
-precondition appears anywhere below — the check fires on any threshold-shaped literal regardless
-of where it was defined, per the 2026-09-05 amendment.
+**Danny's decision (settled, not re-asked here): extend the incumbent, do not replace it.**
 
----
+This document therefore:
+- Discards the prior AD-1 resolution (fixed-syntactic-contexts detection, Stop trigger,
+  `PROVISIONAL` reused as citation marker).
+- Leaves the incumbent's manifest-gated cross-domain check completely untouched — same trigger
+  surface (`PreToolUse` on `Edit`/`Write`), same manifest schema, same `DOMAIN-BOUNDARY:` marker,
+  same scan surface (`tool_input.content`/`new_string` only). No redesign of any of that follows.
+- Designs a **new, additive** same-file/local threshold-literal detection pass that composes with
+  the incumbent inside the same wrapper/probe invocation.
+- Resolves rollout (wiring the incumbent live at all is in scope, per task instruction 5) and the
+  citation-marker question for the new check.
 
-## 1. AD-1 — Detection Rule for "Threshold-Shaped Literal"
+This resolves review Open Questions OQ-A (extend, not replace/coexist-as-second-hook) and OQ-B
+(re-run comparison against the incumbent's actual shape — the incumbent's manifest design is
+correct and un-redesigned for its own scope; the new check does not use a manifest because its
+whole purpose is same-file literals a manifest author cannot pre-declare).
 
-### 1.1 Candidates compared
+## 1. What Changes and What Doesn't
 
-| Approach | Mechanism | Precision | Recall | Verdict |
-|---|---|---|---|---|
-| (a) Fixed syntactic contexts | AST match on: (i) comparison operands (`<`, `<=`, `>`, `>=`, `==`, `!=`) where one side is a numeric/boolean literal and the other side is a name/attribute; (ii) default values of function/method parameters or `dataclass`/`NamedTuple`/constant assignments whose target identifier matches a threshold-suggestive name pattern; (iii) slice/truncation arguments (`[:N]`, `str[:N]`, `.head(N)`-shaped calls, `itertools.islice`) where `N` is a literal | High — every match is a literal sitting in a position that is structurally a bound/cutoff | Moderate — misses thresholds expressed as free-standing named constants used only later (e.g. `MAX_RETRIES = 5` then `for i in range(MAX_RETRIES)`) unless (ii) also matches the assignment itself | **Selected** |
-| (b) Naming-convention heuristic only | Regex over identifier names for `limit\|cap\|threshold\|cutoff\|retry\|budget\|max_\|_max\|min_\|_min` anywhere the identifier is assigned a literal | Low — flags `max_workers=4` (a concurrency knob, not a scientific/domain threshold) and `retry` used for network jitter as readily as a research-relevant cap; also flags nothing when a threshold is named non-suggestively (e.g. `n = 500`) | High on name-matching literals, zero on the rest | Rejected — precision failure reproduces exactly the false-confidence pattern rule 1 exists to prevent (flags noise, trains reviewers to dismiss the hook) |
-| (c) Explicit per-file manifest | A human-maintained list of file:line locations to check | Perfect by construction (only what's listed) | Zero for anything not manually added — defeats the mechanization goal (Problem Statement: "depends on someone remembering") | Rejected — reintroduces the exact human-memory dependency this sprint exists to remove |
-
-### 1.2 Selected rule: (a), fixed syntactic contexts, name-pattern-gated
-
-Rule (a) alone (pure AST-position matching with no name filter) over-fires on ordinary loop
-bounds and array indices, which the requirements explicitly exclude (Edge Cases table, row 1).
-Rule (b) alone under- and over-fires as shown above. The selected rule is **(a) gated by a name
-pattern applied only to the two contexts where a bare positional match is ambiguous** — this is
-not rule (b) revived, because the name pattern is never sufficient on its own to flag; it only
-narrows an already-structural match.
-
-**Concrete rule** (three independently-sufficient match contexts; a literal is flagged if it
-matches ANY of the three):
-
-1. **Comparison-operand context** — a numeric or boolean literal appears as one operand of a
-   comparison operator (`<`, `<=`, `>`, `>=`, `==`, `!=`) against a name or attribute access (not
-   against another literal — `2 == 2` is not a threshold comparison). No name-pattern gate here:
-   position alone is sufficient, because a bare `if size > 5_000_000:` is structurally a
-   threshold check regardless of what `size` is called. **Excluded**: comparisons inside a `for`
-   loop's `range(...)` call or a list/string index expression (`arr[i]`, `s[:n]` handled
-   separately under context 3) — these are loop bounds/indices, not thresholds, per the
-   requirements' own exclusion.
-2. **Named-constant or default-kwarg assignment context** — a numeric or boolean literal is the
-   right-hand side of (i) a module-level or class-level assignment, (ii) a `dataclass`/
-   `NamedTuple`/`TypedDict` field default, or (iii) a function/method parameter default — AND the
-   target identifier matches (case-insensitive) the pattern
-   `(limit|cap|threshold|cutoff|retry|retries|budget|max|min|floor|ceiling)` as a whole word or
-   `snake_case`/`camelCase` segment (e.g. `MAX_RETRIES`, `retry_budget`, `sizeLimit`, but not
-   `maxwell_coefficient` — segment boundary required, not substring). The name gate exists here
-   (unlike context 1) because a bare assignment (`x = 5_000_000`) is syntactically
-   indistinguishable from an ordinary configuration constant without it, and the requirements
-   exclude "ordinary values" — the name pattern is the one operationalizable signal available at
-   this syntactic position.
-3. **Slice/truncation-argument context** — a numeric literal appears as the stop argument of a
-   slice (`x[:N]`, `x[a:N]`), or as a positional/keyword literal argument to a call whose callee
-   name matches `(head|take|truncate|limit|first)` (e.g. `.head(500)`, `itertools.islice(x, 500)`,
-   `df.head(n=500)`). No name gate on the literal itself is needed — the callee/slice position is
-   the structural signal, mirroring the gap-lens-dilution-filter byte-cap incident's exact shape
-   (a slice/truncation argument, per DDR-0014).
-
-**Explicit exclusions** (never flagged regardless of context): literals used as `range()` bounds,
-list/array/string index literals not in slice-stop position (`arr[0]`), literals in test files
-(`test_*.py`, `*_test.py`, `conftest.py` — asserting an expected count is not defining a
-production threshold), and literals `0`, `1`, `-1`, `2` in any context (universally-idiomatic,
-zero information value as a "threshold" — flagging them would be pure noise per DDR-0014's own
-precedent of the WHO byte-cap being a specific, non-idiomatic number).
-
-This rule is fully specified — no "configurable" or "decided at implementation time" residue.
-Language scope: Python only for v1 (both incidents were Python; extending the AST matcher to other
-languages is out of scope, not silently assumed — flagged as a Non-Goal in §7).
-
----
-
-## 2. Citation / PROVISIONAL-Tag Convention
-
-### 2.1 Reuse confirmed, with one addition
-
-The existing convention (`~/.claude/CLAUDE.md` Decision Discipline, rule 1) is sufficient as the
-*content* format: a citable source, or `PROVISIONAL — unvalidated` with a named owner. It is
-**not** sufficient as a *location* format on its own — CLAUDE.md's convention was written for
-narrative docs (specs, architecture docs), not source code, and does not specify how close
-"adjacent to its definition" must be in code. This architecture adds that missing location rule;
-it does not change the tag's content grammar.
-
-### 2.2 Location rule (new, scoped to this hook only)
-
-A citation or PROVISIONAL tag counts as "at or adjacent to" a flagged literal's definition if it
-appears as a `#` comment on the same line as the literal, or on any of the up-to-3 lines
-immediately preceding it, containing either:
-- the literal string `PROVISIONAL` followed within the same comment block by `owner:` or `owner=`
-  and a non-empty name token, or
-- a URL, file path (containing `/` or `.md`/`.py`), or a parenthetical citation matching
-  `\(.*(commit|DDR|PR|#)\w*\)` — matching this repo's existing citation style seen in
-  `first-turn-contract.sh` itself (e.g. `docs/tooling/first-turn-contract-enforcement.md §3.4`).
-
-**3-line lookback is a PROVISIONAL value, not a cited precedent** — no prior hook in this repo's
-history has needed a "how far back does an adjacent comment count" rule, so there is no citable
-precedent to point to. **PROVISIONAL — owner: wright.** Chosen as a starting value matching the
-observed comment-block depth in this repo's own recent PROVISIONAL tags (see
-`first-turn-contract.sh` line 72's multi-line comment block, which spans more than 3 lines above
-its `timeout 5` — meaning this rule as specified would itself under-detect that exact citation and
-require the owner to tune the lookback after first real-world runs). Flagged for revisit once the
-hook has run against this repo's own codebase at least once (see §6).
-
-### 2.3 Removal path
-
-Per requirements US-1/Edge Cases, a threshold that has been removed (inlined without a magic
-number) produces no literal for the AST matcher to find in the first place — "removal" is
-satisfied by the absence of a match, not by a separate code path the hook implements.
-
----
-
-## 3. Trigger Surface
-
-**Selected: Stop hook**, matching `first-turn-contract-enforcement`'s trigger (not PreToolUse, not
-a scheduled scan).
-
-Rationale, compared against the requirements' own candidates (Open Question 3):
-- **PreToolUse on Edit/Write**: rejected — would require the hook to reconstruct whether a given
-  Edit introduces a *new* flagged literal vs. one pre-existing in the file, adding a diff-aware
-  code path this hook does not need; the requirements do not ask for per-edit granularity, only a
-  session-end scan (US-1's "when the Stop-hook runs" framing, carried from Intake unmodified).
-- **Pre-commit-style (git hook)**: rejected — this repo's chosen mechanization pattern for
-  in-session checks is Claude Code's own hook system (`first-turn-contract-enforcement`,
-  `progress-proof-per-slice.sh`), not git hooks; introducing a second mechanism family for one
-  check fragments the pattern DDR-005 argues for consolidating.
-- **Scheduled/on-demand scan**: rejected as the *sole* mechanism — reintroduces the "someone has
-  to remember to run it" failure mode the Problem Statement names directly; Stop hook fires
-  automatically every session end with no operator action required.
-
-Scan target: files touched (added/modified) in the current session per `git diff` against the
-session's starting ref, sourced the same way `first-turn-contract.sh`'s probe already has access
-to session context (transcript path via stdin) — full-repo scan on every Stop is not required by
-any acceptance criterion and would make `log_only` noisy from unrelated pre-existing files on
-day one beyond what's needed to triage the current session's own changes. (Full-repo baseline scan
-for initial triage is a one-time manual invocation, not a hook responsibility — see §6.)
-
----
-
-## 4. Components
-
-| Component | Responsibility | Location |
+| Surface | Incumbent (unchanged) | New (this document) |
 |---|---|---|
-| `unsourced-threshold.sh` | Stop-hook wrapper: capture stdin, invoke probe under bounded timeout, validate probe output shape, fail open on any error, never itself contain detection logic | `.claude/hooks/unsourced-threshold.sh` |
-| `unsourced_threshold_probe.py` | Probe: resolve session's changed Python files via git diff, run the AST detection rule (§1) against each, check citation adjacency (§2) for each match, emit `allow`/`block` JSON per mode, write its own track-record line | `scripts/unsourced_threshold_probe.py` |
-| Track-record log | Append-only JSONL, one entry per hook invocation (pass, flag, or error) | `docs/tooling/unsourced-threshold-track-record.jsonl` |
-| Mode config | Per-repo `log_only`/`blocking` switch | `.claude/hooks/unsourced-threshold.config.json` (new, `{"mode": "log_only"}` default) — kept out of `settings.json` itself so promoting to `blocking` is a one-file edit, not a hook-wiring change |
+| Trigger | `PreToolUse`, `Edit`/`Write` | Same event, same invocation (composed, not duplicated) |
+| Wrapper | `.claude/hooks/domain-boundary-provenance.sh` | Same file, extended |
+| Probe entrypoint | `scripts/domain_boundary_provenance_probe.py` | Same file, extended with a second detection pass |
+| Gating | Per-repo manifest (`pipelineConfigGlobs` + `externalSourceIdentifiers`) | No manifest — runs against any Python file's proposed content, unconditionally (subject to mode gate, §5) |
+| Scan surface | `tool_input.content` / `tool_input.new_string` | Same convention, reused verbatim (task instruction 3) |
+| Citation marker | `DOMAIN-BOUNDARY:` | New marker, `THRESHOLD-PROVENANCE:` (§4) |
+| Decision combination | N/A (only check) | Two independent passes, one combined decision (§3) |
 
----
+Nothing below re-litigates §2–§13 of `docs/tooling/domain-boundary-provenance-hook.md` for the
+manifest-gated check. That document's decision procedure, schemas, and rationale stand as-is and
+are cited by reference, not restated.
 
-## 5. Data Schemas
+## 2. Detection Rule for the New Check (AD-1, resolved for the local-literal case)
 
-```python
-# unsourced_threshold_probe.py — internal shapes (dataclasses, not persisted beyond the log)
+**Decision: fixed set of syntactic contexts, Python-only, name-gated on one context** — this is
+the same rule shape the prior (discarded) architecture pass selected for AD-1, and nothing in
+G-1's finding invalidates the *rule itself* — only the trigger surface, scan-surface framing, and
+citation marker it was wired to. Re-adopted here unchanged in substance, re-hosted on the correct
+trigger/surface/marker.
 
-@dataclass
-class FlaggedLiteral:
-    file: str                # repo-relative path
-    line: int                # 1-indexed
-    context: str              # one of: "comparison", "assignment_or_default", "slice_or_truncation"
-    literal_repr: str         # source text of the literal, e.g. "5_000_000"
-    matched_name: str | None  # identifier that triggered a name-gated context; None for context 1/3
-    reason: str               # human-readable, e.g. "comparison operand against 'size', no citation found within 3 lines"
+**Contexts that count as "threshold-shaped":**
+1. **Comparison operand**: a numeric literal appearing as either operand of a comparison
+   (`<`, `<=`, `>`, `>=`, `==`, `!=`) — e.g. `if retries > 3:`.
+2. **Default-kwarg / assignment whose target name matches a threshold-word pattern**: a numeric
+   or boolean literal assigned to a name, or passed as a default parameter value, where the
+   target/parameter name (case-insensitive substring match) contains one of: `limit`, `cap`,
+   `threshold`, `cutoff`, `retry`, `retries`, `budget`, `timeout`, `max`, `min`. This is the only
+   context gated on a name match — contexts 1 and 3 fire on syntactic shape alone, independent of
+   naming.
+3. **Slice/truncation argument**: a numeric literal used as a slice bound (`x[:50000]`) or as an
+   argument to a truncation-shaped call (`str[:N]`, `.ljust(N)`, `[:N]` generally).
 
-@dataclass
-class ProbeResult:
-    mode: Literal["log_only", "blocking"]
-    files_scanned: list[str]
-    flagged: list[FlaggedLiteral]
-    decision: Literal["allow", "block"]   # "block" only possible if mode == "blocking" and flagged is non-empty
+**Explicit exclusions** (never flagged, regardless of context match):
+- `range()` call bounds (first, second, or third positional argument).
+- A non-slice-stop index into a sequence (`x[i]`, not `x[:i]`).
+- Files under any `test`/`tests`/`fixtures` path component.
+- The literal values `{0, 1, -1, 2}` — idiomatic loop/sentinel/increment values.
+
+**PROVISIONAL — owner: wright.** The `{0, 1, -1, 2}` exclusion set and the context-2 name-word
+list are not derived from an external benchmark; they are a first-pass value for this sprint,
+same status the prior architecture pass gave them (`05-REVIEW.md` confirmed this compliant under
+the prior framing and nothing about re-hosting the rule changes that disposition).
+
+**AST-based, Python-only, no regex fallback** — same posture as the prior pass: syntactic
+detection needs a real parse tree to reliably distinguish "is this a comparison operand" from
+"is this token merely near a `<`", and Python's stdlib `ast` module is zero-dependency and
+already used nowhere else in this repo's hook tooling but is a stdlib import with no new
+dependency cost (§8).
+
+**Scope note**: per Out of Scope in `01-REQUIREMENTS.md`, Python-only is an accepted narrowing,
+not a silent gap — Bash/TS/JSON thresholds in this repo are not scanned by v1 of either check.
+
+## 3. Composition: Two Passes, One Decision
+
+Both checks now run from the same `PreToolUse` invocation of `domain-boundary-provenance.sh` →
+`domain_boundary_provenance_probe.py`, against the same stdin envelope
+(`DomainBoundaryHookInput`, unchanged, §7). The probe's `run()` is restructured to perform two
+independent passes and combine their results:
+
+```
+run(stdin_data):
+    tool_name, tool_input, project_dir  # unchanged extraction
+
+    if tool_name not in ("Edit", "Write"):
+        allow (unchanged, §6 step 1 of incumbent doc)
+
+    scan_surface = get_scan_surface(tool_name, tool_input)   # unchanged helper, reused as-is
+
+    cross_domain_result = run_cross_domain_pass(project_dir, tool_input, scan_surface)
+        # == incumbent's existing steps 2-7, UNMODIFIED logic, extracted into a named function
+        # for composition. Still manifest-gated; still allows silently if no manifest/no
+        # in-scope match.
+
+    local_threshold_result = run_local_threshold_pass(tool_name, raw_file_path, scan_surface, mode)
+        # == new detection (§2, §4), gated only by file extension (.py) and mode (§5) —
+        # NOT gated by any manifest.
+
+    combined = combine(cross_domain_result, local_threshold_result)
+    write_track_record(combined)   # single entry, both passes' findings folded in (§6 schema)
+    emit combined.decision (block if either pass denies and mode allows blocking; else allow)
 ```
 
+**Combination rule**: a `PreToolUse` call may only ever emit one `{"decision": "block", "reason":
+...}` payload (§3 of the incumbent doc — this is a hard constraint of the deny schema, not a
+design choice available to revisit). If both passes find unmarked matches, the combined `reason`
+string concatenates both passes' findings, clearly labeled by check name (`[domain-boundary]` /
+`[threshold-provenance]`), so a denied edit's remediation is unambiguous about which marker is
+missing where. If either pass alone denies, that pass's reason is used unmodified. If both pass
+(or find nothing), the whole call allows.
+
+**Why one wrapper/probe instead of two separate hook entries**: task instruction 3 requires this;
+additionally, both checks operate on the identical scan surface and stdin envelope — a second
+independent hook process would re-parse the same `tool_input` and double the invocation overhead
+for zero decision-quality gain. `first-turn-contract.sh`'s own pattern (one wrapper, one probe,
+one decision) is preserved at the level of "one hook installation," which is what
+`.claude/settings.json` wiring (§5) actually registers.
+
+**No manifest coupling**: the new pass takes no manifest input and is not affected by a target
+repo having no `domain-boundary-manifest.json` — that absence only short-circuits the cross-domain
+pass (per the incumbent's own step 2 "absent → allow" rule, unchanged). The new pass runs
+independently of manifest presence, since its entire premise (per the DDR-0014 amendment) is that
+manifest-based gating is exactly the mechanism that let same-file thresholds go unscanned.
+
+## 4. Citation Marker for the New Check
+
+**Decision: new marker, `THRESHOLD-PROVENANCE:`. Does not reuse `DOMAIN-BOUNDARY:` or bare
+`PROVISIONAL`.**
+
+**Rationale, following the incumbent's own §5 reasoning pattern (not re-litigating it, applying
+it to a third case):**
+- **Not `PROVISIONAL` alone** — same objection the incumbent's §5 already establishes: a bare
+  `PROVISIONAL — owner: X` tag asserts "not yet validated," which is one of the amendment's three
+  satisfying conditions (option b) but not the only one. A citation to a reproducible source
+  (option a) is a different, stronger claim than PROVISIONAL and needs a marker that doesn't
+  presuppose "unvalidated." Reusing bare `PROVISIONAL` as the universal marker would make option
+  (a)'s citations indistinguishable from option (b)'s admissions in a mechanical text-presence
+  scan, which is exactly the ambiguity DDR-0014's own citation-format open question (Interview,
+  01-REQUIREMENTS Constraints) flagged as not yet confirmed sufficient. The requirements doc
+  already anticipates the existing PROVISIONAL convention might prove insufficient (Constraints:
+  "flagged as not yet confirmed sufficient... if architecture finds it insufficient, that is an
+  architecture-level finding, not a requirements gap") — this is that finding.
+- **Not `DOMAIN-BOUNDARY:`** — per the incumbent's own §5, that marker's semantic is specifically
+  "this value crossed from another domain and here is why it's correct for this consuming site."
+  A same-file threshold that never crossed anything is not a domain-boundary claim; forcing it
+  under that marker would make `DOMAIN-BOUNDARY:` comments appear on code that domain-boundary
+  review has no reason to look at, diluting the marker's own signal value for its original
+  purpose (cross-repo/cross-module retrofit triage, per DDR-0014's retrofit section).
+- **`THRESHOLD-PROVENANCE:` accepts any of the three amendment-satisfying forms on one marker
+  line**: a citation (option a), an explicit named-owner PROVISIONAL tag (option b) — the
+  existing `PROVISIONAL — owner: X` string is still what appears, just now recognized by this
+  marker rather than required to double as the marker itself — or is simply absent because the
+  literal was removed (option c, which trivially satisfies the check by there being no literal
+  left to flag). Concretely: `# THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright, unmeasured` is
+  a valid, complete citation line satisfying option (b); `# THRESHOLD-PROVENANCE: see DDR-0014
+  §Amendment for why 5s is reused from first-turn-contract.sh's measured bound` satisfies (a).
+
+**v1 citation rule for the new check** (deliberately mirrors the incumbent's §5 shape for
+consistency, values re-justified independently, not copied):
+- A citation is a comment line containing the literal marker `THRESHOLD-PROVENANCE:`
+  (case-sensitive, exact string) followed by non-whitespace content on the same line.
+- The marker must appear within **3 lines** (inclusive) above or below the line containing the
+  flagged literal, counted within the same scan surface (`tool_input.content`/`new_string`) — not
+  the incumbent's 5-line window. **PROVISIONAL — owner: wright.** A tighter window than the
+  incumbent's is deliberate, not arbitrary-different-for-its-own-sake: threshold literals are
+  typically single-line assignments or comparisons with no natural multi-line block the way a
+  cross-domain read's surrounding context often has, so a tighter default is being tried first;
+  like the incumbent's window, this is unmeasured and owned by wright for revision once real
+  false-positive/negative data exists (Roadmap Slice 10, unchanged from prior pass's plan).
+- Same location rule as the incumbent: citation lives in the same file as the flagged literal, not
+  a separate doc.
+
+## 5. Rollout: `log_only` Mode (new capability, both checks)
+
+**Current state (confirmed by direct read, task instruction 5): the incumbent is NOT wired into
+`.claude/settings.json`.** No `PreToolUse` entry exists for `domain-boundary-provenance.sh`
+anywhere in the live hooks config. Getting the hook live at all — for both the incumbent
+cross-domain check and the new local-threshold check — is in scope for this sprint.
+
+**Decision: wire it live now under `log_only`, not straight to blocking.**
+
+**Rationale:**
+- `01-REQUIREMENTS.md` US-2 and `NORTH-STAR.md` both make `log_only`-first a Must, specifically
+  because widening scope (dropping the domain-crossing precondition, per the amendment) surfaces
+  every pre-existing same-file magic number in this repo — a class of finding the incumbent's
+  manifest-gated design never touches today (manifest scope + cross-domain-only kept its blast
+  radius small). The new check has no comparable natural narrowing; it runs on any `.py` file
+  edited via `Edit`/`Write`, unconditionally.
+- **The incumbent's cross-domain check has never run live in this repo** (unwired since 2026-08-22
+  per the roster) — there is zero production track-record data on its own false-positive rate.
+  Wiring both checks straight to blocking on day one would be the first time either check's real
+  behavior against live editing sessions is observed, with the failure mode being a block, not a
+  log line. That is the exact rollout risk `log_only`-first exists to absorb (DDR-0014 amendment's
+  Rollout section, quoted directly: "report-only first, each repo owner triages existing constants
+  against their own backlog, promotion to blocking is a separate per-repo decision").
+- Fail-open (probe crash/timeout) already bounds the risk of an unrelated block from a bug: `mode`
+  bounds the risk of a *correct* detection being disruptive before triage has happened.
+
+**Design addition required: a `mode` config, since v1 of the incumbent is binary allow/deny with
+no log-only concept.**
+
 ```typescript
-// Track-record entry (JSONL, one object per line) — same top-level shape family as
-// first-turn-contract-track-record.jsonl (timestamp, session_id, decision) with fields specific
-// to this check appended, not a divergent schema.
-interface UnsourcedThresholdTrackRecordEntry {
-  timestamp: string;            // ISO 8601 UTC
-  session_id: string | null;
+/** New config file, sibling to the manifest, read by the probe at the start of run().
+ *  Absent file -> mode defaults to "log_only" (fail-safe default: an uninstalled/unconfigured
+ *  mode file must never default to blocking). */
+interface DomainBoundaryModeConfig {
+  schemaVersion: 1;
+  /** "log_only": findings are written to the track-record log with decision "flag" (new value,
+   *  §6) but the PreToolUse call always allows (never emits {"decision":"block"}).
+   *  "blocking": findings that would deny under log_only instead actually deny. */
   mode: "log_only" | "blocking";
-  files_scanned: string[];
-  flagged_count: number;
-  flagged: Array<{
-    file: string;
-    line: number;
-    context: "comparison" | "assignment_or_default" | "slice_or_truncation";
-    literal_repr: string;
-    reason: string;
-  }>;
-  decision: "allow" | "block" | "probe_error";
-  probe_error: string | null;   // populated only when decision === "probe_error"
 }
 ```
 
-```json
-// .claude/hooks/unsourced-threshold.config.json
-{ "mode": "log_only" }
+**Path**: `docs/tooling/domain-boundary-mode.json`, discovered relative to
+`$CLAUDE_PROJECT_DIR` — same discovery convention as the manifest (§2 of the incumbent doc),
+sibling file, not a field added to the manifest itself (kept separate because the mode applies to
+*both* checks composed in §3, while the manifest only ever configured the cross-domain check;
+folding mode into the manifest schema would misleadingly suggest mode is manifest-scoped).
+
+**No existing precedent in this repo for a hook-specific mode file** — `first-turn-contract.sh`
+has no equivalent (it has no graduated-severity concept, only allow/deny). This is a new,
+minimal addition, schema-versioned the same way the manifest is, for the same forward-compat
+reason.
+
+**Behavior change to the decision procedure (§3's `combine`)**: when `mode` is `"log_only"`, any
+pass that would otherwise produce a deny instead produces a track-record entry with
+`decision: "flag"` (new value, §6) and the `PreToolUse` call emits nothing (allow). When `mode` is
+`"blocking"`, a would-deny pass denies exactly as the incumbent's cross-domain check already does
+today. This mode gate wraps **both** passes identically — the cross-domain check, once wired live,
+also starts under `log_only` rather than jumping straight to the blocking behavior its
+already-written code implements, since it has equally never run against live traffic.
+
+**Initial `.claude/settings.json` wiring**: add one `PreToolUse` entry matching `Edit`/`Write`,
+pointing at `.claude/hooks/domain-boundary-provenance.sh` (unchanged path), with
+`docs/tooling/domain-boundary-mode.json` shipped at `{"schemaVersion": 1, "mode": "log_only"}` as
+the initial committed value — satisfying `01-REQUIREMENTS.md`'s Must: "No repo's hook installation
+ships in `blocking` mode as its initial configuration."
+
+## 6. Data Schema Changes
+
+```typescript
+// Unchanged from the incumbent doc's §7, reused verbatim:
+interface DomainBoundaryHookInput {
+  tool_name: string;
+  tool_input: {
+    file_path: string;
+    content?: string;
+    old_string?: string;
+    new_string?: string;
+  };
+  cwd?: string;
+}
+
+interface DomainBoundaryHookOutput {
+  decision?: "block";
+  reason?: string;
+}
+
+// Extended: TrackRecordEntry gains a `checks` breakdown and a new decision value.
+interface TrackRecordEntry {
+  timestamp: string;
+  session_id: string | null;
+  tool_name: string;
+  file_path: string | null;
+  mode: "log_only" | "blocking";                  // NEW — which mode produced this decision
+  cross_domain: {
+    manifest_status: "absent_or_invalid" | "matched";
+    file_in_scope: boolean | null;
+    matches_found: number | null;
+    matches_cited: number | null;
+  };
+  local_threshold: {                               // NEW
+    file_scanned: boolean;                         // false for non-.py files, test paths
+    matches_found: number | null;                  // count of flagged threshold-shaped literals
+    matches_cited: number | null;                  // count carrying a qualifying THRESHOLD-PROVENANCE: marker
+  };
+  decision: "allow" | "flag" | "deny" | "probe_error";  // "flag" is NEW — log_only would-have-denied
+  reason: string | null;
+  probe_error: string | null;
+}
 ```
 
----
+**Migration note**: this is a breaking schema change to `TrackRecordEntry` (nested `cross_domain`/
+`local_threshold` objects replace the incumbent's flat `manifest_status`/`file_in_scope`/
+`matches_found`/`matches_cited` fields). The incumbent's track-record log
+(`docs/tooling/domain-boundary-provenance-track-record.jsonl`) is gitignored and has never been
+populated by a live wiring (§5) — there is no historical data this migration needs to preserve or
+reconcile, so the schema change is a clean cutover, not a versioned-log concern.
 
-## 6. API Contracts
+## 7. New Function Signatures
 
 ```python
-def find_changed_python_files(repo_dir: str, base_ref: str) -> list[str]:
-    """Files changed in the current session vs. base_ref, filtered to *.py, excluding
-    test_*.py/*_test.py/conftest.py per §1.2 exclusions."""
+# scripts/domain_boundary_provenance_probe.py — additions, alongside all existing functions
+# (load_manifest, normalize_file_path, match_globs, get_scan_surface, etc.), which are
+# UNMODIFIED.
 
-def detect_threshold_literals(file_path: str) -> list[FlaggedLiteral]:
-    """AST walk applying the three match contexts from §1.2. Returns literals with NO
-    adjacency check applied yet (citation check is a separate pass, §2)."""
+def load_mode_config(project_dir: str) -> str:
+    """Reads docs/tooling/domain-boundary-mode.json. Returns "log_only" on any absence,
+    read failure, or schema-invalid content (fail-safe default, §5)."""
 
-def has_adjacent_citation(file_path: str, line: int) -> bool:
-    """Implements the §2.2 lookback rule (same line + up to 3 preceding lines)."""
+def detect_threshold_literals(file_path: str, scan_surface: str) -> list[FlaggedLiteral]:
+    """AD-1 detection (§2). file_path used only to apply the test/fixture path exclusion and
+    the .py extension gate — never read from disk; operates on scan_surface text only, parsed
+    via ast.parse(scan_surface, ...) with a syntax-error -> return [] (fail-open: an
+    unparsable partial-edit fragment is not flagged, not crashed on)."""
 
-def run(mode: Literal["log_only", "blocking"], changed_files: list[str]) -> ProbeResult:
-    """Orchestrates detect + citation-check per file, applies mode to decision, writes its own
-    track-record line on every path (mirrors first_turn_contract_probe.py's write-before-emit
-    invariant, spec §6 of that hook)."""
+class FlaggedLiteral(TypedDict):
+    line_index: int         # 0-based, within scan_surface
+    context: str            # "comparison" | "named_threshold" | "slice_truncation"
+    literal_repr: str       # e.g. "50000", "True"
+
+def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
+    """3-line window (§4), same shape as the incumbent's has_qualifying_marker_in_window but
+    against THRESHOLD-PROVENANCE: and PROXIMITY_WINDOW=3, kept as a separate function/constant
+    rather than parameterizing the incumbent's — the two windows are independently PROVISIONAL
+    and must be revisable independently without an accidental shared-constant coupling."""
+
+def run_cross_domain_pass(project_dir, tool_input, scan_surface) -> PassResult:
+    """Incumbent's existing steps 2-7 (manifest load, normalize, glob match, identifier scan,
+    DOMAIN-BOUNDARY: window check), extracted verbatim into a function, no logic change."""
+
+def run_local_threshold_pass(tool_name, raw_file_path, scan_surface, mode) -> PassResult:
+    """New. Gated on: raw_file_path ends with .py, and no path component is
+    test/tests/fixtures (§2 exclusion). Not gated by manifest presence."""
+
+class PassResult(TypedDict):
+    ran: bool
+    matches_found: int | None
+    matches_cited: int | None
+    unmarked: list[tuple[int, str]]   # (line_idx, description) pairs feeding combine()'s reason text
+    detail: dict                      # pass-specific track-record fields (manifest_status/file_in_scope, or file_scanned)
+
+def combine(cross_domain: PassResult, local_threshold: PassResult, mode: str) -> CombinedResult:
+    """§3's combination rule. mode="log_only" downgrades any would-deny to decision="flag",
+    always emits allow to the caller. mode="blocking" denies if either pass has unmarked
+    matches, concatenating both passes' reasons, labeled."""
 ```
 
-Wrapper (`unsourced-threshold.sh`) contract: identical shape to `first-turn-contract.sh` verbatim
-— same stdin capture, same `timeout N` invocation, same stdout-shape validation
-(`{}`/no-`decision`-key = allow; `{"decision":"block","reason":str}` = block; anything else =
-probe failure → fail open), same `write_probe_error` fallback writer for paths where the probe
-never got to write its own line. This is a reuse, not a new design — see §7 for the one
-new-vs-inherited constant.
+This resolves review items G-6/G-7/G-8/G-9, which were raised against the discarded from-scratch
+design — see §8 for per-item disposition.
 
----
+## 8. Disposition of 05-REVIEW.md's Five Lesser Drifts (G-6 through G-9, G-4)
 
-## 7. Patterns, Dependencies, Constants
-
-| Pattern | Usage | Rationale |
+| Finding | Was about | Status under this extension design |
 |---|---|---|
-| Stop-hook wrapper + subprocess probe, bounded timeout, fail-open | `unsourced-threshold.sh` / `unsourced_threshold_probe.py` | Cited precedent: `first-turn-contract-enforcement` (`docs/tooling/first-turn-contract-enforcement.md` §3.4/§4.2, `.claude/hooks/first-turn-contract.sh`). Not redesigned per Constraints. |
-| Append-only JSONL track record | `docs/tooling/unsourced-threshold-track-record.jsonl` | Same precedent, same file family (`first-turn-contract-track-record.jsonl`) — one schema per check, not a shared file, matching the existing pattern of per-hook logs. |
-| AST-based structural matching over regex-only heuristics | `detect_threshold_literals` | §1.2 rationale — regex-only (candidate b) rejected for precision failure. |
-| Per-repo JSON config file for mode switch, separate from `settings.json` | `unsourced-threshold.config.json` | No existing precedent in this repo for a hook-specific mode file; chosen over a `settings.json` env-var because promoting to `blocking` should not require editing the hook-wiring file Frank/reviewers scrutinize for hook *registration*, only a small dedicated config. This is a new pattern, not a cited one — flagged as **PROVISIONAL, owner: wright**, revisit if a second mode-switchable hook is ever added (should the pattern generalize to a shared config, or stay per-hook). |
+| **G-6** (`base_ref` undefined) | The discarded design's Stop-hook trigger needed a git base ref to find "session-changed files." | **Moot.** This design keeps `PreToolUse` on `Edit`/`Write` (the incumbent's trigger) — there is no "changed files since session start" concept at all; the scan surface is the single tool call's own `content`/`new_string`, exactly as the incumbent already does. No base-ref resolution is needed anywhere in this document. |
+| **G-7** (`run()` takes `mode` as param AND reads config) | Same ambiguity risk exists in principle. | **Addressed directly**, not just moot: §7 specifies `run()` calls `load_mode_config()` itself, once, at the top, then passes the resulting `mode` string into `combine()` as a plain argument — config is read exactly once, by `run()`, never re-read or re-passed ambiguously. |
+| **G-8** (`ProbeResult.decision` can't express `probe_error`) | The discarded design's `ProbeResult` type omitted `probe_error`. | **Addressed.** §6's `TrackRecordEntry.decision` explicitly lists `"allow" \| "flag" \| "deny" \| "probe_error"` as one flat union, matching the incumbent's own existing pattern (its `TrackRecordEntry.decision` already includes `probe_error`) — no separate `ProbeResult` type with a narrower union is introduced by this design; `PassResult`/`CombinedResult` (§7) are per-pass/pre-decision structures, not the final logged decision. |
+| **G-9** (self-scan undefined) | Whether the new probe's own PROVISIONAL constants (a lookback bound, an exclusion set) get scanned by its own detection rule once live. | **Applies, and is now answerable concretely**: the local-threshold pass (§2) runs on any `.py` file, unconditionally except for test paths — `scripts/domain_boundary_provenance_probe.py` is not excluded, so an edit to it is self-scanned like any other file. Its own `PROXIMITY_WINDOW = 5` (incumbent, unchanged) and this document's new `PROXIMITY_WINDOW = 3` constant (§4) both already carry `# PROVISIONAL — owner: wright` comments in the source/this doc — Roadmap must verify (carried to 04-ROADMAP, not decided here) that those comments, once written into the probe file exactly as worded, actually land within 3 lines of their respective assignment per §2's context-2 name-gate (`_WINDOW` matches no threshold word in the current constant names — **flagged**: `PROXIMITY_WINDOW` does not contain limit/cap/threshold/cutoff/retry/budget/timeout/max/min, so context 2's name gate as specified would NOT flag it, meaning the self-scan produces a false negative on exactly the constant G-9 asks about). This is a real detection-rule gap this document surfaces rather than hides: `PROXIMITY_WINDOW` is a threshold by function but not by name. Not resolved by renaming (out of scope for this pass — renaming the incumbent's own `PROXIMITY_WINDOW` is an unrelated-file edit this sprint doesn't need); flagged to Roadmap as an explicit fixture case ("named constant that is a threshold by role but not by name — document as an accepted v1 detection gap, not a bug"). |
+| **G-4** (US-4 AC2 no verification path) | "No log message implies soundness" has no test. | **Still applies, unchanged from before** — this is a requirements-level testability gap independent of which design implements it. Not this document's to resolve; flagged to Roadmap the same way the review already did (a grep-based test asserting the deny/flag `reason` string template contains no soundness-implying language, e.g. no "verified correct"/"sound"/"validated" claims beyond presence-check wording). |
 
-**Anti-patterns (do not use)**:
-- Domain-crossing / import-graph detection of any kind — explicitly dropped by the 2026-09-05
-  amendment; no code path may reconstruct it.
-- Regex-only name matching as the sole detection signal (candidate b, §1.1) — rejected for
-  precision.
-- A shared track-record file across multiple hooks — breaks the one-schema-per-log precedent and
-  couples unrelated hooks' failure/log formats.
-
-### Constants introduced by this sprint (Decision Discipline compliance check)
-
-| Constant | Value | Source |
-|---|---|---|
-| Wrapper subprocess timeout | 5s | **Not a fresh number** — copied directly from `first-turn-contract.sh`'s cited 5s bound (line 72-79 of that file: "PROVISIONAL — owner: wright. 5s budget... measured directly against this probe"). That measurement does not transfer to this probe (different workload: AST-walking a diff's worth of Python files vs. parsing a transcript) — so this is re-flagged here as **PROVISIONAL, owner: wright, unmeasured for this probe**, not silently inherited as if re-validated. Must be measured against this probe's actual runtime once built (mirrors how the precedent hook measured its own 167ms/85ms figures) before this PROVISIONAL can be closed out. |
-| Citation lookback window | 3 lines | **PROVISIONAL, owner: wright** — see §2.2; no citable precedent exists in this repo for comment-adjacency depth in source code (only in narrative docs). Flagged for revisit after first real-world run against this repo. |
-| Excluded idiomatic literals | `{0, 1, -1, 2}` | **PROVISIONAL, owner: wright** — chosen by inspection of DDR-0014's own incident literals (all were far outside this set: byte caps and market-cap floors are multi-digit domain-specific numbers), not by any external benchmark. No citable source exists; flagged rather than fabricated as if derived. |
-| Name-pattern gate word list (`limit|cap|threshold|cutoff|retry|retries|budget|max|min|floor|ceiling`) | — | Not a numeric constant, so Decision Discipline's "citable precedent or PROVISIONAL" applies more loosely (it is a design choice, not a magic number) — but flagged as **PROVISIONAL, owner: wright** for completeness, since an incomplete word list has the same silent-failure shape as an uncited number: it will under-detect without anyone noticing. Revisit after first real-world run. |
-
-No constant in this table is treated as finalized without an owner or a source — every row is
-either a direct citation to an existing measured value (timeout, re-flagged as unmeasured for
-*this* probe) or an explicit named-owner PROVISIONAL.
-
-### Dependencies
+## 9. Dependencies
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| Python 3 stdlib `ast` module | (stdlib, already used by `first_turn_contract_probe.py`'s repo) | AST parsing for detection rule — no new external dependency |
-| Python 3 stdlib `subprocess`/`json`/`datetime` | (stdlib) | Wrapper/probe plumbing, matches precedent hook | 
+| Python 3 stdlib `ast` | matches existing interpreter (no new requirement) | `detect_threshold_literals` (§2) — parses `scan_surface` to find comparison/assignment/slice nodes. New import for this probe file, but stdlib, zero new third-party dependency. |
+| Python 3 stdlib (`json`, `re`, `os`, `sys`, `fnmatch`, `datetime`) | unchanged | Reused from the incumbent, no change. |
 
-No new third-party libraries — matches `first-turn-contract-enforcement`'s zero-new-dependency
-footprint.
+No new third-party dependency. Consistent with the incumbent's own zero-third-party posture
+(its §10).
+
+## 10. Patterns (delta from incumbent's §11)
+
+| Pattern | Usage | Rationale |
+|---|---|---|
+| Two independent detection passes, one combined decision | `run()` (§3) | Composes cleanly without duplicating the wrapper/probe/hook-registration machinery for a second hook entry; keeps one `PreToolUse` call, one track-record entry, one deny-schema emission per Claude Code's own one-decision-per-call constraint. |
+| Fail-safe config default (absent mode file → `log_only`, never `blocking`) | `load_mode_config` (§5) | Mirrors the incumbent's "absent manifest → allow" fail-safe posture — an unconfigured or partially-installed hook must always default toward the less disruptive behavior, never the more disruptive one. |
+| AST-based syntactic detection over regex | `detect_threshold_literals` (§2) | Reliably distinguishes "literal is a comparison operand" from "literal merely appears near a comparison token" — same rationale the discarded design already established for this specific sub-decision, unaffected by the trigger-surface correction. |
+
+**Anti-patterns (do not use), unchanged from incumbent plus one addition:**
+- General static import/reference analysis for either check — rejected (incumbent §4, unaffected).
+- Reusing `DOMAIN-BOUNDARY:` or bare `PROVISIONAL` as the new check's marker — rejected, §4.
+- **New**: a second, independent hook registration/process for the local-threshold check — rejected,
+  §3 (violates task instruction 3's explicit "same wrapper... not duplicated").
+
+## 11. Integration Points
+
+- **`.claude/settings.json`**: gains one new `PreToolUse` entry (currently absent, §5) — no entry
+  is modified or removed, since none currently exists for this hook family.
+- **`docs/tooling/domain-boundary-provenance-hook.md`**: this LOCKED doc's §2–§10 remain the
+  authoritative spec for the cross-domain pass; it is not rewritten by this sprint. A short
+  addendum section should be appended (Roadmap concern, not this document's) pointing at this
+  architecture doc for the composed local-threshold behavior, so a future reader of the LOCKED doc
+  isn't misled into thinking the hook is still single-purpose.
+- **`docs/tooling/domain-boundary-manifest.json`** (self-test fixture manifest, incumbent's own):
+  untouched — still governs only the cross-domain pass.
+- **`docs/tooling/domain-boundary-mode.json`** (new, §5): read by both passes via one `run()`-level
+  call.
+- **`HOOK-DEPLOYMENT-ROSTER.md`**: needs a status update (Roadmap concern) — the roster's existing
+  `domain-boundary-provenance` (DDR-006) row currently reflects "built, unwired"; after this
+  sprint it becomes "built, wired, `log_only`."
+
+## 12. Contradictions Flagged to `01-REQUIREMENTS.md` (not silently patched here, per task instruction)
+
+1. **US-1 AC1** still says the detection rule is "to be finalized at architecture time" (G-5,
+   already flagged by review) — now finalized by §2 of this document; the requirements doc needs
+   a pointer, not a rewrite.
+2. **US-3 / Constraints** say "reuse `first-turn-contract-enforcement`'s wrapper shape" — true in
+   spirit, but the actual reused shape is now the **incumbent domain-boundary hook's** wrapper
+   (which is itself already a reuse of `first-turn-contract.sh`'s shape, per that hook's own §11).
+   Requirements should clarify this is a two-generations-removed reuse, not a direct one, so a
+   forge reader doesn't go looking for a fresh copy of `first-turn-contract.sh`'s literal code.
+3. **Title/identity mismatch**: `01-REQUIREMENTS.md`'s Summary describes "A Stop-hook, sibling in
+   shape to `first-turn-contract-enforcement`" — this document's design is a `PreToolUse` hook
+   (inherited from the incumbent, not a `Stop` hook). This is a direct contradiction, not a
+   phrasing nuance: trigger surface changed from `Stop` to `PreToolUse` as a consequence of
+   extending the incumbent rather than building fresh. Requirements needs this corrected, not
+   just annotated.
+4. **Out of Scope** doesn't mention the incumbent's disposition at all (this was G-1's core
+   complaint) — needs an explicit line: "the incumbent `domain-boundary-provenance` hook and its
+   LOCKED spec doc are extended, not replaced or retired; no new/second hook is created."
+5. **NORTH-STAR.md**'s Success Criteria bullet "A working Stop-hook wrapper... reusing that
+   infrastructure" has the same Stop-vs-PreToolUse mismatch as item 3 above; per this repo's
+   Decision Discipline, Danny personally reviews North Star doc edits before any change to this
+   file is treated as locked — flagged for that review, not edited here.
+
+## 13. Open Items Carried to Forge
+
+- **§2's exclusion set and name-word list** — PROVISIONAL, owner wright, unmeasured (unchanged
+  disposition from the prior pass, re-hosted here).
+- **§4's 3-line window** — PROVISIONAL, owner wright, unmeasured, deliberately independent from
+  the incumbent's 5-line window.
+- **§8's `PROXIMITY_WINDOW` self-scan false-negative** — an accepted, explicitly documented v1
+  detection gap (constant is a threshold by role, not by name), not a blocking issue, but must be
+  captured as a named fixture case in the roadmap's test corpus, not silently absent from it.
+- **§11's roster/LOCKED-doc addendum updates** — Roadmap-level housekeeping, not architecture.
 
 ---
 
-## 8. Integration Points
-
-- **`.claude/settings.json`**: add a new `Stop` hook entry, sibling to the existing
-  `first-turn-contract.sh` entry (same array, additional object) — does not replace or reorder the
-  existing entry.
-- **`docs/tooling/`**: new track-record log and a new `unsourced-threshold-enforcement.md` spec
-  doc (implementation-time artifact, mirroring `first-turn-contract-enforcement.md`'s role as the
-  probe's own detailed spec — out of scope for this architecture doc to pre-write, but flagged so
-  forge knows it's expected, matching the precedent hook's documentation shape).
-- **`git`**: probe shells out to `git diff` (or reads `git status`-equivalent) to find the current
-  session's changed files — read-only, no git state mutation.
-- **DDR-0014** (`gap-lens-dilution-filter`): this build implements the detection rule DDR-0014
-  assigned to agent-rig; no code-level integration, citation-only per Constraints.
-
----
-
-## 9. Mode Switch: `log_only` vs `blocking`
-
-- Config file `unsourced-threshold.config.json` (§4) is read by the probe at the start of `run()`.
-  Missing file or missing `mode` key defaults to `log_only` (fail-safe default, not just
-  initial-install default — matches Edge Cases table row "no repo's hook ships in blocking mode").
-- `log_only`: `ProbeResult.decision` is always `"allow"` regardless of `flagged`; the flagged list
-  is still fully populated and written to the track-record log (US-2's "writes findings... does
-  not block").
-- `blocking`: `ProbeResult.decision` is `"block"` if `flagged` is non-empty, `"allow"` otherwise.
-  The wrapper relays this exactly as `first-turn-contract.sh` relays its probe's block/allow
-  (§6's contract) — no new relay logic needed in the wrapper.
-- No migration/upgrade path is implemented for auto-promoting a repo from `log_only` to
-  `blocking` — promotion is a manual one-line edit to the config file by the repo owner, per
-  Constraints ("never bundled into initial install").
-
----
-
-## 10. Requirements Coverage
-
-| Requirement | Covered by |
-|---|---|
-| US-1 (detect + flag) | §1 detection rule, §5 `FlaggedLiteral`, §6 `detect_threshold_literals` |
-| US-1 AC4 (no domain-crossing condition) | §1.2 rule contains no import/boundary check anywhere; §0 restated |
-| US-2 (log_only default, blocking opt-in) | §9 |
-| US-3 (fail-open, bounded timeout, append-only log) | §3 trigger, §6 wrapper contract (verbatim reuse), §7 timeout constant, §5 track-record schema |
-| US-4 (presence-only, no soundness judgment) | §2 citation convention checks presence of tag/citation text only, never evaluates truth of a citation's content — no code path in §6 does so |
-| AD-1 | §1 (this document's core resolution) |
-| Every introduced constant sourced/PROVISIONAL | §7 table |
-
----
-
-## 11. Non-Goals (explicit, for Frank/forge)
-
-- Multi-language support beyond Python (§1.2).
-- Full-repo baseline scan as a hook responsibility (§3) — a one-time manual invocation of the
-  probe script directly (not via the Stop hook) is the intended path for initial-triage baselining
-  of a newly-installed repo; this is not a separate component, just the same probe script run
-  by hand with `changed_files` supplied as the full file list instead of a git diff.
-- Auto-promotion from `log_only` to `blocking`.
-- Retrofit into `gap-lens-dilution-filter` or any other repo (Out of Scope, requirements).
-- Solving DDR-010's overlapping shape (`market_data`).
-
----
-
-## HALT Check
-
-No HALT triggered. AD-1 is resolved with one concrete rule (§1.2), no design decision was left
-"configurable," and every introduced constant is either cited (timeout, re-flagged as
-unmeasured-for-this-probe) or an explicit named-owner PROVISIONAL (lookback window, idiomatic
-literal set, name-pattern word list, config-file-vs-settings.json pattern choice). The one item
-carried forward as a known gap rather than resolved here: the 5s timeout's applicability to this
-probe's actual (not yet measured) runtime — this is not a HALT because the precedent hook's own
-process was identical (ship a PROVISIONAL bound, measure at forge time, tighten if needed), not a
-gap unique to this sprint.
+*This document does not self-lock. Per this repo's workflow, it proceeds to Frank's binding
+spec-gate and human approval before any status change from DRAFT — including explicit review of
+this revision's resolution of OQ-A/OQ-B against the human decision already given (extend, not
+replace).*

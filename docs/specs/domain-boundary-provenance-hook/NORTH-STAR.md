@@ -3,13 +3,16 @@
 **Date**: 2026-09-05
 
 ## Declared Intent
-Build a Stop-hook that mechanically flags any numeric or boolean literal used as a threshold,
-cap, limit, cutoff, retry count, or budget that lacks a citation, a named-owner PROVISIONAL tag,
-or removal at its point of definition — regardless of whether the value crossed a domain boundary
-between pipelines. Traces to Intake's amended Problem Statement (`INTAKE.md`, 2026-09-05
-amendment): PROMOTED DEFAULT does not require a boundary crossing, and the original
-domain-crossing-only trigger required an unoperationalizable judgment call that this sprint drops
-in favor of a mechanically checkable rule.
+Extend the existing, Frank-forge-gate-PASSED `domain-boundary-provenance` PreToolUse hook
+(`.claude/hooks/domain-boundary-provenance.sh` + `scripts/domain_boundary_provenance_probe.py`)
+with a new same-file/local detection pass that mechanically flags any numeric or boolean literal
+used as a threshold, cap, limit, cutoff, retry count, or budget that lacks a citation, a
+named-owner PROVISIONAL tag, or removal at its point of definition — regardless of whether the
+value crossed a domain boundary between pipelines. The incumbent's manifest-gated cross-domain
+check stays untouched; this is an extension, not a replacement. Traces to Intake's amended
+Problem Statement (`INTAKE.md`, 2026-09-05 amendment): PROMOTED DEFAULT does not require a
+boundary crossing, and the original domain-crossing-only trigger required an unoperationalizable
+judgment call that this sprint drops in favor of a mechanically checkable rule.
 
 ## In Scope / Out of Scope
 See `01-REQUIREMENTS.md` Out of Scope once written. Confirmed via Interview (`INTERVIEW.md` Q1):
@@ -17,9 +20,11 @@ this sprint is agent-rig build only — it does not execute retrofit into gap-le
 or the wider repo roster; that is separate follow-on work.
 
 ## Success Criteria (Layer 1 — fidelity)
-- A working Stop-hook wrapper, sibling to `first-turn-contract-enforcement`'s shape (bounded
-  timeout, fail-open on internal error, append-only track-record log), reusing that
-  infrastructure rather than redesigning it (Interview Q2).
+- A working PreToolUse extension to the incumbent `domain-boundary-provenance` hook, reusing its
+  wrapper/probe split (itself already a reuse of `first-turn-contract-enforcement`'s shape —
+  bounded timeout, fail-open on internal error, append-only track-record log) rather than
+  redesigning it or building a second hook (Interview Q2, Architecture §12 correction, Danny
+  wording approval 2026-09-05).
 - A concrete, checkable detection rule for "threshold-shaped literal" is specified and
   implemented — not deferred as "configurable" or "finalized at implementation time."
 - The check verifies citation/PROVISIONAL-tag/removal presence only — it does not judge whether
