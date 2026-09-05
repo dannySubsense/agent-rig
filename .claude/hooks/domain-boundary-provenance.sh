@@ -34,15 +34,54 @@ cat >"$STDIN_FILE"
 # emit_allow either). On a clean exit-0 run the probe's own run()/main() already wrote a line
 # (allow, deny, or its own probe_error) — this function must not run on that path, or it would
 # double-log. Never lets a failure here affect the wrapper's own exit code.
+# Resolve the mode field for a probe_error entry the wrapper constructs itself (Architecture §6's
+# resolution of 05-REVIEW.md G-5: mode is non-nullable, so the wrapper must independently read
+# docs/tooling/domain-boundary-mode.json using the identical fail-safe default
+# load_mode_config (scripts/domain_boundary_provenance_probe.py) applies: file absent, unreadable,
+# or schema-invalid (not a JSON object, or schemaVersion != 1, or mode not in
+# {"log_only","blocking"}) -> "log_only"; otherwise the file's mode value verbatim. A minimal
+# shell-native read is sufficient here -- jq if available, else grep/sed, else "log_only" on any
+# failure.
+resolve_wrapper_mode() {
+  local project_dir="$1"
+  local mode_path="$project_dir/docs/tooling/domain-boundary-mode.json"
+  local mode=""
+
+  if [ ! -f "$mode_path" ]; then
+    echo "log_only"
+    return
+  fi
+
+  if command -v jq >/dev/null 2>&1; then
+    mode="$(jq -er 'if (.schemaVersion == 1) and (.mode == "log_only" or .mode == "blocking") then .mode else empty end' "$mode_path" 2>/dev/null)" || mode=""
+  fi
+
+  if [ -z "$mode" ]; then
+    # Fallback: grep/sed extraction. Only trust it if schemaVersion is present and equal to 1
+    # somewhere in the file (best-effort, not a real JSON parse) and the extracted mode value is
+    # one of the two allowed literals.
+    if grep -q '"schemaVersion"[[:space:]]*:[[:space:]]*1' "$mode_path" 2>/dev/null; then
+      mode="$(grep -m 1 -o '"mode"[[:space:]]*:[[:space:]]*"[^"]*"' "$mode_path" 2>/dev/null | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/')"
+    fi
+  fi
+
+  case "$mode" in
+    log_only|blocking) echo "$mode" ;;
+    *) echo "log_only" ;;
+  esac
+}
+
 write_probe_error() {
   local cause="$1"
-  python3 - "$CLAUDE_PROJECT_DIR" "$STDIN_FILE" "$cause" <<'PYEOF' || true
+  local mode
+  mode="$(resolve_wrapper_mode "$CLAUDE_PROJECT_DIR")"
+  python3 - "$CLAUDE_PROJECT_DIR" "$STDIN_FILE" "$cause" "$mode" <<'PYEOF' || true
 import json
 import os
 import sys
 from datetime import datetime, timezone
 
-project_dir, stdin_path, cause = sys.argv[1], sys.argv[2], sys.argv[3]
+project_dir, stdin_path, cause, mode = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 track_record_path = os.path.join(
     project_dir, "docs", "tooling", "domain-boundary-provenance-track-record.jsonl"
 )
@@ -62,15 +101,26 @@ try:
 except Exception:
     pass
 
+if mode not in ("log_only", "blocking"):
+    mode = "log_only"
+
 entry = {
     "timestamp": datetime.now(timezone.utc).isoformat(),
     "session_id": session_id,
     "tool_name": tool_name,
     "file_path": file_path,
-    "manifest_status": "absent_or_invalid",
-    "file_in_scope": None,
-    "matches_found": None,
-    "matches_cited": None,
+    "mode": mode,
+    "cross_domain": {
+        "manifest_status": "absent_or_invalid",
+        "file_in_scope": None,
+        "matches_found": None,
+        "matches_cited": None,
+    },
+    "local_threshold": {
+        "file_scanned": False,
+        "matches_found": None,
+        "matches_cited": None,
+    },
     "decision": "probe_error",
     "reason": None,
     "probe_error": cause,

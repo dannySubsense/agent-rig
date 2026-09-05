@@ -193,6 +193,175 @@ EXPECTED_REPO="$(cd "$fake_repo" && pwd -P)"
 ACTUAL_VAL="${STDERR_CONTENT#*SET:}"
 assert_eq "\$CLAUDE_PROJECT_DIR defaults to the wrapper's own resolved repo root" "$EXPECTED_REPO" "$ACTUAL_VAL"
 
+# --- Test 6: probe_error entry has mode "log_only" when the mode config is absent -------------
+fake_repo="$FAKE_PROBE_DIR/repo6"
+rm -rf "$fake_repo"
+mkdir -p "$fake_repo/.claude/hooks" "$fake_repo/scripts" "$fake_repo/docs/tooling"
+cp "$WRAPPER" "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
+cat >"$fake_repo/scripts/domain_boundary_provenance_probe.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+print("boom", file=sys.stderr)
+sys.exit(1)
+EOF
+chmod +x "$fake_repo/scripts/domain_boundary_provenance_probe.py"
+# No docs/tooling/domain-boundary-mode.json is written -- absent config.
+
+echo '{"session_id":"s1","tool_name":"Edit","tool_input":{"file_path":"x.py"},"cwd":"'"$fake_repo"'"}' \
+  | env CLAUDE_PROJECT_DIR="$fake_repo" bash "$fake_repo/.claude/hooks/domain-boundary-provenance.sh" >/dev/null
+MODE_VAL="$(cat "$fake_repo/docs/tooling/domain-boundary-provenance-track-record.jsonl" \
+  | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["mode"])')"
+assert_eq "absent mode config: probe_error entry mode is log_only" "log_only" "$MODE_VAL"
+
+# --- Test 7: probe_error entry has mode "blocking" when the mode config says blocking ----------
+fake_repo="$FAKE_PROBE_DIR/repo7"
+rm -rf "$fake_repo"
+mkdir -p "$fake_repo/.claude/hooks" "$fake_repo/scripts" "$fake_repo/docs/tooling"
+cp "$WRAPPER" "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
+cat >"$fake_repo/scripts/domain_boundary_provenance_probe.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+print("boom", file=sys.stderr)
+sys.exit(1)
+EOF
+chmod +x "$fake_repo/scripts/domain_boundary_provenance_probe.py"
+cat >"$fake_repo/docs/tooling/domain-boundary-mode.json" <<'EOF'
+{"schemaVersion": 1, "mode": "blocking"}
+EOF
+
+echo '{"session_id":"s1","tool_name":"Edit","tool_input":{"file_path":"x.py"},"cwd":"'"$fake_repo"'"}' \
+  | env CLAUDE_PROJECT_DIR="$fake_repo" bash "$fake_repo/.claude/hooks/domain-boundary-provenance.sh" >/dev/null
+MODE_VAL="$(cat "$fake_repo/docs/tooling/domain-boundary-provenance-track-record.jsonl" \
+  | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["mode"])')"
+assert_eq "blocking mode config: probe_error entry mode is blocking" "blocking" "$MODE_VAL"
+
+# --- Test 8: probe_error entries never write null/None for mode, across timeout / non-zero /----
+# malformed-stdout paths, using the default (no mode config present) fixtures already exercised
+# in Tests 1-3's fake repos.
+for repo_dir in "$FAKE_PROBE_DIR/repo" "$FAKE_PROBE_DIR/repo2" "$FAKE_PROBE_DIR/repo3"; do
+  if [ -f "$repo_dir/docs/tooling/domain-boundary-provenance-track-record.jsonl" ]; then
+    MODE_VAL="$(cat "$repo_dir/docs/tooling/domain-boundary-provenance-track-record.jsonl" \
+      | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["mode"])')"
+    assert_eq "$repo_dir: mode is never null" "true" "$([ "$MODE_VAL" != "None" ] && [ -n "$MODE_VAL" ] && echo true || echo false)"
+  fi
+done
+
+# --- Test 9: nested schema shape -- probe_error entry has cross_domain/local_threshold objects -
+# (Slice 7's migrated TrackRecordEntry shape, not the old flat shape.)
+SHAPE_OK="$(cat "$FAKE_PROBE_DIR/repo2/docs/tooling/domain-boundary-provenance-track-record.jsonl" \
+  | python3 -c '
+import json, sys
+e = json.loads(sys.stdin.read())
+ok = (
+    isinstance(e.get("cross_domain"), dict)
+    and isinstance(e.get("local_threshold"), dict)
+    and e.get("decision") == "probe_error"
+    and "mode" in e
+)
+print("true" if ok else "false")
+')"
+assert_eq "probe_error entry uses migrated nested cross_domain/local_threshold schema" "true" "$SHAPE_OK"
+
+# --- Test 10: malformed JSON mode config -> log_only (fail-safe, not a real JSON parse) --------
+fake_repo="$FAKE_PROBE_DIR/repo10"
+rm -rf "$fake_repo"
+mkdir -p "$fake_repo/.claude/hooks" "$fake_repo/scripts" "$fake_repo/docs/tooling"
+cp "$WRAPPER" "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
+cat >"$fake_repo/scripts/domain_boundary_provenance_probe.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+print("boom", file=sys.stderr)
+sys.exit(1)
+EOF
+chmod +x "$fake_repo/scripts/domain_boundary_provenance_probe.py"
+printf '{not valid json at all' >"$fake_repo/docs/tooling/domain-boundary-mode.json"
+
+echo '{"session_id":"s1","tool_name":"Edit","tool_input":{"file_path":"x.py"},"cwd":"'"$fake_repo"'"}' \
+  | env CLAUDE_PROJECT_DIR="$fake_repo" bash "$fake_repo/.claude/hooks/domain-boundary-provenance.sh" >/dev/null
+MODE_VAL="$(cat "$fake_repo/docs/tooling/domain-boundary-provenance-track-record.jsonl" \
+  | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["mode"])')"
+assert_eq "malformed JSON mode config: probe_error entry mode is log_only" "log_only" "$MODE_VAL"
+
+# --- Test 11: valid JSON, missing "mode" key -> log_only ---------------------------------------
+fake_repo="$FAKE_PROBE_DIR/repo11"
+rm -rf "$fake_repo"
+mkdir -p "$fake_repo/.claude/hooks" "$fake_repo/scripts" "$fake_repo/docs/tooling"
+cp "$WRAPPER" "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
+cat >"$fake_repo/scripts/domain_boundary_provenance_probe.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+print("boom", file=sys.stderr)
+sys.exit(1)
+EOF
+chmod +x "$fake_repo/scripts/domain_boundary_provenance_probe.py"
+cat >"$fake_repo/docs/tooling/domain-boundary-mode.json" <<'EOF'
+{"schemaVersion": 1}
+EOF
+
+echo '{"session_id":"s1","tool_name":"Edit","tool_input":{"file_path":"x.py"},"cwd":"'"$fake_repo"'"}' \
+  | env CLAUDE_PROJECT_DIR="$fake_repo" bash "$fake_repo/.claude/hooks/domain-boundary-provenance.sh" >/dev/null
+MODE_VAL="$(cat "$fake_repo/docs/tooling/domain-boundary-provenance-track-record.jsonl" \
+  | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["mode"])')"
+assert_eq "missing mode key: probe_error entry mode is log_only" "log_only" "$MODE_VAL"
+
+# --- Test 12: wrong schemaVersion -> log_only (mirrors Slice 2's load_mode_config bug class) ----
+fake_repo="$FAKE_PROBE_DIR/repo12"
+rm -rf "$fake_repo"
+mkdir -p "$fake_repo/.claude/hooks" "$fake_repo/scripts" "$fake_repo/docs/tooling"
+cp "$WRAPPER" "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
+cat >"$fake_repo/scripts/domain_boundary_provenance_probe.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+print("boom", file=sys.stderr)
+sys.exit(1)
+EOF
+chmod +x "$fake_repo/scripts/domain_boundary_provenance_probe.py"
+cat >"$fake_repo/docs/tooling/domain-boundary-mode.json" <<'EOF'
+{"schemaVersion": 2, "mode": "blocking"}
+EOF
+
+echo '{"session_id":"s1","tool_name":"Edit","tool_input":{"file_path":"x.py"},"cwd":"'"$fake_repo"'"}' \
+  | env CLAUDE_PROJECT_DIR="$fake_repo" bash "$fake_repo/.claude/hooks/domain-boundary-provenance.sh" >/dev/null
+MODE_VAL="$(cat "$fake_repo/docs/tooling/domain-boundary-provenance-track-record.jsonl" \
+  | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["mode"])')"
+assert_eq "wrong schemaVersion: probe_error entry mode is log_only" "log_only" "$MODE_VAL"
+
+# --- Test 13: jq-unavailable fallback (grep/sed extraction) still resolves mode correctly -------
+# Forces resolve_wrapper_mode's jq branch to be skipped by hiding jq from PATH, proving the
+# fallback path is actually exercised rather than assumed-present.
+fake_repo="$FAKE_PROBE_DIR/repo13"
+rm -rf "$fake_repo"
+mkdir -p "$fake_repo/.claude/hooks" "$fake_repo/scripts" "$fake_repo/docs/tooling"
+cp "$WRAPPER" "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
+cat >"$fake_repo/scripts/domain_boundary_provenance_probe.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+print("boom", file=sys.stderr)
+sys.exit(1)
+EOF
+chmod +x "$fake_repo/scripts/domain_boundary_provenance_probe.py"
+cat >"$fake_repo/docs/tooling/domain-boundary-mode.json" <<'EOF'
+{"schemaVersion": 1, "mode": "blocking"}
+EOF
+
+NO_JQ_DIR="$FAKE_PROBE_DIR/no-jq-path"
+mkdir -p "$NO_JQ_DIR"
+for bin in bash python3 sh env cat grep sed timeout mkdir rm cp chmod mktemp dirname wc printf; do
+  real="$(command -v "$bin" 2>/dev/null)"
+  [ -n "$real" ] && ln -sf "$real" "$NO_JQ_DIR/$bin"
+done
+
+if command -v jq >/dev/null 2>&1; then
+  echo '{"session_id":"s1","tool_name":"Edit","tool_input":{"file_path":"x.py"},"cwd":"'"$fake_repo"'"}' \
+    | env -i CLAUDE_PROJECT_DIR="$fake_repo" PATH="$NO_JQ_DIR" HOME="$HOME" \
+      bash "$fake_repo/.claude/hooks/domain-boundary-provenance.sh" >/dev/null
+  MODE_VAL="$(cat "$fake_repo/docs/tooling/domain-boundary-provenance-track-record.jsonl" \
+    | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["mode"])')"
+  assert_eq "jq unavailable: grep/sed fallback resolves mode blocking" "blocking" "$MODE_VAL"
+else
+  echo "SKIP: jq not installed in this environment -- cannot prove a jq-present vs jq-absent contrast; fallback path is exercised by default in Tests 6/7/10/11/12 either way."
+fi
+
 echo
 echo "----------------------------------------"
 echo "PASS: $PASS  FAIL: $FAIL"
