@@ -55,6 +55,15 @@ This is a cross-cutting behavioral discipline, not a fix to one agent's habits �
 2. **Risk-averse** — among defensible options, the one with the smallest, most reversible blast radius.
 3. **Aligned with best practices and industry standards** — for the domain in question; a novel or idiosyncratic approach needs a stated reason, it isn't the default.
 4. **YAGNI-compliant** — no speculative generality, configuration, or abstraction beyond what the decision at hand actually needs.
+5. **Slow and safe — speed is not a measure of progress; speed kills** (added 2026-09-05, Danny). A
+   recommendation that trades verification for velocity is not more correct for having arrived
+   faster — it is a smaller sample of checking dressed up as decisiveness. This session's own
+   domain-boundary-provenance-hook sprint is the concrete case: a scoped Frank brief and a
+   chat-transcribed benchmark both let a design regression (a fix that killed the hook's ability to
+   detect the exact incident shape it exists for) pass as fast, clean progress through two gate
+   rounds — caught only when a cold, unscoped, unhurried re-check ran. Throughput on gates, spec
+   cycles, or fix-and-regate loops is not itself evidence of correctness, and "we moved fast through
+   N rounds" is never, on its own, a reason to trust round N+1 more than round 1.
 
 A flat menu without a stated recommendation is only appropriate when the decision is irreducibly a preference/values call with no technically correct answer (e.g. project naming, repo visibility) — and even there, the agent states its own lean rather than presenting it neutrally. This criterion applies wherever Q3 is reached, regardless of which upstream branch (Fork or Confirm) produced it.
 
