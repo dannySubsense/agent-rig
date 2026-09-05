@@ -20,14 +20,24 @@
       transcribed into this file's `## Forge Gate` section — "all slices done" is not "sprint done."
 
 ## Current
-Slice: 3
-Step: @code-executor
+Slice: 4
+Step: @test-runner (re-run after N/A regex fix)
 Last updated: 2026-09-05
 
 ## Fix Attempts
 | Test/File | Attempts | Last Error |
 |-----------|----------|------------|
-| test_threshold_marker_placeholder_owner_* (Slice 4) | 1 | `owner: N/A` captured as `"N"` (regex char class excluded `/`), not blocklisted — fix routed to @code-executor, widening char class |
+| test_threshold_marker_placeholder_owner_* (Slice 4) | 1 | `owner: N/A` captured as `"N"` (regex char class excluded `/`), not blocklisted — FIXED, verified, 202/202 passing under pytest |
+
+## Notes
+- 2026-09-05: `tests/test_domain_boundary_provenance_probe.py` has a legacy standalone `__main__`
+  test runner alongside its pytest-collected tests. The standalone runner doesn't support pytest
+  fixtures (`tmp_path`), so 12 fixture-using tests (all pre-existing, from Slices 1-2, not Slice 4)
+  fail under `python3 tests/test_domain_boundary_provenance_probe.py` direct invocation with
+  "list index out of range" — while the same tests pass under `pytest`. This is a pre-existing
+  dual-runner inconsistency, not a regression. Pytest is this repo's actual test framework (used
+  to verify every slice so far); treating pytest's 202/202 as authoritative. Not fixed in this
+  slice — flagging as a known gap, not blocking.
 
 ## Spec Gate
 
