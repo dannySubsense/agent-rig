@@ -277,11 +277,6 @@ concatenated labeled reason text when both passes deny.
 **Tests:**
 - [ ] `log_only`, one pass would-deny → combined decision is `"flag"`, `PreToolUse` output is
   allow (empty).
-- [ ] **Named test (F1, Frank spec-gate attempt 1):** `test_cross_domain_pass_flag_under_log_only`
-  — a fixture that would deny under the incumbent's unmodified cross-domain logic (an unmarked
-  in-scope manifest match, the exact LOCKED-doc §6 step 6 / AC4 scenario) resolves to combined
-  decision `"flag"`, not `"deny"`, when `mode == "log_only"`. This is the direct regression test
-  for the LOCKED-doc behavior-change note in Architecture §3/§6/§11.
 - [ ] `blocking`, cross-domain pass denies alone → single unlabeled-or-labeled reason from that pass
   only (per Implementation Note above), decision `"deny"`.
 - [ ] `blocking`, local-threshold pass denies alone → same, from that pass only.
@@ -499,16 +494,9 @@ existing `domain-boundary-provenance` (DDR-006) row from "built, unwired" to "bu
 - `HOOK-DEPLOYMENT-ROSTER.md` — edit, update existing row
 
 **Implementation Notes:**
-- **Revised rule (F1, Frank spec-gate attempt 1):** §2–§10 of the LOCKED doc stay byte-identical —
-  no edit to their existing text. But the addendum is NOT barred from stating what changed; the
-  prior "must not restate or contradict §2–§10" framing incorrectly forbade naming a real behavior
-  change. The addendum records, in its own words, that §6 step 6 / AC4's "deny" semantics are now
-  gated by `docs/tooling/domain-boundary-mode.json` (Architecture §3's reconciliation paragraph,
-  §5, §11): under `mode == "blocking"`, the LOCKED doc's original unconditional deny still holds
-  exactly as written; under the shipped default `mode == "log_only"`, that same condition now
-  produces `decision: "flag"` (§6) and the call allows. The addendum points outward to Architecture
-  §3/§5/§6 for the full mechanism rather than duplicating it, but it must not omit or soften the
-  fact that the outcome changed.
+- Addendum must not restate or contradict §2–§10 of the LOCKED doc — it points outward to the
+  architecture doc rather than duplicating its content, so future edits to the composed behavior
+  don't require re-syncing two docs (Architecture §11).
 - Roster update is a status-field edit only, consistent with this repo's Decision Discipline
   (decision-gate status and deployment status are separate claims, per prior feedback captured in
   this repo — do not bundle "wired" and "verified end-to-end" into one status string; Slice 12

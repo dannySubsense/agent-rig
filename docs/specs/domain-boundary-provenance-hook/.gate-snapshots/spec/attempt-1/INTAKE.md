@@ -83,15 +83,10 @@ be strongest (OQ-5, found 2026-08-20, ruled/removed 2026-08-22).
 
 ## What Is Missing
 
-1. **A same-file/local detection pass for threshold-shaped literals with no citation at their
-   definition.** (Corrected 2026-09-05, Danny re-initialed — Frank's spec-gate caught this line as
-   stale.) The cross-domain half of this check already exists and shipped (v1, PR #11, Frank
-   forge-gate PASS, `.claude/hooks/domain-boundary-provenance.sh` +
-   `scripts/domain_boundary_provenance_probe.py`) — it is built but not currently wired live. This
-   item is about extending that existing mechanism with a new detection pass, not building from
-   nothing. Prior to this correction, both source incidents (still true) were caught by
-   audit/measurement after the fact, not by anything running unattended — the extension closes
-   that gap for the same-file case the v1 manifest-gated check structurally cannot see.
+1. **A hook that detects a threshold-shaped literal with no citation at its definition.**
+   Currently nothing exists — the check is entirely a documented convention (CLAUDE.md Rule 1,
+   the `benchmark` agent) that depends on someone remembering to run it. Both source incidents
+   were caught by audit/measurement after the fact, not by anything running unattended.
 2. **A definition of "threshold-shaped literal."** (Amended 2026-09-05 — was "outside this
    pipeline's own config/spec," dropped with the domain-crossing trigger.) Needs a general,
    checkable rule for which numeric/boolean literals count as thresholds/caps/limits/cutoffs
@@ -100,10 +95,8 @@ be strongest (OQ-5, found 2026-08-20, ruled/removed 2026-08-22).
 3. **A citation convention the hook checks against.** Likely reuses this repo's existing
    PROVISIONAL-tag convention (CLAUDE.md Decision Discipline) rather than inventing a new format,
    but that reuse is not yet confirmed as sufficient for this check's needs.
-4. **The incumbent PreToolUse hook wired into `.claude/settings.json`** (built but currently not
-   live — no entry present, confirmed 2026-09-05) **plus the new local-threshold pass composed
-   into the same wrapper/probe**, not a second hook or a Stop-hook trigger. (Corrected 2026-09-05,
-   same pass as item 1 above.)
+4. **A Stop-hook (or equivalent trigger) wired into `.claude/settings.json`**, sibling to
+   `first-turn-contract.sh`, with its own track-record log per this repo's established pattern.
 5. **A first retrofit target.** `gap-lens-dilution-filter` is the origin and the obvious first
    target per DDR-0014; beyond that, this repo's existing retrofit-roster pattern
    (`signpost-pillar-propagation`'s target list) applies rather than a fresh survey — but scope for

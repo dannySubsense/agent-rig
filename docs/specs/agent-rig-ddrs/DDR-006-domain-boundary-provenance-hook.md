@@ -1,10 +1,20 @@
-# DDR-006 — Domain-Boundary Provenance Hook (implementation-side record)
+# DDR-006 — Unsourced-Threshold Provenance Hook (implementation-side record, renamed 2026-09-05, was "Domain-Boundary Provenance Hook")
 
-**Status**: DRAFT — ownership accepted, not yet spec'd/forged
+**Status**: **Corrected 2026-09-05 — v1 already SHIPPED, currently unwired; extension in
+spec-gate.** v1 (domain-crossing-only scope) was specced, forged, Frank-forge-gate PASSED (attempt
+3/3 + supplementary), and merged — PR #11, `.claude/hooks/domain-boundary-provenance.sh` +
+`scripts/domain_boundary_provenance_probe.py`, LOCKED spec at
+`docs/tooling/domain-boundary-provenance-hook.md`. **It is built but not currently wired into
+`.claude/settings.json`** — confirmed by direct read, no live entry. A 2026-09-05 scope-broadening
+amendment (see DDR-0014 §"Amendment, 2026-09-05") extends this hook with a new same-file/local
+threshold detection pass; that extension sprint (`docs/specs/domain-boundary-provenance-hook/`) is
+currently in Frank's binding spec-gate loop (attempt 1/3 FAIL, in remediation) as of this
+correction. This file previously described v1 as "not yet spec'd/forged" — that was stale from
+before the original build shipped and is corrected here.
 **Author**: wright
-**Date**: 2026-08-22
+**Date**: 2026-08-22 (v1), corrected 2026-09-05
 **Scope**: cross-project — implemented and stewarded in agent-rig, run against any homelab
-pipeline that reads a constant/cap/flag across a domain boundary.
+pipeline that has an unsourced threshold-shaped literal (own-pipeline or cross-domain).
 
 ---
 
@@ -41,29 +51,37 @@ replacement for, the `benchmark` agent (which judges whether an *existing* citat
 good) — this hook only closes the "no citation at all" gap, unattended, without needing an agent
 dispatch to be remembered.
 
-## 2. Not yet decided (open, per this DDR's DRAFT status)
+## 2. Resolved in v1 (shipped, PR #11)
 
-- **Hook event and trigger surface.** Candidates: PreToolUse (on Edit/Write to pipeline
-  config/data files), a pre-commit-style check, or a scheduled/on-demand scan. Needs the same
-  design rigor `first-turn-contract-enforcement` went through (Frank spec-gate, live-verified
-  field/event claims, not assumed) before implementation.
-- **What counts as "outside this pipeline's own config/spec."** DDR-0014 gives two clear positive
-  examples (a DB column owned by a different domain; an imported module's constant) but the
-  general detection rule — how the hook tells a cross-boundary read from a normal same-repo
-  import — is not yet specified.
-- **What counts as a valid citation**, and where it must live (inline comment, a docs file, a
-  structured tag) — needs a decision, likely reusing this repo's existing PROVISIONAL-tag
-  convention (CLAUDE.md Decision Discipline) rather than inventing a new one.
-- **Rollout scope**: which repos this runs against first. gap-lens-dilution-filter is the origin
-  and an obvious first target; beyond that follows this repo's existing retrofit-roster pattern
-  (`signpost-pillar-propagation`'s target list) rather than a fresh survey.
-- **Sequencing against DDR-005.** This hook is one concrete instance of DDR-005's general thesis
-  (mechanize conduct, don't leave it as prose) — worth building as DDR-005's first real test case
-  rather than a separate track, per DDR-005 §5's own named-test framing.
+- **Hook event and trigger surface: PreToolUse**, on Edit/Write, gated by an explicit per-repo
+  manifest (`docs/tooling/domain-boundary-manifest.json`) — not pre-commit, not scheduled. See
+  `docs/tooling/domain-boundary-provenance-hook.md` §3 for full rationale.
+- **Detection rule: explicit manifest** (`pipelineConfigGlobs` + `externalSourceIdentifiers`), not
+  static import/reference analysis. See that spec's §4.
+- **Citation convention: `DOMAIN-BOUNDARY:` marker**, 5-line proximity window, PROVISIONAL owner
+  wright. PROVISIONAL-tag reuse was explicitly considered and rejected (semantically wrong claim).
+  See that spec's §5.
+- **Rollout scope**: agent-rig build only (Intake OQ-4). Retrofit into gap-lens-dilution-filter or
+  elsewhere is separate, later work — not yet started as of this correction.
 
-## 3. Next step
+## 3. Not yet decided (open, per the 2026-09-05 extension sprint currently in progress)
 
-Intake, per this repo's standard workflow (Intake mandatory before spec). Not yet written.
+- **Wiring v1 live**: `.claude/settings.json` has no entry for this hook. Getting it live (under
+  `log_only`, per the extension sprint's Architecture §11/§3) is in scope for the current
+  extension sprint, not a separate future task.
+- **Extension detection rule** for same-file/local threshold-shaped literals (the 2026-09-05
+  amendment's scope) — being resolved in `docs/specs/domain-boundary-provenance-hook/02-ARCHITECTURE.md`
+  (currently in Frank spec-gate remediation, attempt 1/3 FAIL, fixes in progress).
+- **Sequencing against DDR-005.** Unchanged from v1 — still one concrete instance of DDR-005's
+  general thesis.
+
+## 4. Next step
+
+Frank's binding spec-gate for the extension sprint, attempt 2/3 (attempt 1 FAILed on two blocking
+findings, both routed for correction as of this update). See
+`docs/specs/domain-boundary-provenance-hook/GATE-LOG.md` for current state — read that file
+directly rather than trusting this DDR's account of it, since this DDR was itself found stale in
+this same correction pass.
 
 ---
 

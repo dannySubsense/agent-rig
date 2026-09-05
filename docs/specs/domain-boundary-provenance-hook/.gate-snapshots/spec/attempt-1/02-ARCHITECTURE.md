@@ -160,20 +160,6 @@ this pass in blocking mode," which §5 already guarantees as the initial state. 
 decision is made or implied by this document; this paragraph exists so a future promoter meets the
 LOCKED doc's argument explicitly rather than rediscovering or silently overriding it.
 
-**Explicit naming of the LOCKED-doc behavior change (F1, Frank spec-gate attempt 1).** The above
-reconciliation has a direct, previously-unstated consequence for the incumbent's own LOCKED text:
-`docs/tooling/domain-boundary-provenance-hook.md` §6 step 6 and AC4 currently read as unconditional
-— "an unmarked identifier match → deny" / "an unmarked cross-domain read is denied." **That is no
-longer true as shipped by this sprint.** Under the `mode` gate (§5), the cross-domain pass's deny
-now fires only when `mode == "blocking"`; under the shipped default (`log_only`), the same
-condition that the LOCKED doc calls "denied" instead produces `decision: "flag"` (§6) and the
-`PreToolUse` call allows. This is a real behavior change to a LOCKED spec's stated outcome, not a
-new document overriding an old one by omission — it is named here explicitly so it is not
-discovered later as an undocumented contradiction. The LOCKED doc's own §2–§10 text is not edited
-(Roadmap Slice 11 keeps it byte-identical); instead, the addendum appended in that slice states
-this exact gating relationship in so many words, per Roadmap Slice 11's revised rule (see that
-slice for the corrected instruction — it no longer forbids saying what changed).
-
 ## 4. Citation Marker for the New Check
 
 **Decision: new marker, `THRESHOLD-PROVENANCE:`. Does not reuse `DOMAIN-BOUNDARY:` or bare
@@ -291,12 +277,6 @@ pass that would otherwise produce a deny instead produces a track-record entry w
 today. This mode gate wraps **both** passes identically — the cross-domain check, once wired live,
 also starts under `log_only` rather than jumping straight to the blocking behavior its
 already-written code implements, since it has equally never run against live traffic.
-
-**Consequence for the LOCKED doc named explicitly (F1):** this is the mechanism by which
-`docs/tooling/domain-boundary-provenance-hook.md` §6 step 6 / AC4's unconditional "deny" text is
-superseded in practice — under the shipped `log_only` default, that step's condition now resolves
-to `decision: "flag"`, never `"deny"`. See §3's reconciliation paragraph and §11's integration-point
-entry for the LOCKED doc, and Roadmap Slice 11 for the addendum text obligation this creates.
 
 **Initial `.claude/settings.json` wiring**: add one `PreToolUse` entry matching `Edit`/`Write`,
 pointing at `.claude/hooks/domain-boundary-provenance.sh` (unchanged path), with
@@ -496,40 +476,37 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   addendum section should be appended (Roadmap concern, not this document's) pointing at this
   architecture doc for the composed local-threshold behavior, so a future reader of the LOCKED doc
   isn't misled into thinking the hook is still single-purpose.
-- **`docs/tooling/domain-boundary-manifest.json`** (F2 correction, Frank spec-gate attempt 1):
-  **this file does not exist and has never been tracked in this repo** — confirmed by direct
-  check. No repo-root manifest exists in agent-rig; this is deliberate, not an oversight — the
-  cross-domain pass's own step 2 "absent → allow" rule means it currently always short-circuits to
-  allow here (the incumbent's own gate log records this). The real fixture used by the incumbent's
-  tests is `tests/fixtures/domain_boundary_manifest_fixture.json`, written into a tmp dir by the
-  test harness, not read from the repo root. This document's prior draft incorrectly listed
-  `domain-boundary-manifest.json` as an existing, untouched integration point; that row is deleted
-  and replaced by this corrected one. **Roadmap Slice 12's self-scan verification still correctly
-  yields its required `"flag"` result via the new local-threshold pass alone** — that pass has no
-  manifest dependency at all (§3 "No manifest coupling"), so the absence of a repo-root manifest
-  does not affect whether Slice 12's self-scan produces the expected `"flag"` outcome.
+- **`docs/tooling/domain-boundary-manifest.json`** (self-test fixture manifest, incumbent's own):
+  untouched — still governs only the cross-domain pass.
 - **`docs/tooling/domain-boundary-mode.json`** (new, §5): read by both passes via one `run()`-level
   call.
 - **`HOOK-DEPLOYMENT-ROSTER.md`**: needs a status update (Roadmap concern) — the roster's existing
   `domain-boundary-provenance` (DDR-006) row currently reflects "built, unwired"; after this
   sprint it becomes "built, wired, `log_only`."
 
-## 12. Corrections to `01-REQUIREMENTS.md`/`NORTH-STAR.md` (F3, Frank spec-gate attempt 1: Applied)
+## 12. Contradictions Flagged to `01-REQUIREMENTS.md` (not silently patched here, per task instruction)
 
-1. **US-1 AC1** ("to be finalized at architecture time", G-5) — **Applied.** `01-REQUIREMENTS.md` now points at Architecture §2 as the finalized detection rule.
-2. **US-3 / Constraints** (wrapper-reuse framing) — **Applied.** Requirements now clarifies this
-   is a two-generations-removed reuse via the incumbent's wrapper, not a direct copy of
-   `first-turn-contract.sh`.
-3. **Title/identity mismatch** (Stop-hook vs. `PreToolUse`) — **Applied.** Requirements now
-   correctly describes a `PreToolUse` hook, inherited from the incumbent. Confirmed by direct
-   check: `grep -n "Stop-hook" 01-REQUIREMENTS.md NORTH-STAR.md` returns no matches.
-4. **Out of Scope** (incumbent's disposition unstated, G-1) — **Applied.** Out of Scope now
-   states explicitly that the incumbent hook and its LOCKED spec are extended, not replaced or
-   retired, and no new/second hook is created.
-5. **NORTH-STAR.md** Success Criteria (same Stop-vs-`PreToolUse` mismatch as item 3) —
-   **Applied**, with Danny's personal sign-off obtained per this repo's Decision Discipline for
-   North Star doc edits. Confirmed by the same `grep -n "Stop-hook"` check above: no remaining
-   references.
+1. **US-1 AC1** still says the detection rule is "to be finalized at architecture time" (G-5,
+   already flagged by review) — now finalized by §2 of this document; the requirements doc needs
+   a pointer, not a rewrite.
+2. **US-3 / Constraints** say "reuse `first-turn-contract-enforcement`'s wrapper shape" — true in
+   spirit, but the actual reused shape is now the **incumbent domain-boundary hook's** wrapper
+   (which is itself already a reuse of `first-turn-contract.sh`'s shape, per that hook's own §11).
+   Requirements should clarify this is a two-generations-removed reuse, not a direct one, so a
+   forge reader doesn't go looking for a fresh copy of `first-turn-contract.sh`'s literal code.
+3. **Title/identity mismatch**: `01-REQUIREMENTS.md`'s Summary describes "A Stop-hook, sibling in
+   shape to `first-turn-contract-enforcement`" — this document's design is a `PreToolUse` hook
+   (inherited from the incumbent, not a `Stop` hook). This is a direct contradiction, not a
+   phrasing nuance: trigger surface changed from `Stop` to `PreToolUse` as a consequence of
+   extending the incumbent rather than building fresh. Requirements needs this corrected, not
+   just annotated.
+4. **Out of Scope** doesn't mention the incumbent's disposition at all (this was G-1's core
+   complaint) — needs an explicit line: "the incumbent `domain-boundary-provenance` hook and its
+   LOCKED spec doc are extended, not replaced or retired; no new/second hook is created."
+5. **NORTH-STAR.md**'s Success Criteria bullet "A working Stop-hook wrapper... reusing that
+   infrastructure" has the same Stop-vs-PreToolUse mismatch as item 3 above; per this repo's
+   Decision Discipline, Danny personally reviews North Star doc edits before any change to this
+   file is treated as locked — flagged for that review, not edited here.
 
 ## 13. Open Items Carried to Forge
 
