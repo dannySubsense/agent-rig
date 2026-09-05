@@ -33,6 +33,15 @@ Last updated: 2026-09-05
 | soundness-language grep test (Slice 9) | 3 | Attempt 1: under-sensitive. Attempt 2's `\bvalid\b` too broad+too narrow, corrected to `\bvalidated\b`. Attempt 3: independently re-ran and found `\bverified\b` ALSO too broad — trips on legitimate "live-verified" in the module docstring. Bare word-boundary matching against arbitrary source strings is the wrong approach; redesigning to scan only reason-message-shaped strings, or require proximity to a citation/soundness-relevant noun. |
 
 ## Notes
+- 2026-09-05, Slice 10: `.claude/settings.json`'s hook config is loaded at session start.
+  This session added the new PreToolUse entry mid-session, so this session's own tool
+  dispatch will never pick it up. QC proved the wrapper/probe behave correctly on a real
+  payload via direct invocation (wiring shape, JSON validity, and execution all verified),
+  but the "a live Claude Code Edit/Write call triggers the hook" Done-When item can only be
+  confirmed from a FRESH session in this repo, after this session ends. Slice 12
+  (End-to-End Verification) covers this same requirement — deferring final live-trigger
+  confirmation there / to the next fresh session, not treating it as a Slice 10 blocker
+  since the underlying code is proven correct.
 - 2026-09-05: `tests/test_domain_boundary_provenance_probe.py` has a legacy standalone `__main__`
   test runner alongside its pytest-collected tests. The standalone runner doesn't support pytest
   fixtures (`tmp_path`), so 12 fixture-using tests (all pre-existing, from Slices 1-2, not Slice 4)

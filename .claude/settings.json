@@ -20,6 +20,15 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/progress-proof-per-slice.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/domain-boundary-provenance.sh"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
