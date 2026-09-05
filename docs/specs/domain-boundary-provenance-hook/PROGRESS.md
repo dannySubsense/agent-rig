@@ -30,6 +30,7 @@ Last updated: 2026-09-05
 | test_threshold_marker_placeholder_owner_* (Slice 4) | 1 | `owner: N/A` captured as `"N"` (regex char class excluded `/`), not blocklisted — FIXED, verified, 202/202 passing under pytest |
 | 19 tests (Slice 7, run() restructure) | 1 | Not an implementation bug: stale `decision` expectations on .py fixtures that now correctly trip the new local-threshold pass (e.g. `EXTERNAL_CAP_V1 = 5` in src/app.py), plus 2 tests using .json fixture paths where .py was needed to exercise local-threshold at all. Routed to @test-writer for per-case diagnosis, not blanket fix. |
 | wrapper jq-fallback test (Slice 8) | 1 | grep/sed fallback secretly depends on `head`, not available in test sandbox — resolved to `log_only` instead of `blocking` (fail-safe worked, but the fallback tier itself is fragile). Fix: remove `head` dependency, use pure grep/sed. |
+| soundness-language grep test (Slice 9) | 1 | Under-sensitive per QC mutation testing — caught phrase forms ("citation is sound") but missed bare word forms ("citation verified", "sound citation"). Fix: word-boundary regex for verified/sound/validated/valid, excluding "invalid"/"validate" (mechanical) false positives. |
 
 ## Notes
 - 2026-09-05: `tests/test_domain_boundary_provenance_probe.py` has a legacy standalone `__main__`
