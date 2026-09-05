@@ -148,16 +148,16 @@ feature/implementation completion, not per-slice:
 - Missing `docs/NORTHSTAR.md` (the project North Star) is a HALT outright; a Layer 1 PASS
   never substitutes for a missing Layer 2 check.
 - If the project North Star exists but its `Status` is `DRAFT`, Layer 2 may still PASS, but the
-  verdict is stamped `PROVISIONAL` and that tag carries unmodified through `GATE-LOG.md`, the
-  Session End summary, and the PR description.
+  verdict is stamped `PROVISIONAL` and that tag carries unmodified through `PROGRESS.md`'s
+  `## Forge Gate` section, the Session End summary, and the PR description.
 - On FAIL, the current implementation artifacts are snapshotted to
   `docs/specs/{feature}/.gate-snapshots/forge/attempt-{N}/` before re-delegation, and the
   attempt counter for `LANE: forge-gate` is independent of `LANE: spec-gate`'s counter.
 - At attempt 3, a FAIL includes a convergence judgment (`SHRINKING` / `STATIC` / `THRASHING`);
-  the orchestrator independently re-derives that classification from `GATE-LOG.md` and the
+  the orchestrator independently re-derives that classification from `PROGRESS.md` and the
   snapshots before surfacing a STATIC/THRASHING result to Danny.
 
-Verdicts append to `docs/specs/{feature}/GATE-LOG.md`'s `## Forge Gate` section. Only a PASS
+Verdicts append to `docs/specs/{feature}/PROGRESS.md`'s `## Forge Gate` section. Only a PASS
 verdict (PROVISIONAL or not) allows the sequence to continue to `@doc-writer`, the full test
 suite, and `@github-ops`'s PR.
 

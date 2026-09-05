@@ -64,7 +64,7 @@ The orchestrator (`@spec-advisor`, via `/spec-start`) runs a fixed 0-9 step sequ
 | 5 | Define UI spec | @ui-spec-writer | `03-UI-SPEC.md` |
 | 6 | Build roadmap | @planner | `04-ROADMAP.md` |
 | 7 | Review completeness (editorial gap-fix loop precedes Frank's gate) | @spec-reviewer | `05-REVIEW.md` |
-| 8 | Frank binding spec-gate (`LANE: spec-gate`), up to 3 attempts, Layer 1 (sprint North Star fidelity) and Layer 2 (project North Star relevance) evaluated on every attempt | @frank | Verdict appended to `GATE-LOG.md` |
+| 8 | Frank binding spec-gate (`LANE: spec-gate`), up to 3 attempts, Layer 1 (sprint North Star fidelity) and Layer 2 (project North Star relevance) evaluated on every attempt | @frank | Verdict appended to `PROGRESS.md`'s `## Spec Gate` section |
 | 9 | Human approval — full artifact set (including `NORTH-STAR.md` by name) plus Frank's verdict presented to Danny | Danny | Approval / change request |
 
 ---
@@ -137,7 +137,7 @@ docs/specs/model-viewer/
 ├── 03-UI-SPEC.md
 ├── 04-ROADMAP.md
 ├── 05-REVIEW.md
-└── GATE-LOG.md
+└── PROGRESS.md
 ```
 
 ---

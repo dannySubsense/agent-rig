@@ -119,7 +119,7 @@ you write the verdict, not left ambiguous:
    what must happen, and what artifact it must land in]`, routed to whichever agent/lane owns
    landing it. A Carried Condition is not advisory language for the orchestrator to narrate back as
    "I'll add that later" — it is a line item the orchestrator is required to copy into that sprint's
-   tracked artifact (`PROGRESS.md`/`GATE-LOG.md`/the doc itself) before the PASS is treated as
+   tracked artifact (`PROGRESS.md`/the doc itself) before the PASS is treated as
    closed out, same discipline as any FAIL's Fix/Next-step.
 
 There is no third option — a condition mentioned only in prose, with no Fix/Next-step line, is a

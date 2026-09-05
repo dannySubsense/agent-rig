@@ -131,7 +131,7 @@ feature.
 - **`PROGRESS.md` still applies**, at `docs/tooling/{tool-name}/PROGRESS.md` (lite artifacts have
   no sprint directory to hold it) — same shape and update discipline as the full cycle's
   `docs/specs/{feature}/PROGRESS.md`.
-- **`GATE-LOG.md`** lives at `docs/tooling/{tool-name}/GATE-LOG.md` for the same reason. If
+- **`PROGRESS.md`** lives at `docs/tooling/{tool-name}/PROGRESS.md` for the same reason. If
   `/spec-start --lite` already created one during its own Lite Step 2 (Frank spec-gate), reuse that
   file — its `## Spec Gate` section stays as-is, this session's Frank forge-gate writes to a new
   `## Forge Gate` section in the same file, exactly like the full-cycle relationship between the
@@ -155,13 +155,13 @@ feature.
     same as the full cycle.
   - Same attempt-counter/snapshot/convergence-judgment machinery at the binding gate, no manual
   override, applies unchanged. Lite mode has no sprint directory (`docs/specs/{feature}/`), so the
-  Frank forge-gate contract's `SPRINT_NORTH_STAR`, `GATE_LOG`, and `SNAPSHOT_DIR` paths do not apply
+  Frank forge-gate contract's `SPRINT_NORTH_STAR`, `PROGRESS_PATH`, and `SNAPSHOT_DIR` paths do not apply
   as written below. Substitute, scoped to lite mode only:
   - `SPRINT_NORTH_STAR: docs/tooling/{tool-name}/SPEC.md` in place of the sprint `NORTH-STAR.md` path —
     Layer 1 becomes "does the implementation fulfill this locked document's contract," Layer 2
     (project North Star relevance) is unchanged, reading `docs/NORTHSTAR.md` directly per the same
     DRAFT/PROVISIONAL rule as the full cycle.
-  - `GATE_LOG: docs/tooling/{tool-name}/GATE-LOG.md` — the same file `/spec-start --lite`'s Frank
+  - `PROGRESS_PATH: docs/tooling/{tool-name}/PROGRESS.md` — the same file `/spec-start --lite`'s Frank
     spec-gate wrote to (its `## Spec Gate` section stays as-is; this gate adds a `## Forge Gate`
     section alongside it), as described above.
   - `SNAPSHOT_DIR: docs/tooling/{tool-name}/.gate-snapshots/forge/` in place of
@@ -201,7 +201,7 @@ You do NOT:
 | @github-ops | Git operations | sonnet | Commits/PRs |
 | @doc-writer | Documentation | sonnet | Doc files |
 | @research | Technical investigation | sonnet | Findings |
-| @frank | Binding forge-gate verdict (`LANE: forge-gate`) | fable | Verdict appended to `GATE-LOG.md` |
+| @frank | Binding forge-gate verdict (`LANE: forge-gate`) | fable | Verdict appended to `PROGRESS.md` |
 
 ---
 
@@ -348,11 +348,11 @@ PROJECT_NORTH_STAR: docs/NORTHSTAR.md  ← Frank reads this himself; the
                      orchestrator passes the PATH, never paraphrases its
                      content into the contract (checking a document's
                      claim about itself via a summary is a SHARED WELL)
-GATE_LOG: docs/specs/{feature}/GATE-LOG.md (prior attempts, if any — read
+PROGRESS_PATH: docs/specs/{feature}/PROGRESS.md (prior attempts, if any — read
           directly, don't trust the orchestrator's recap of them either)
 SNAPSHOT_DIR: docs/specs/{feature}/.gate-snapshots/forge/
-← In lite mode, GATE_LOG and SNAPSHOT_DIR substitute to
-  docs/tooling/{tool-name}/GATE-LOG.md and
+← In lite mode, PROGRESS_PATH and SNAPSHOT_DIR substitute to
+  docs/tooling/{tool-name}/PROGRESS.md and
   docs/tooling/{tool-name}/.gate-snapshots/forge/ respectively — see the
   Lite Mode section above.
 
@@ -377,11 +377,36 @@ Fix/Next-step).
 2. If the file does not exist at all: Frank's verdict is `HALT` — Layer 2 is not evaluated as a pass under any circumstance, and a Layer 1 PASS never substitutes for it.
 3. If the file exists and its `Status` line reads `DRAFT`: Layer 2 may still PASS on its merits, but the Verdict's Layer 2 line is stamped `PROVISIONAL` in the verdict text itself (e.g. "Layer 2: pass — PROVISIONAL, project North Star Status is DRAFT"). The feature is not blocked on the project North Star leaving DRAFT — it proceeds — but the PROVISIONAL tag is written into the verdict and is never omitted.
 4. If the file exists and its `Status` line is non-`DRAFT`: Layer 2 is a normal binding PASS/FAIL, no PROVISIONAL tag.
-5. The PROVISIONAL tag, once stamped, travels unmodified with the verdict through every subsequent step of this sequence — it is carried into `GATE-LOG.md`'s Findings Summary column verbatim, and it is presented, unmodified, at the Session End summary and to @github-ops's PR description. No step in this sequence strips, softens, or silently drops a PROVISIONAL tag.
+5. The PROVISIONAL tag, once stamped, travels unmodified with the verdict through every subsequent step of this sequence — it is carried into `PROGRESS.md`'s Findings Summary column verbatim, and it is presented, unmodified, at the Session End summary and to @github-ops's PR description. No step in this sequence strips, softens, or silently drops a PROVISIONAL tag.
 
 **Orchestrator loop on receiving the verdict:**
 
-Before the first Frank forge-gate invocation, if `docs/specs/{feature}/GATE-LOG.md` does not yet exist, create it from `~/.claude/templates/GATE-LOG-TEMPLATE.md` (the installed location; `spec-orchestration-07152026/templates/GATE-LOG-TEMPLATE.md` if developing inside this repo directly, before install) — every "append to GATE-LOG.md" instruction below assumes the file already exists; this is the one-time step that makes that true. (If `/spec-start` already ran for this feature, `GATE-LOG.md` exists with its `## Spec Gate` section populated — the `## Forge Gate` section is the one this gate writes to.)
+If `/spec-start` already ran for this feature, `PROGRESS.md` exists with its `## Spec Gate`
+section populated (and, by forge time, its `## Slices` section too — see the Progress Tracking
+File documentation below). This forge-gate step is responsible for the `## Forge Gate` section,
+added alongside whatever already exists — it does not recreate the file.
+
+If `PROGRESS.md` somehow doesn't exist yet at forge-gate time (e.g. `--lite` skipped spec, or some
+other path), create it fresh with just the `## Forge Gate` section, using the same table/counter/
+convergence-judgment shape `/spec-start` uses for its `## Spec Gate` section:
+
+```markdown
+# Progress: {feature-name}
+
+## Forge Gate
+Counter: {N}/3
+
+| Attempt | Date | Verdict | Findings Summary | Snapshot |
+|---|---|---|---|---|
+
+Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
+Deep-diagnosis evidence:
+Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
+```
+
+Every "append to PROGRESS.md" instruction below assumes the `## Forge Gate` section already exists
+in the file (either because it was just created above, or because it was created empty by
+`/spec-start` per its own PROGRESS.md template) — this is the one-time step that makes that true.
 
 ```
 PASS  → the orchestrator performs its own full review of the artifact —
@@ -393,7 +418,7 @@ PASS  → the orchestrator performs its own full review of the artifact —
         mental model of what shipped — a pillar it carries forward, not a
         signpost it glances at — which is the second reason this step
         exists, not just redundancy for its own sake. Then append to
-        GATE-LOG.md: Frank's verdict verbatim, plus the orchestrator's own
+        PROGRESS.md: Frank's verdict verbatim, plus the orchestrator's own
         review findings — not Frank's verdict alone. Proceed to
         @doc-writer / full test suite / @github-ops PR. A PROVISIONAL
         Layer 2 pass still counts as PASS — not blocking — but the
@@ -401,7 +426,7 @@ PASS  → the orchestrator performs its own full review of the artifact —
         description, it is never silently dropped.
 FAIL  → snapshot current artifacts to docs/specs/{feature}/.gate-snapshots/forge/attempt-{N}/
         (lite mode: docs/tooling/{tool-name}/.gate-snapshots/forge/attempt-{N}/),
-        append to GATE-LOG.md, route Fix/Next-step items to the named
+        append to PROGRESS.md, route Fix/Next-step items to the named
         agent(s) (@code-executor / @test-writer / @test-runner / @qc-agent
         as applicable), re-delegate, increment attempt counter, re-invoke
         Frank
@@ -412,7 +437,7 @@ HALT (attempt 3, STATIC or THRASHING)
         before surfacing anything to Danny
 ```
 
-No manual override path exists at any FAIL/HALT — this is the literal enforcement of "no conditional pass, no exceptions." The attempt counter for `LANE: forge-gate` is independent of `LANE: spec-gate`'s counter (tracked in the same `GATE-LOG.md` but under its own `## Forge Gate` section) — a struggling implementation phase never eats into spec's budget or vice versa.
+No manual override path exists at any FAIL/HALT — this is the literal enforcement of "no conditional pass, no exceptions." The attempt counter for `LANE: forge-gate` is independent of `LANE: spec-gate`'s counter (tracked in the same `PROGRESS.md` but under its own `## Forge Gate` section) — a struggling implementation phase never eats into spec's budget or vice versa.
 
 **Snapshot-before-retry procedure:** Immediately before each re-delegation that follows a FAIL/HALT verdict, copy the current state of every artifact listed in `ARTIFACTS` above into `docs/specs/{feature}/.gate-snapshots/forge/attempt-{N}/` (where `{N}` is the attempt number that just failed). This runs every time, before re-delegation — without it, the implementation files get overwritten in place by the re-delegation, leaving nothing to diff for the convergence judgment or the independent re-derivation algorithm below. The directory is not gitignored; it persists for the life of the gate loop and may be pruned once the gate reaches PASS.
 
@@ -423,7 +448,7 @@ If attempt 3 is also a FAIL, Frank's verdict includes a convergence judgment —
 Before surfacing a STATIC or THRASHING result to Danny, the orchestrator runs its own **independent re-derivation** — it does not treat Frank's classification as sufficient on its own:
 
 ```
-1. Read GATE-LOG.md attempts 1-3 directly (not Frank's verbal recap)
+1. Read PROGRESS.md attempts 1-3 directly (not Frank's verbal recap)
 2. Read .gate-snapshots/forge/attempt-{1,2,3}/ directly — diff attempt
    N against attempt N-1 for each artifact
 3. Classify independently: does the same substantive finding recur
@@ -431,7 +456,7 @@ Before surfacing a STATIC or THRASHING result to Danny, the orchestrator runs it
    with no convergence (THRASHING)? Are failures shrinking (would have
    been a routine continue, not actually stuck)?
 4. Compare own classification to Frank's Findings classification
-   AGREE    → escalate to Danny with combined evidence (GATE-LOG entry +
+   AGREE    → escalate to Danny with combined evidence (PROGRESS.md entry +
               diff summary + Frank's verdict), Frank's underlying
               PASS/FAIL/HALT stays binding
    DISAGREE → escalate to Danny presenting BOTH classifications
@@ -441,7 +466,7 @@ Before surfacing a STATIC or THRASHING result to Danny, the orchestrator runs it
               still binding.
 ```
 
-This algorithm reads `GATE-LOG.md` and the snapshot diffs directly — it never re-reads Frank's summary a second time and calls that verification. Disagreement between the orchestrator's independent read and Frank's diagnosis is always escalated to Danny with both classifications shown; neither side resolves it unilaterally.
+This algorithm reads `PROGRESS.md` and the snapshot diffs directly — it never re-reads Frank's summary a second time and calls that verification. Disagreement between the orchestrator's independent read and Frank's diagnosis is always escalated to Danny with both classifications shown; neither side resolves it unilaterally.
 
 A HALT triggered by a missing `PROJECT_NORTH_STAR` does not increment the attempt counter — that failure mode isn't fixable by retrying the same artifacts, so it HALTs to Danny immediately, outside the attempt mechanism entirely.
 
@@ -561,7 +586,7 @@ Maintain progress in `docs/specs/{feature}/PROGRESS.md`:
 - [ ] Slice 3: Integration — PENDING
 - [ ] **Frank binding forge-gate** — PENDING. Runs once, only after every slice above is checked
       off (see `## Frank Binding Forge-Gate` above). Do not set `Status: COMPLETE` before this
-      line is checked and its verdict is transcribed into `GATE-LOG.md`'s `## Forge Gate` section —
+      line is checked and its verdict is transcribed into `PROGRESS.md`'s `## Forge Gate` section —
       "all slices done" is not "sprint done."
 
 ## Current
@@ -574,9 +599,24 @@ Last updated: 2024-01-15T14:30:00Z
 |-----------|----------|------------|
 | filterStore.test.ts | 2 | "Expected 3, got 0" |
 
+## Forge Gate
+Counter: {N}/3
+
+| Attempt | Date | Verdict | Findings Summary | Snapshot |
+|---|---|---|---|---|
+
+Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
+Deep-diagnosis evidence:
+Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
+
 ## Notes
 - [Any blockers or decisions]
 ```
+
+If `/spec-start` already ran, this same file also carries a `## Spec Gate` section above (populated
+at spec time) — Forge only ever adds/updates its own `## Forge Gate` section, never touches `## Spec
+Gate`. Frank's forge-gate verdict is transcribed into this `## Forge Gate` section per the binding
+gate procedure above.
 
 Update this file after each step. On session resume, read it to continue.
 
@@ -657,4 +697,3 @@ Reason: [specific reason]
 Blocking: [what cannot proceed]
 Needs: [what would unblock — human decision, clarification, etc.]
 ```
-</content>
