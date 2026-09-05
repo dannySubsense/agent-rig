@@ -5,8 +5,8 @@
 ## Slices
 - [x] Slice 1: Extract `run_cross_domain_pass()` — COMPLETE (2026-09-05, commit `3a5de4e`). QC found one FAIL (missing PassResult TypedDict), fixed and re-verified PASS. 162/162 tests passing.
 - [x] Slice 2: Mode Config Loader — COMPLETE (2026-09-05, commit `baa2261`). QC found one FAIL (missing schemaVersion validation), fixed and re-verified PASS. 171/171 tests passing.
-- [ ] Slice 3: `detect_threshold_literals()` — IN_PROGRESS
-- [ ] Slice 4: `has_threshold_provenance_marker()` — PENDING
+- [x] Slice 3: `detect_threshold_literals()` — COMPLETE (2026-09-05, commit `dcbd346`). QC found one FAIL (missing type annotations), fixed and re-verified PASS. 2/2 real-incident recall confirmed by direct execution. 186/186 tests passing.
+- [ ] Slice 4: `has_threshold_provenance_marker()` — PENDING (holding for pacing decision)
 - [ ] Slice 5: `run_local_threshold_pass()` — PENDING
 - [ ] Slice 6: `combine()` — PENDING
 - [ ] Slice 7: `TrackRecordEntry` Schema Migration + `run()` Restructure — PENDING
