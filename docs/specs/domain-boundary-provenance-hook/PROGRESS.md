@@ -1,6 +1,6 @@
 # Progress: unsourced-threshold-provenance-hook (domain-boundary-provenance-hook)
 
-## Status: IN_PROGRESS
+## Status: IN_PROGRESS (all 12 slices complete, awaiting Frank binding forge-gate)
 
 ## Slices
 - [x] Slice 1: Extract `run_cross_domain_pass()` — COMPLETE (2026-09-05, commit `3a5de4e`). QC found one FAIL (missing PassResult TypedDict), fixed and re-verified PASS. 162/162 tests passing.
@@ -14,8 +14,8 @@
 - [x] Slice 9: Test Corpus Additions — COMPLETE (2026-09-05, commit `51c6d8c`). Soundness-language check took 3 fix iterations (own independent verification caught 2 real regressions the fix reports missed) before correct redesign (exclude docstrings/comments, scan only reason-message strings). Adversarial final QC confirmed real mutations still caught. 236/236 tests, 25/25 wrapper tests passing.
 - [x] Slice 10: Live Wiring — COMPLETE (2026-09-05, commit `b57d9f1`). Wiring correctness fully verified by direct execution (exit 0, no block, correct schema). Live Claude-Code-triggered fire deferred to Slice 12/next fresh session — settings.json hooks load at session start, structurally can't fire in this same session. 261/261 tests passing.
 - [x] Slice 11: Documentation — COMPLETE (2026-09-05, commit `3a2f7cc`). LOCKED doc §2-§10 verified byte-identical, addendum traced word-by-word against real code and confirmed accurate, roster row correctly separates wired-status from verification claim.
-- [ ] Slice 12: End-to-End Verification — IN_PROGRESS
-- [ ] **Frank binding forge-gate** — PENDING. Runs once, only after every slice above is checked
+- [x] Slice 12: End-to-End Verification — COMPLETE (2026-09-05, commit `7e22e41`). Real live-fire evidence found and verified: this session's own Edit calls fired the hook post-Slice-10 with zero restart, disproving Slice 10's session-restart assumption. Runtime measured (median 1.15ms). Findings captured in Architecture §14. All 12 slices now complete.
+- [ ] **Frank binding forge-gate** — PENDING, invoking cold (repo+SHA+verdict-required only). Runs once, only after every slice above is checked
       off. Do not set `Status: COMPLETE` before this line is checked and its verdict is
       transcribed into this file's `## Forge Gate` section — "all slices done" is not "sprint done."
 
