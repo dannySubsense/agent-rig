@@ -13,15 +13,15 @@
 - [x] Slice 8: Wrapper Updates — COMPLETE (2026-09-05, commit `56da5f4`). Real bug found (hidden `head` dependency in grep/sed fallback) + fixed, QC-verified byte-for-byte fail-safe parity with Python. 25/25 wrapper tests, 222/222 Python tests passing.
 - [x] Slice 9: Test Corpus Additions — COMPLETE (2026-09-05, commit `51c6d8c`). Soundness-language check took 3 fix iterations (own independent verification caught 2 real regressions the fix reports missed) before correct redesign (exclude docstrings/comments, scan only reason-message strings). Adversarial final QC confirmed real mutations still caught. 236/236 tests, 25/25 wrapper tests passing.
 - [x] Slice 10: Live Wiring — COMPLETE (2026-09-05, commit `b57d9f1`). Wiring correctness fully verified by direct execution (exit 0, no block, correct schema). Live Claude-Code-triggered fire deferred to Slice 12/next fresh session — settings.json hooks load at session start, structurally can't fire in this same session. 261/261 tests passing.
-- [ ] Slice 11: Documentation — IN_PROGRESS
-- [ ] Slice 12: End-to-End Verification — PENDING
+- [x] Slice 11: Documentation — COMPLETE (2026-09-05, commit `3a2f7cc`). LOCKED doc §2-§10 verified byte-identical, addendum traced word-by-word against real code and confirmed accurate, roster row correctly separates wired-status from verification claim.
+- [ ] Slice 12: End-to-End Verification — IN_PROGRESS
 - [ ] **Frank binding forge-gate** — PENDING. Runs once, only after every slice above is checked
       off. Do not set `Status: COMPLETE` before this line is checked and its verdict is
       transcribed into this file's `## Forge Gate` section — "all slices done" is not "sprint done."
 
 ## Current
-Slice: 11
-Step: @doc-writer
+Slice: 12
+Step: verification (no new agent role — end-to-end check)
 Last updated: 2026-09-05
 
 ## Fix Attempts
