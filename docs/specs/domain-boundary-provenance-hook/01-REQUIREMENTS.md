@@ -124,14 +124,18 @@ under the corrected three-context rule (Architecture §2, `results.md` §4).
 Detection is Python-only, AST-based, with a per-line regex fallback used only for the module/class-level
 assignment context when `ast.parse` fails on a fragment (Architecture §2.1) — the other two contexts
 (comparison operand, slice/truncation argument) have no fallback and silently yield no candidate on
-an unparsable fragment. Explicit exclusions: non-slice indexing, test/fixture paths,
-and the literal set `{0, 1, -1, 2}` (NOT YET BENCHMARKED for precision — ships with a
-fully-specified executable validation plan in Architecture §2; not to be treated as validated
-until that plan runs). The `range()`-bound exclusion previously listed here has been removed: the
-committed benchmark measured it firing zero times across the entire 445-file corpus under every
-candidate rule, confirming it is structurally inert (a `range()` argument can never match any of
-the three detection contexts), so it is deleted rather than carried forward as inert ceremony
-(Architecture §2, cited to `results.md` §3).
+an unparsable fragment. Explicit exclusions: non-slice indexing and test/fixture paths only. **The
+literal-value exclusion set `{0, 1, -1, 2}` previously listed here was REMOVED, 2026-09-05, per
+Danny's decision (cold Frank spec-gate attempt 4, F1 — an earlier revision invented a fourth,
+non-existent disposition under `~/.claude/CLAUDE.md` rule 1 to justify carrying it unowned).** All
+threshold-shaped literals — including the small idiomatic values `0`, `1`, `-1`, and `2` — are now
+flagged unfiltered; the resulting volume is absorbed by `log_only` mode (US-2), the same reasoning
+this document already applies to keeping the comparison and slice/truncation contexts broad. The
+`range()`-bound exclusion previously listed here has also been removed: the committed benchmark
+measured it firing zero times across the entire 445-file corpus under every candidate rule,
+confirming it is structurally inert (a `range()` argument can never match any of the three detection
+contexts), so it is deleted rather than carried forward as inert ceremony (Architecture §2, cited to
+`results.md` §3).
 
 This document does not restate the rule's full substance — see Architecture §2 for the
 authoritative definition and disposition of every constant.
@@ -199,9 +203,11 @@ same-file/local-threshold detection pass is new work.
 - Must: every predetermined constant this sprint's own code introduces carries a citable
   precedent or an explicit PROVISIONAL tag with a named owner — no exception for the hook's own
   artifacts, per this repo's Decision Discipline. The detection rule's own three syntactic
-  contexts, the `{0, 1, -1, 2}` exclusion's leverage figure, and the citation-proximity window
-  (`PROXIMITY_WINDOW_THRESHOLD = 2`) are cited to `02-ARCHITECTURE.md` §2/§4, not restated here —
-  see that section for the authoritative citation trail (`results.md` §§2-5).
+  contexts and the citation-proximity window (`PROXIMITY_WINDOW_THRESHOLD = 2`) are cited to
+  `02-ARCHITECTURE.md` §2/§4, not restated here — see that section for the authoritative citation
+  trail (`results.md` §§2-5). There is no literal-value exclusion in this design (`{0, 1, -1, 2}`
+  removed, 2026-09-05, Architecture §2) — no constant needs citing for a filter that no longer
+  exists.
 - Must not: implement or imply a soundness/correctness judgment on existing citations within this
   check's logic or output.
 - Must not: expand this sprint's scope to include retrofit work into other repos.

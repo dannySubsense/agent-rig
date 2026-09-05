@@ -39,10 +39,18 @@ and found several constants below were not just unlabeled — they were wrong, w
 false-positive/false-negative evidence, and one section (§7's original marker-comment text)
 contained a genuine self-refuting bug (a 5-line comment block prescribed to satisfy a 3-line
 detection window). That revision applied every finding available at the time. Per this repo's
-binding rule (CLAUDE.md Decision Discipline), no constant in this document rests on a
-self-assigned or unassigned `owner:` tag — each one carries either a real citation, a fully-stated
-executable benchmarking plan with an explicit "not yet validated" disposition, or a redesign that
-removes the need for it.
+binding rule (`~/.claude/CLAUDE.md` rule 1), no constant in this document rests on a self-assigned
+or unassigned `owner:` tag — each one carries exactly one of the three dispositions that rule
+actually names: (a) a citable, reproducible source; (b) an explicit `PROVISIONAL — unvalidated`
+marker with a named human owner; or (c) deletion. **Correction, 2026-09-05 (cold Frank spec-gate
+attempt 4, F1): an earlier revision of this section stated a fourth disposition — "a fully-stated
+executable benchmarking plan with an explicit 'not yet validated' disposition" — as if it were a
+fourth valid option alongside the three above.** It is not; rule 1 names exactly three dispositions
+and an unexecuted plan is not one of them ("a design doc saying a value 'must be calibrated before
+deployment' is not a source if the calibration never ran"). That invented fourth option is deleted
+from this document, not merely reworded. Its only load-bearing use was to justify carrying the
+`{0, 1, -1, 2}` literal-value exclusion set forward unvalidated (§2) — see §2 for the disposition
+that replaces it: deletion, per Danny's 2026-09-05 decision.
 
 ### 0.2 Detection-Rule Correction Notice (this revision — Frank spec-gate attempt 3 FAIL)
 
@@ -184,9 +192,22 @@ not one:**
    and the whole-line anchors (`^...$`) still require the entire line to be exactly one
    assignment with nothing trailing but an optional comment. The regex fallback is unchanged in
    every other respect (same anchors, same target-name capture, same context-3-only scope); only
-   the shape of literal it accepts is widened. This reasoning has not been validated by a rerun of
-   `results-fragment-shaped.md`'s F1 case against the fixed pattern — that remains open, tracked
-   alongside the rest of §13's precision gap.
+   the shape of literal it accepts is widened. **Verified 2026-09-05 (F2, cold Frank spec-gate
+   attempt 4): the committed `scan_thresholds.py` still had the old integer/boolean-only pattern at
+   the time of that gate — the doc and the shipped detector disagreed.** The script's pattern (and
+   its value-parsing branch, which previously called `int(raw)` unconditionally and would have
+   silently dropped a matched float back out) are both now fixed to match this section's text, and
+   `regex_fallback_candidates("test", "x.py", "    dilution_pct_min: float = 0.10\n")` was run
+   directly against the fixed function, confirming a `Candidate(value=0.1, ...)` is produced where
+   the old pattern produced none. Re-running `scan_thresholds.py`'s whole-corpus scan (445 files)
+   produced byte-identical `results.md`/`candidates.jsonl` output, because every file in that corpus
+   parses successfully under strategy 1 (`ast.parse`) or 2 (`dedent` retry) — the regex fallback
+   (strategy 3) is never exercised on a whole file, so this fix has no effect on the whole-file
+   benchmark numbers cited elsewhere in this document; it only matters for fragment-shaped input
+   (`tool_input.new_string`), which is what the hook actually scans in production. A full rerun of
+   `results-fragment-shaped.md`'s F1 case through that separate fragment-matrix script remains open,
+   tracked alongside the rest of §13's precision gap — this verification is a direct function-level
+   check, not that rerun.
 
 **Robustness by context, stated explicitly (required by this correction, not left implicit):**
 
@@ -243,10 +264,14 @@ a much larger, unmeasured behavior change than this task asked for, for a "simpl
 buys nothing since volume is already absorbed by `log_only`. Net: keep all three contexts, adopt
 rule (c) exactly as measured, do not invent a fourth combination.
 
-**Net flagged volume for rule (c) (this repo's benchmark corpus, all three exclusions applied,
-`results.md` §3): 481** (of 2173 total candidates before exclusion). This is volume, not
-false-positive count — no precision sample has been drawn (see disposition below and `results.md`
-§6).
+**Net flagged volume for rule (c) (this repo's benchmark corpus, remaining two exclusions
+applied — non-slice index and test/fixture path — `{0,1,-1,2}` exclusion removed, 2026-09-05): 856**
+(of 2173 total candidates before exclusion; re-derived directly from `candidates.jsonl`'s
+per-candidate `in_range_call`/`in_test_path` flags, since `results.md` §3's own "Net flagged"
+column still reports the pre-removal 481 figure — that column measures the four-rule benchmark's
+original exclusion set, not this document's now-adopted design, and is not re-run here). This is
+volume, not false-positive count — no precision sample has ever been drawn on this population (see
+disposition below).
 
 **Explicit exclusions** (never flagged, regardless of context match):
 - **`range()` call bounds — REMOVED this revision.** The prior draft carried this as an explicit
@@ -261,62 +286,52 @@ false-positive count — no precision sample has been drawn (see disposition bel
   `results.md` §3, not carried forward as inert ceremony.
 - A non-slice-stop index into a sequence (`x[i]`, not `x[:i]`).
 - Files under any `test`/`tests`/`fixtures` path component.
-- **The literal values `{0, 1, -1, 2}`** — see disposition immediately below. **Leverage is now
-  measured; correctness (precision) is NOT. Do not treat as validated until the labeling plan
-  below runs.**
 
-**Disposition of the `{0, 1, -1, 2}` exclusion set (benchmark audit finding, highest-leverage
-constant in this design — re-measured this revision under rule (c)).** The committed benchmark
-measured this set directly, per rule, against the 445-file corpus (`results.md` §3):
+**The `{0, 1, -1, 2}` literal-value exclusion previously listed here is REMOVED, 2026-09-05, per
+Danny's decision — see the disposition immediately below.** There is no third exclusion in this
+design as of this revision.
 
-| Rule | Total candidates | In `{0,1,-1,2}` | Share |
+**Disposition of the `{0, 1, -1, 2}` exclusion set — REMOVED, 2026-09-05 (Danny's decision, per
+cold Frank spec-gate attempt 4, F1; see `PROGRESS.md`'s Spec Gate attempt 4 row).**
+
+This document previously carried `{0, 1, -1, 2}` as a third exclusion, on the strength of an
+invented fourth rule-1 disposition ("a fully-stated executable benchmarking plan") that §0.1
+corrects and deletes this revision. That exclusion decided 60.5% of all rule-(c) candidates
+(`results.md` §3, table reproduced below for the historical record only — it is no longer this
+document's live design) — the single highest-leverage constant in the whole detection rule, riding
+on an option the binding rule does not offer:
+
+| Rule | Total candidates | In `{0,1,-1,2}` (historical, no longer excluded) | Share |
 |---|---|---|---|
 | (a) | 1768 | 1237 | 70.0% |
 | (b) | 1922 | 1265 | 65.8% |
 | **(c) — adopted** | **2173** | **1315** | **60.5%** |
 | (d) | 2103 | 1281 | 60.9% |
 
-Under the adopted rule (c), **60.5% of all threshold-shaped candidates fall inside `{0, 1, -1,
-2}`** — this document's task brief characterizes the measured range across rules as "60-70%,"
-consistent with the table above. This is a **different, and now committed-and-reproducible,**
-number than either prior unreproducible claim this document has carried (the original draft's
-unmeasured 84.7%-under-the-old-rule figure is superseded by this table; that number was measured
-under rule (b), not the now-adopted rule (c), and is not restated here as if unchanged). This
-remains the single highest-leverage exclusion value in the entire detection rule: excluding it
-removes roughly six in ten candidates before any other filter runs.
+**Decision: delete the exclusion, do not own or re-benchmark it.** This document already makes
+exactly this argument elsewhere in this same section for keeping contexts 1–2 broad ("`log_only`
+mode... makes the extra volume a logging cost, not a blocking cost") — applied here too, to the
+exclusion itself rather than to a context. Per `~/.claude/CLAUDE.md` rule 1, an unsourced constant
+gets a citation, a named-human-owner `PROVISIONAL` marker, or deletion — there is no fourth option,
+and no named human has stepped forward to own a `PROVISIONAL — unvalidated` tag on this value.
+Deletion removes the need for either.
 
-**Leverage is now measured. Correctness is not.** `results.md` §6 states this explicitly: "The
-`{0,1,-1,2}` exclusion set remains unvalidated — this run measures its SHARE, which is its
-leverage, not its correctness." No hand-labeled sample has been drawn distinguishing a true
-"idiomatic sentinel/loop/increment value that citation would not meaningfully improve" from a real
-unsourced threshold that happens to equal 0, 1, -1, or 2. Per this repo's binding rule, this value
-cannot ship as validated. The disposition is: **this value is not yet benchmarked for precision,
-and carries the following executable plan as its validation path (Roadmap concern, not yet run):**
+**Effective this revision: all threshold-shaped literals are flagged unfiltered, including the
+small idiomatic values `0`, `1`, `-1`, and `2`.** There is no literal-value exclusion anywhere in
+the adopted design. This measurably increases flagged volume — 856 of 2173 rule-(c) candidates
+survive the two remaining exclusions (non-slice index, test/fixture path) with no value filter,
+against 481 when the now-removed exclusion was still applied (see the volume line above) — and that
+increase is absorbed entirely by `log_only` mode (§5): under `log_only`, every one of those 856
+candidates produces a track-record `"flag"` log entry, never a block, so the correctness question
+this exclusion existed to answer (is `0`/`1`/`-1`/`2` usually idiomatic or usually a real unsourced
+threshold?) does not need to be settled before shipping. Any given repo owner triaging their own
+`log_only` log is free to conclude a specific `0`/`1`/`-1`/`2` finding is noise and move on — that
+per-finding judgment call is exactly what `log_only` exists to defer to a human, not something this
+architecture document needs to pre-decide by carrying an unowned constant.
 
-1. Run the local-threshold detection pass **unfiltered** (i.e. with the `{0, 1, -1, 2}` exclusion
-   temporarily disabled) against the same defined corpus `results.md` §1 already used: this repo
-   (`agent-rig`) plus the seven repos currently listed in `HOOK-DEPLOYMENT-ROSTER.md`, plus
-   `market_data`. (`candidates.jsonl` already contains every raw candidate and rule-membership flag
-   from this exact corpus scan — the labeling plan below draws its sample from that committed file,
-   not a fresh scan, unless the corpus composition has since changed.)
-2. Draw a stratified random sample of 200 rows from `candidates.jsonl`'s rule-(c) net-flagged
-   population (stratified by literal value, so `0`, `1`, `-1`, `2`, and non-excluded values are all
-   represented rather than dominated by whichever value is most common).
-3. Hand-label each sampled row true-positive ("this literal genuinely needed a provenance
-   citation") or false-positive ("this is an idiomatic loop/sentinel/increment value that citation
-   would not meaningfully improve").
-4. For each candidate value in `{0, 1, -1, 2}` (and any other value considered for exclusion),
-   compute its measured precision as a true positive across the labeled sample. **Exclude a value
-   from flagging only if its measured precision falls below 5%.** Values at or above that
-   threshold stay in scope for flagging even if they are numerically small.
-5. Until this run happens, the current `{0, 1, -1, 2}` exclusion set ships as an inherited,
-   unvalidated default — not a validated design decision. Any false negative it produces (a real
-   unsourced threshold at exactly `0`, `1`, `-1`, or `2` that goes unflagged) is a known, named risk
-   of shipping ahead of the benchmark, not a silent gap.
-
-This is a Roadmap-tracked open item (§13), not resolved by this architecture document — the
-labeling run itself is out of scope for an architecture-fix task and belongs to
-implementation/forge follow-up.
+This is not a Roadmap-tracked open item — there is nothing left to benchmark or own. If a future
+pass wants to reintroduce a literal-value exclusion, it needs its own citation or named-owner
+`PROVISIONAL` tag at that time, per the same rule this correction applies now.
 
 **AST-based, Python-only; regex fallback only for context 3** — contexts 1-2 have no regex
 fallback by design (see the robustness table above), same posture as the prior pass: syntactic
@@ -760,9 +775,9 @@ class FlaggedLiteral(TypedDict):
                              # to the assignment target
     literal_repr: str       # e.g. "50000", "True"
 
-# The `{0, 1, -1, 2}` literal-value exclusion set applies identically across all three contexts
-# above, including the new assignment context — NOT YET BENCHMARKED for precision under rule (c)
-# specifically; see §2 disposition and the labeling plan cited there.
+# No literal-value exclusion set exists in this design (removed 2026-09-05, §2 disposition —
+# Danny's decision, cold Frank spec-gate attempt 4 F1). All threshold-shaped literals from all
+# three contexts above, including 0/1/-1/2, are flagged unfiltered; volume is absorbed by log_only.
 
 def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
     """Uses PROXIMITY_WINDOW_THRESHOLD = 2 (this file, above), checked against
@@ -810,7 +825,7 @@ now a real, non-trivial question — see below).
 | **G-6** (`base_ref` undefined) | The discarded design's Stop-hook trigger needed a git base ref to find "session-changed files." | **Moot.** This design keeps `PreToolUse` on `Edit`/`Write` (the incumbent's trigger) — there is no "changed files since session start" concept at all; the scan surface is the single tool call's own `content`/`new_string`, exactly as the incumbent already does. No base-ref resolution is needed anywhere in this document. |
 | **G-7** (`run()` takes `mode` as param AND reads config) | Same ambiguity risk exists in principle. | **Addressed directly**, not just moot: §7 specifies `run()` calls `load_mode_config()` itself, once, at the top, then passes the resulting `mode` string into `combine()` as a plain argument — config is read exactly once, by `run()`, never re-read or re-passed ambiguously. |
 | **G-8** (`ProbeResult.decision` can't express `probe_error`) | The discarded design's `ProbeResult` type omitted `probe_error`. | **Addressed.** §6's `TrackRecordEntry.decision` explicitly lists `"allow" \| "flag" \| "deny" \| "probe_error"` as one flat union, matching the incumbent's own existing pattern (its `TrackRecordEntry.decision` already includes `probe_error`) — no separate `ProbeResult` type with a narrower union is introduced by this design; `PassResult`/`CombinedResult` (§7) are per-pass/pre-decision structures, not the final logged decision. |
-| **G-9 / G-4 (self-scan)** | Whether the new probe's own PROVISIONAL constants get scanned by its own detection rule once live. | **REOPENED and answered for real this pass — no longer moot.** The prior revision's "resolved, no tag needed" disposition depended entirely on the now-corrected §2 having removed all assignment detection; that premise is gone. Under the rule adopted this revision (§2, context 3), **every module-level and class-level `NAME = <literal>` assignment in this probe file itself is now in scope for the local-threshold pass**, unconditionally — including `PROXIMITY_WINDOW = 5` (incumbent, unchanged) and the new `PROXIMITY_WINDOW_THRESHOLD = 2` (§7, this pass). Neither is in `{0, 1, -1, 2}`, so neither is exclusion-protected. **Concrete answer, not deferred**: `PROXIMITY_WINDOW_THRESHOLD = 2` ships in §7 with an inline `THRESHOLD-PROVENANCE:` comment on the line immediately above it, citing `results.md` §5 by exact path — satisfying option (a) (a real citation) under the new 2-line window (§4), so this probe's own edit does not produce an unmarked self-flag when the hook next scans its own source. The incumbent's `PROXIMITY_WINDOW = 5` is **out of this sprint's file-touch scope** (§1: the incumbent's file is extended, its existing lines are not edited) — it does not currently carry a `THRESHOLD-PROVENANCE:` comment, and under the redesigned rule it **will** be flagged (as `unmarked`, `context: "assign_module_or_class"`) the first time this hook scans `scripts/domain_boundary_provenance_probe.py` itself. This is named as a real, live self-scan finding, not glossed over: it is `log_only` at initial wiring (§5), so it produces a track-record `"flag"` entry, not a block — but it is a true positive against the probe's own pre-existing unlabeled-by-this-marker constant, and is reported to Danny (accompanying report) as a same-sprint or immediate-follow-up file-touch decision, since leaving a LOCKED incumbent file's own constant unmarked while shipping a check whose entire purpose is catching exactly that pattern is a visible inconsistency the first live scan will surface mechanically. Roadmap Slice 9 must add an explicit fixture case asserting this **is** flagged (not "is not flagged," reversing the prior revision's fixture direction) so the corrected self-scan behavior is a tested claim. |
+| **G-9 / G-4 (self-scan)** | Whether the new probe's own PROVISIONAL constants get scanned by its own detection rule once live. | **REOPENED and answered for real this pass — no longer moot.** The prior revision's "resolved, no tag needed" disposition depended entirely on the now-corrected §2 having removed all assignment detection; that premise is gone. Under the rule adopted this revision (§2, context 3), **every module-level and class-level `NAME = <literal>` assignment in this probe file itself is now in scope for the local-threshold pass**, unconditionally — including `PROXIMITY_WINDOW = 5` (incumbent, unchanged) and the new `PROXIMITY_WINDOW_THRESHOLD = 2` (§7, this pass). No literal-value exclusion exists in this design (§2, removed 2026-09-05), so neither constant is exclusion-protected regardless of its value. **Concrete answer, not deferred**: `PROXIMITY_WINDOW_THRESHOLD = 2` ships in §7 with an inline `THRESHOLD-PROVENANCE:` comment on the line immediately above it, citing `results.md` §5 by exact path — satisfying option (a) (a real citation) under the new 2-line window (§4), so this probe's own edit does not produce an unmarked self-flag when the hook next scans its own source. The incumbent's `PROXIMITY_WINDOW = 5` is **out of this sprint's file-touch scope** (§1: the incumbent's file is extended, its existing lines are not edited) — it does not currently carry a `THRESHOLD-PROVENANCE:` comment, and under the redesigned rule it **will** be flagged (as `unmarked`, `context: "assign_module_or_class"`) the first time this hook scans `scripts/domain_boundary_provenance_probe.py` itself. This is named as a real, live self-scan finding, not glossed over: it is `log_only` at initial wiring (§5), so it produces a track-record `"flag"` entry, not a block — but it is a true positive against the probe's own pre-existing unlabeled-by-this-marker constant, and is reported to Danny (accompanying report) as a same-sprint or immediate-follow-up file-touch decision, since leaving a LOCKED incumbent file's own constant unmarked while shipping a check whose entire purpose is catching exactly that pattern is a visible inconsistency the first live scan will surface mechanically. Roadmap Slice 9 must add an explicit fixture case asserting this **is** flagged (not "is not flagged," reversing the prior revision's fixture direction) so the corrected self-scan behavior is a tested claim. |
 | **G-4** (US-4 AC2 no verification path) | "No log message implies soundness" has no test. | **Still applies, unchanged from before** — this is a requirements-level testability gap independent of which design implements it. Not this document's to resolve; flagged to Roadmap the same way the review already did (a grep-based test asserting the deny/flag `reason` string template contains no soundness-implying language, e.g. no "verified correct"/"sound"/"validated" claims beyond presence-check wording). |
 
 ## 9. Dependencies
@@ -925,11 +940,10 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 
 ## 13. Open Items Carried to Forge
 
-- **§2's `{0, 1, -1, 2}` exclusion set** — leverage measured this pass (60.5% share under adopted
-  rule (c), `results.md` §3), **correctness (precision) still NOT YET BENCHMARKED**. Carries the
-  full executable validation plan stated in §2 (stratified 200-row hand-labeled sample drawn from
-  the already-committed `candidates.jsonl`, 5%-precision exclusion threshold). Not to be treated as
-  validated until that plan runs; running it is Roadmap/forge follow-up, not resolved here.
+- **§2's `{0, 1, -1, 2}` exclusion set** — **REMOVED, 2026-09-05** (Danny's decision, per cold
+  Frank spec-gate attempt 4, F1 — see `PROGRESS.md`'s Spec Gate attempt 4 row). No longer carried as
+  an open item: there is no exclusion left to validate or own. All threshold-shaped literals,
+  including `0`/`1`/`-1`/`2`, are flagged unfiltered; volume is absorbed by `log_only` (§2, §5).
 - **§2's assignment context** — ADDED this pass (context 3, `assign_module_or_class`), replacing
   the prior revision's complete removal of assignment detection. Cited to `results.md` §4's 2/2
   recall result **against the whole-file corpus**. The *design* is settled; the *recall figure's

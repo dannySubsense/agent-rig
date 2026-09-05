@@ -130,8 +130,9 @@ assignment-based, all name-agnostic**: (1) comparison operand, (2) slice/truncat
 **no vocabulary gate, no case restriction**). Context 3 is the corrected addition — Architecture §2
 cites `results.md` §4's recall table showing this is the only rule achieving 2/2 recall on the two
 real historical incidents (`_HEAD_BYTES = 65_536`, `filing_text_max_bytes: int = 512_000`), both of
-which are assignments. Plus the three remaining explicit exclusions (non-slice-stop index,
-test/tests/fixtures path component, literal set `{0, 1, -1, 2}`).
+which are assignments. Plus the two remaining explicit exclusions (non-slice-stop index,
+test/tests/fixtures path component). **The literal-value exclusion `{0, 1, -1, 2}` is REMOVED,
+2026-09-05 (Danny's decision, Architecture §2) — there is no literal-value filter in this design.**
 
 **Depends On:** —
 
@@ -171,17 +172,19 @@ test/tests/fixtures path component, literal set `{0, 1, -1, 2}`).
   because a `range()` positional argument is a call argument, never itself a comparison operand, a
   slice bound, or a module/class-level assignment target under any candidate rule. It was never a
   live exclusion; it is dead code and is not implemented.
-- `{0, 1, -1, 2}` exclusion set is NOT YET BENCHMARKED for precision — carries the full executable
-  validation plan from Architecture §2 (unfiltered scan of the roster corpus already committed in
-  `candidates.jsonl`, 200-row stratified hand-labeled sample, exclude a value only if measured
-  precision < 5%). Leverage is measured (60.5% of all rule-(c) candidates fall inside this set,
-  `results.md` §3) but correctness is not — do not treat as validated until that plan runs.
+- `{0, 1, -1, 2}` exclusion set — **REMOVED, 2026-09-05** (Danny's decision, Architecture §2, cold
+  Frank spec-gate attempt 4 F1). No literal-value filter exists in this design; the implementation
+  must not carry one. Volume this removal adds (60.5% of rule-(c) candidates were previously
+  excluded by this filter, `results.md` §3, historical figure only) is absorbed by `log_only` mode
+  (§5), not by re-filtering.
 
 **Tests:**
 - [ ] Each of the 3 syntactic contexts flags a matching literal (one case per context, including a
   module-level assignment case and a class-level assignment case for context 3).
 - [ ] Non-slice-stop index (`x[i]`) is not flagged; slice-stop (`x[:50000]`) is flagged.
-- [ ] Literals `0, 1, -1, 2` are never flagged in any context (current unbenchmarked exclusion set).
+- [ ] Literals `0, 1, -1, 2` ARE flagged like any other threshold-shaped literal in any of the
+  three contexts (direction reversed, 2026-09-05: the exclusion set previously asserted here is
+  removed, Architecture §2/Danny's decision — no literal value is exempt from flagging).
 - [ ] Files under a `test`/`tests`/`fixtures` path component produce no flags.
 - [ ] A qualifying module-level or class-level named assignment (e.g. `MAX_RETRIES = 500`, and a
   lowercase-named equivalent such as `filing_text_max_bytes = 512_000`) IS flagged, with
@@ -251,9 +254,9 @@ incumbent's `PROXIMITY_WINDOW = 5`.
   or unassigned ownership is invalid. See Architecture §4 for the full mechanical rule.
 - **Self-scan is reopened and resolved, not moot (Architecture §8/§13, G-9).** With assignment
   detection restored (Slice 3), every module-level and class-level `NAME = <literal>` assignment in
-  this probe file itself is in scope for the local-threshold pass, unconditionally. Neither
-  `PROXIMITY_WINDOW = 5` (incumbent, unchanged) nor `PROXIMITY_WINDOW_THRESHOLD = 2` (this slice) is
-  in `{0, 1, -1, 2}`, so neither is exclusion-protected. `PROXIMITY_WINDOW_THRESHOLD = 2` carries its
+  this probe file itself is in scope for the local-threshold pass, unconditionally. There is no
+  literal-value exclusion in this design (`{0, 1, -1, 2}` removed, 2026-09-05, Architecture §2), so
+  neither constant is exclusion-protected regardless of its value. `PROXIMITY_WINDOW_THRESHOLD = 2` carries its
   own citation comment (above) and is therefore marked, not flagged. The incumbent's
   `PROXIMITY_WINDOW = 5` is **out of this sprint's file-touch scope** (Architecture §1: the
   incumbent's existing lines are not edited) and does **not** currently carry a
@@ -504,8 +507,9 @@ grep-based test satisfying US-4 AC2 / Architecture §8's G-4 disposition.
   or user-facing log message anywhere in the probe/wrapper source asserts or implies a citation's
   correctness — check literal string templates, not runtime output alone.
 - Each of the three syntactic detection contexts (comparison, slice/truncation, module/class-level
-  assignment), each of the three remaining exclusions (non-slice-stop index, test-path component,
-  `{0, 1, -1, 2}`), both citation-satisfying forms (citation vs. named-owner PROVISIONAL), and the
+  assignment), each of the two remaining exclusions (non-slice-stop index, test-path component —
+  the `{0, 1, -1, 2}` exclusion is REMOVED, 2026-09-05, Architecture §2; no fixture should assert it),
+  both citation-satisfying forms (citation vs. named-owner PROVISIONAL), and the
   unowned-PROVISIONAL-treated-as-absent edge case (Requirements Edge Cases table) each need at least
   one fixture case if not already covered by Slices 3–4's unit tests — this slice is about
   corpus-level (integration) coverage, not duplicating unit tests. **This fixture is now
@@ -616,10 +620,9 @@ value directly rather than assuming).
 
 **Depends On:** Slices 1–11
 
-**Files:** none new — verification only. §2's exclusion-set benchmarking plan (unfiltered
-roster-corpus scan, 200-row stratified sample, per Architecture §2) is separate future work, not
-part of this slice's deliverable; any resulting change to the `{0, 1, -1, 2}` exclusion set is a
-follow-up edit to `02-ARCHITECTURE.md`, tracked separately.
+**Files:** none new — verification only. There is no exclusion-set benchmarking plan to run —
+the `{0, 1, -1, 2}` literal-value exclusion was removed, 2026-09-05 (Danny's decision, Architecture
+§2); nothing here is deferred behind it.
 
 **Tests:**
 - [ ] At least one real `Edit`/`Write`-triggered run completes and appends a single, schema-valid
@@ -666,12 +669,9 @@ follow-up edit to `02-ARCHITECTURE.md`, tracked separately.
 - Auto-promotion tooling from `log_only` to `blocking`.
 - Multi-language support beyond Python (Bash/TS/JSON thresholds unscanned by v1 of either pass).
 - Resolving DDR-010 (Gate Assertion-Coverage Check, `market_data`, still DRAFT).
-- Running §2's `{0, 1, -1, 2}` exclusion-set benchmarking plan (unfiltered roster-corpus scan,
-  JSONL dump, 200-row stratified hand-labeled sample) — the plan is fully specified in Architecture
-  §2, but executing it is out of scope for this roadmap; the current exclusion set ships unvalidated
-  until that plan runs.
-- Tightening the §2 exclusion set based on Slice 12's findings — follow-up work, not a new slice in
-  this roadmap.
+- **REMOVED, not deferred:** the `{0, 1, -1, 2}` literal-value exclusion set and its associated
+  benchmarking/labeling plan no longer exist in this design (Architecture §2, Danny's decision,
+  2026-09-05) — there is nothing here to run or tighten later.
 - Any rewrite, retirement, or redesign of the incumbent's manifest-gated cross-domain check itself
   (schema, trigger, scan surface, `DOMAIN-BOUNDARY:` marker, decision logic) — untouched by this
   sprint per Architecture §1/§11.

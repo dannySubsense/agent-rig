@@ -275,7 +275,7 @@ class Scanner(ast.NodeVisitor):
 # no textual fallback by design (false-positive risk against strings/type hints).
 FRAGMENT_ASSIGN_RE = re.compile(
     r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*[\w.\[\], ]+)?\s*=\s*"
-    r"(-?\d[\d_]*|True|False)\s*(?:#.*)?$"
+    r"(-?\d[\d_]*(?:\.\d[\d_]*)?|True|False)\s*(?:#.*)?$"
 )
 
 PARSE_DIRECT = "direct_parse"
@@ -317,7 +317,7 @@ def regex_fallback_candidates(repo: str, relpath: str, source: str) -> list[Cand
             val = False
         else:
             try:
-                val = int(raw)
+                val = float(raw) if "." in raw else int(raw)
             except ValueError:
                 continue
         out.append(Candidate(
