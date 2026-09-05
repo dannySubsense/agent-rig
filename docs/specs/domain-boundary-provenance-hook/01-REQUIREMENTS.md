@@ -121,7 +121,10 @@ incidents this hook exists to prevent (`_HEAD_BYTES = 65_536` and `filing_text_m
 512_000`, both named-constant assignments) — measured recall 0/2 under the two-context rule, 2/2
 under the corrected three-context rule (Architecture §2, `results.md` §4).
 
-Detection is Python-only, AST-based. Explicit exclusions: non-slice indexing, test/fixture paths,
+Detection is Python-only, AST-based, with a per-line regex fallback used only for the module/class-level
+assignment context when `ast.parse` fails on a fragment (Architecture §2.1) — the other two contexts
+(comparison operand, slice/truncation argument) have no fallback and silently yield no candidate on
+an unparsable fragment. Explicit exclusions: non-slice indexing, test/fixture paths,
 and the literal set `{0, 1, -1, 2}` (NOT YET BENCHMARKED for precision — ships with a
 fully-specified executable validation plan in Architecture §2; not to be treated as validated
 until that plan runs). The `range()`-bound exclusion previously listed here has been removed: the

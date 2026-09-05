@@ -209,7 +209,8 @@ identified in the traced expectation below — I2 sliced with its original 4-spa
 enclosing `class` line, which recovered via strategy 2 (dedent-retry) or strategy 3 (regex
 fallback) depending on exact slice boundaries. This is a real execution against fragments sliced
 live from the working tree and from `git show 7d9fdf5:research/pipeline/config.py`, not a logic
-trace, and it is corroborated by a byte-identical corpus regression (same file referenced above).
+trace. A byte-identical corpus regression was reported verbally during this pass but was **not
+committed anywhere as re-runnable evidence** — it is not cited here as corroboration.
 
 **Scope of what was confirmed, stated precisely so it is not over-read:** this rerun validates
 **context 3 (module/class-level assignment) only** — both ground-truth incidents are context 3,
@@ -317,7 +318,8 @@ This is a Roadmap-tracked open item (§13), not resolved by this architecture do
 labeling run itself is out of scope for an architecture-fix task and belongs to
 implementation/forge follow-up.
 
-**AST-based, Python-only, no regex fallback** — same posture as the prior pass: syntactic
+**AST-based, Python-only; regex fallback only for context 3** — contexts 1-2 have no regex
+fallback by design (see the robustness table above), same posture as the prior pass: syntactic
 detection needs a real parse tree to reliably distinguish "is this a comparison operand" from
 "is this token merely near a `<`," and, now, "is this a module/class-level assignment target" from
 "is this an arbitrary name token." Python's stdlib `ast` module is a new import for this probe
@@ -827,7 +829,7 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 |---------|-------|-----------|
 | Two independent detection passes, one combined decision | `run()` (§3) | Composes cleanly without duplicating the wrapper/probe/hook-registration machinery for a second hook entry; keeps one `PreToolUse` call, one track-record entry, one deny-schema emission per Claude Code's own one-decision-per-call constraint. |
 | Fail-safe config default (absent mode file → `log_only`, never `blocking`) | `load_mode_config` (§5) | Mirrors the incumbent's "absent manifest → allow" fail-safe posture — an unconfigured or partially-installed hook must always default toward the less disruptive behavior, never the more disruptive one. |
-| AST-based syntactic detection over regex | `detect_threshold_literals` (§2) | Reliably distinguishes "literal is a comparison operand" from "literal merely appears near a comparison token," and now "assignment target is at module/class body scope" from "name token appears anywhere" — same rationale the discarded design already established, extended to the new assignment context. |
+| AST-based syntactic detection, with a context-3-only regex fallback for unparsable fragments | `detect_threshold_literals` (§2) | Reliably distinguishes "literal is a comparison operand" from "literal merely appears near a comparison token," and now "assignment target is at module/class body scope" from "name token appears anywhere" — same rationale the discarded design already established, extended to the new assignment context. Contexts 1-2 stay AST-only, no fallback. |
 | Shape-only detection, no name-vocabulary or case gate | `detect_threshold_literals` (§2) | **Vocabulary-gate false-negative/false-positive figures removed this revision (G-4, `05-REVIEW.md`, HIGH)** — the prior "8/10 words never fire, 11 measured false positives" pair was inherited from the discarded name-gate/vocabulary design and does not appear anywhere in `results.md`; the current script implements no vocabulary gate and cannot have produced them. Deleted, not re-derived, because the decision does not need them: restricting assignment targets to UPPER_CASE (rule (d)) alone already drops recall on the real I2 incident (a lowercase dataclass field) from 2/2 to 1/2 (`results.md` §4, cited and verified) — that single, real, cited measurement is sufficient to reject both case-gating and, by the same shape-vs-vocabulary reasoning, name-vocabulary gating. No fabricated number is needed to support a decision the recall table already carries on its own. |
 | Two independently-justified proximity windows, one per pass | `PROXIMITY_WINDOW` (incumbent, 5, unchanged) / `PROXIMITY_WINDOW_THRESHOLD` (new, 2, §4/§7) | The incumbent's window was never measured against this corpus and predates this benchmark; importing it into the new pass on an unmeasured assumption of shared applicability would repeat the same "promoted default" failure mode this repo's CLAUDE.md names explicitly. Measuring and citing a window specific to the new pass's own candidate population (`results.md` §5) is the correct scope for the citation, even though it costs a second constant to maintain. |
 
@@ -930,15 +932,17 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   validated until that plan runs; running it is Roadmap/forge follow-up, not resolved here.
 - **§2's assignment context** — ADDED this pass (context 3, `assign_module_or_class`), replacing
   the prior revision's complete removal of assignment detection. Cited to `results.md` §4's 2/2
-  recall result **against the whole-file corpus**. Not fully resolved as open, per G-1 below — the
-  three-context *design* is settled; the *recall figure's applicability to the real scan surface*
-  is not yet.
+  recall result **against the whole-file corpus**. The *design* is settled; the *recall figure's
+  applicability to the real scan surface* was open as of that citation and is now RESOLVED for
+  context 3 by the fragment-shaped rerun — see G-1 immediately below.
 - **G-1 (`05-REVIEW.md`, CRITICAL) — fragment-vs-whole-file scan surface — RESOLVED for context 3
   this pass (2026-09-05).** The fragment-shaped rerun (`results-fragment-shaped.md`) executed the
   fixed three-strategy `detect_threshold_literals` against realistic `new_string`-shaped fragments
   (changed line(s) + 0/1/3 lines of real context, real indentation, including the worst case: I2
-  indented with no enclosing class line) for both ground-truth incidents and got 9/9 PASS, plus a
-  byte-identical corpus regression. **Contexts 1-2 remain unmeasured by design** — no regex
+  indented with no enclosing class line) for both ground-truth incidents and got 9/9 PASS. A
+  byte-identical corpus regression was reported during this pass but was not committed as
+  re-runnable evidence, so it is not cited as corroboration here. **Contexts 1-2 remain unmeasured
+  by design** — no regex
   fallback exists for them, so this result does not extend to the whole detector, only to context
   3. **Precision is still unmeasured** — no false-positive labeling has been done on the regex
   fallback at fragment or whole-file scale; that remains open. Additionally, the rerun surfaced a

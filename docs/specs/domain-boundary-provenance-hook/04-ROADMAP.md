@@ -144,8 +144,10 @@ test/tests/fixtures path component, literal set `{0, 1, -1, 2}`).
 - Operates on `scan_surface` text only via `ast.parse`, never reads `file_path` from disk;
   `file_path` used only for the `.py`/test-path exclusion checks (Architecture §7 docstring is the
   contract).
-- Syntax error on `ast.parse` → return `[]` (fail-open on unparsable partial-edit fragment, not a
-  crash).
+- Syntax error on `ast.parse` → attempt strategy 2 (`textwrap.dedent` retry on `IndentationError`),
+  then strategy 3 (per-line regex fallback, context 3 only); only if all three strategies fail does
+  the function return `[]` (fail-open on a genuinely unparsable fragment, not a crash). See the
+  fragment-robustness note below for the full three-strategy chain.
 - The assignment context is detected via one additional `ast.walk` pass over the same already-parsed
   tree (Architecture §5.1/§2.1) — module-level `Assign`/`AnnAssign` nodes at `Module` body scope,
   and class-level `Assign`/`AnnAssign` nodes at `ClassDef` body scope, whose value is a numeric or
