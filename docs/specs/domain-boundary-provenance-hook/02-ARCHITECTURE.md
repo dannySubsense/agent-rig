@@ -130,6 +130,82 @@ repo's DDR-001 recommendation criteria: **full recall on the disqualifying groun
 lower candidate volume**, especially since `log_only` mode (§5) makes the extra volume a logging
 cost, not a blocking cost. Rule (c) is adopted.
 
+### 2.1 Fragment-Robustness Fix (G-1, `05-REVIEW.md`, CRITICAL — resolved this revision)
+
+**The recall table above was measured against whole `.py` files. The hook does not scan whole
+files.** `get_scan_surface` (§1, reused verbatim) returns only `tool_input.new_string` (`Edit`) or
+`tool_input.content` (`Write`) — for an `Edit`, this is frequently an indented fragment with no
+enclosing module/class/def statement. `ast.parse()` on a fragment shaped exactly like I2's real
+incident —
+
+```
+    filing_text_max_bytes: int = 512_000
+```
+
+— (an indented class-body line with no enclosing `class Foo:` in the fragment) raises
+`IndentationError` (a `SyntaxError` subclass). The unqualified `ast.parse(scan_surface) ... except
+SyntaxError: return []` behavior would swallow this exception and silently return zero candidates
+— exactly the failure mode this correction pass exists to fix, one layer down. No document
+previously named this.
+
+**Fix, effective this revision — `detect_threshold_literals` attempts up to three parse strategies,
+not one:**
+
+1. `ast.parse(scan_surface)` — succeeds for whole files, `Write`-supplied full-file content, and
+   any `Edit` fragment that is already valid starting at column 0 (e.g. a top-level statement, or a
+   module-level assignment fragment — I1's shape).
+2. On `IndentationError` specifically (not any other `SyntaxError`) — retry
+   `ast.parse(textwrap.dedent(scan_surface))`. This recovers a fragment that is uniformly
+   over-indented relative to a valid top-level parse — I2's shape, when the `Edit`'s `new_string`
+   is just the changed line(s) at a consistent indentation with no partial/mismatched braces.
+3. If both (1) and (2) still raise `SyntaxError` (any `SyntaxError`, not only `IndentationError` —
+   e.g. a fragment spanning a partial class header with a dangling `:`, or mixed indentation across
+   multiple lines) — fall back to a **per-line regex scan restricted to the assignment context
+   only**: a line matching
+   `^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*[\w.\[\], ]+)?\s*=\s*(-?\d[\d_]*|True|False)\s*(?:#.*)?$`
+   (an optionally-annotated `NAME = <literal>`, whole-line match, trailing comment permitted) is
+   treated as a fallback `assign_module_or_class` candidate with `target_name` taken from the first
+   capture group. This regex fallback exists **only** for context 3 — see the robustness table
+   below for why the other two contexts do not get one.
+
+**Robustness by context, stated explicitly (required by this correction, not left implicit):**
+
+| Context | Robust to fragment-level parsing? | Why / why not |
+|---|---|---|
+| 1. Comparison operand | **Degrades, no fallback.** A bare comparison fragment often parses standalone once dedented, but a fragment that cuts mid-block can still fail all three `ast` strategies. No regex fallback is specified: a naive per-line `<`/`>` scan has high false-positive risk against string literals, f-strings, and type hints, so a silent miss is preferred here over a noisy textual fallback. |
+| 2. Slice/truncation argument | **Degrades, no fallback,** same reasoning as context 1 — `[:N]`-shaped tokens appear inside string literals and type hints too, so no regex fallback is added. |
+| 3. Module/class-level named assignment | **Robust**, via the three-strategy chain above. Both real historical incidents (I1, I2) are exactly this shape, and `NAME = <literal>` / `NAME: type = <literal>` is a low-ambiguity whole-line textual pattern (a full assignment statement, not a substring match) — the risk/reward tradeoff that keeps contexts 1-2 fallback-free does not apply here. |
+
+Contexts 1-2 keep the pre-existing fail-open behavior (an unparsable fragment yields no candidate
+from these contexts specifically); context 3 gets the fallback chain because it is both the shape
+that matters most (both ground-truth incidents) and the shape safest to detect textually.
+
+**Status of the 2/2 recall claim after this fix: NOT YET VALIDATED AT THE REAL SCAN SURFACE.**
+`results.md` §4's 2/2 table was measured against whole files. Tracing both incidents through the
+fixed chain above (a logic trace, not a re-run measurement):
+- **I1** (`_HEAD_BYTES = 65_536`, module-level, unindented) — an `Edit` fragment containing just
+  this line parses unchanged under strategy 1. Recall for I1 is expected to hold under fragment
+  input.
+- **I2** (`filing_text_max_bytes: int = 512_000`, class-body, indented) — a single-line `Edit`
+  fragment raises `IndentationError` under strategy 1 and is expected to recover under strategy
+  2's `textwrap.dedent` (a single indented line dedents cleanly). A multi-line fragment that
+  includes a partial class header, or mixed indentation, is not guaranteed to recover under
+  strategy 2 (`dedent` strips a common whitespace prefix; it does not reconstruct a missing `class
+  Foo:` line) and would depend on strategy 3's regex fallback, which recovers a bare `NAME =
+  <literal>` line regardless of surrounding context.
+
+**This is a traced expectation, not a measured result.** Per this correction's own required
+follow-up: re-run `results.md` §4's two-incident recall method against **simulated `new_string`-
+style fragments** — for I1 and I2, construct the fragment an `Edit` would actually propose (the
+changed line(s) plus 0, 1, and 3 lines of real surrounding context, at the real file's actual
+indentation, not the whole file), run the fixed three-strategy `detect_threshold_literals` against
+each variant, and record PASS/MISS per variant. This is a small, scoped, re-runnable addition to
+`scan_thresholds.py` (or a sibling script) — precisely specifiable, not requiring a full
+`benchmark`-agent dispatch, but **it has not been run as part of this architecture-fix pass.** Until
+it runs, the 2/2 recall figure must be read as **whole-file recall only**; fragment-level recall
+(the population the hook actually consumes) is **NOT YET VALIDATED** and this document does not
+claim otherwise. Tracked as an open item, §13.
+
 **On keeping contexts 1–2 (comparison, slice/truncation) alongside the new context 3**: kept, not
 dropped. Both incidents are assignment-shaped, so contexts 1–2 add zero incremental recall on the
 two disqualifying ground-truth cases specifically — that is stated plainly, not glossed over. They
@@ -378,14 +454,43 @@ an unmeasured assumption of shared applicability either. `THRESHOLD-PROVENANCE:`
 for its own pass: 5 lines (incumbent, unchanged, out of scope for re-justification here) and 2
 lines (new, cited to `results.md` §5).
 
-**v1 citation rule for the new check:**
-- A citation is a comment line containing the literal marker `THRESHOLD-PROVENANCE:`
-  (case-sensitive, exact string) followed by non-whitespace content on the same line.
-- The marker must appear within **2 lines (inclusive) above or below** the line containing the
-  flagged literal — `PROXIMITY_WINDOW_THRESHOLD = 2`, cited to
-  `docs/research/domain-boundary-hook-benchmark/results.md` §5, per the table above.
-- Same location rule as the incumbent: citation lives in the same file as the flagged literal, not
-  a separate doc.
+**v1 citation rule for the new check — RESOLVED this revision (G-2, `05-REVIEW.md`, CRITICAL).**
+Prior wording checked marker-presence-plus-non-whitespace-content only, which `#
+THRESHOLD-PROVENANCE: TODO` would satisfy — a direct contradiction of `01-REQUIREMENTS.md` AC2 and
+its Edge Case row ("a PROVISIONAL tag that does not name a human owner → treated as absent,
+flagged"), and of Danny's 2026-09-05 ruling that self-assigned or unassigned ownership is invalid.
+**Requirements is correct; this section was wrong. Fixed here, not the other way around** — bare
+presence never satisfies the check.
+
+A `THRESHOLD-PROVENANCE:` line satisfies the check if and only if **all** of the following hold:
+
+1. The line contains the literal marker `THRESHOLD-PROVENANCE:` (case-sensitive, exact string),
+   followed by non-whitespace content on the same line — necessary but **not sufficient**.
+2. The marker appears within **2 lines (inclusive) above or below** the line containing the
+   flagged literal — `PROXIMITY_WINDOW_THRESHOLD = 2`, cited to
+   `docs/research/domain-boundary-hook-benchmark/results.md` §5, per the table above.
+3. Same location rule as the incumbent: citation lives in the same file as the flagged literal,
+   not a separate doc.
+4. **The content after the marker satisfies at least one of the two amendment-required forms,
+   checked mechanically:**
+   - **(a) Citation** — the content after the marker contains a checkable pointer, matched by any
+     of: a file-path-shaped token (regex `[\w./-]+\.(py|md|json|ts|tsx|sh)\b`), a URL
+     (`https?://`), or a DDR reference (`DDR-\d+`). Example: `THRESHOLD-PROVENANCE:
+     docs/research/domain-boundary-hook-benchmark/results.md §5`.
+   - **(b) Named human owner** — the content after the marker contains the case-insensitive
+     substring `owner:` (or `owner -`/`owner —`, matching the incumbent's own `PROVISIONAL —
+     owner: wright` convention) immediately followed, after optional whitespace/dashes, by a name
+     token matching `[A-Za-z][A-Za-z0-9_-]*` that is **not** one of the following disallowed
+     placeholder tokens (case-insensitive, exact match on the token): `TODO`, `TBD`, `unassigned`,
+     `unknown`, `none`, `self`, `N/A`. Example: `THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright`.
+   - **A bare `THRESHOLD-PROVENANCE: PROVISIONAL` or `THRESHOLD-PROVENANCE: TODO` with no citation
+     pointer and no `owner: <name>` token satisfies neither (a) nor (b) and is treated as absent —
+     the literal is flagged**, exactly as `01-REQUIREMENTS.md`'s Edge Case row requires.
+
+This is the single answer mirrored into `01-REQUIREMENTS.md` (already stated correctly there — no
+change needed) and `04-ROADMAP.md` Slices 4 and 9 (both corrected to match, see those slices).
+Roadmap Slice 4's prior "presence is presence" framing is deleted, not merely softened — it was the
+literal statement of the bug this fix removes.
 
 ## 5. Rollout: `log_only` Mode (new capability, both checks)
 
@@ -472,24 +577,33 @@ call on every `.py` `Edit`/`Write` (§2, §7) — a materially different cost pr
 inherited bound, and the benchmark audit is correct that this cannot be silently inherited without
 re-justification.
 
-**Disposition: verified directly against this repo, not left as an unvalidated inheritance.**
-Measured 2026-09-05, reproducible via `python3 -c "import ast, time; ..."` against this repo's own
-files:
-- `ast.parse()` against this repo's actual largest `.py` file (`tests/test_first_turn_contract_probe.py`,
-  949 lines) took **~8ms** average over 50 runs.
-- `ast.parse()` against a synthetic 10,010-line file (well beyond any single file currently in this
-  repo or the roster corpus) took **~76ms** average over 20 runs.
+**Disposition, corrected this revision (G-3, `05-REVIEW.md`, HIGH — the prior ~8ms/~76ms pair was
+not a real citable measurement).** The previously-stated "~8ms / ~76ms, measured 2026-09-05,
+reproducible" figures are **discredited numbers, not this document's own measurement** — the
+committed `scan_thresholds.py` docstring (L8-L13) names 76ms by value as one of three numbers from
+the prior, superseded audit that were **not reproducible**, and records Frank's cold re-run at
+**377ms**. Carrying 76ms forward as "measured, reproducible" in this section directly contradicted
+the one committed artifact that names it. That pair is deleted, not softened.
 
-Both figures are more than **two orders of magnitude below the 5,000ms budget** (76ms is 1.5% of
-the budget even at 10x this repo's largest real file). This is a citable, reproducible measurement
-against this repo (not a back-of-envelope guess and not a claim about "commodity hardware" in the
-abstract) — `ast.parse`'s cost is negligible relative to the existing 5s bound for any file size
-plausible in this codebase or the roster corpus, and adding a third detection context (§2, module/
-class-level assignment scan) does not change this: it is one additional `ast.walk` pass over the
-same already-parsed tree, not a second `ast.parse` call. **The 5s timeout is re-justified as-is for
-this sprint's addition; no re-measurement Roadmap slice is required for the `ast.parse` cost
-specifically.** The timeout constant's own PROVISIONAL/owner framing in the wrapper file is a
-pre-existing artifact outside this sprint's file-touch scope (see report) and is not edited here.
+**Corrected disposition: use Frank's re-run figure (377ms, logged in `GATE-LOG.md` attempt 3) as
+the only currently-committed, reproducible timing data point for this class of `ast.parse` cost.**
+This is still more than **13x below the 5,000ms budget** (377ms is 7.5% of the budget) — the
+conclusion (timeout is adequate) is unchanged and does not depend on the discredited 8ms/76ms pair.
+No new number is invented in its place: `results.md` itself carries no independent `ast.parse`
+timing measurement of its own (its docstring only reports the two prior-audit figures and states
+them as unreproducible), so **this section's own timing figure needs re-measurement against this
+repo's current corpus** before it can be cited as this document's own reproducible number, rather
+than a borrowed cold-re-run figure from a different gate. This is a Roadmap-tracked open item
+(§13) — re-run `python3 -c "import ast, time; ..."` (or equivalent) against this repo's actual
+largest `.py` file and a synthetic worst-case file, commit the script or the exact command used,
+and cite the result here by path, the same discipline `results.md` already applies to every other
+number in this document. Until that re-run happens, **377ms is the disposition, cited to
+`GATE-LOG.md` attempt 3, not to an unlabeled "measured 2026-09-05" claim** — the conclusion (5s
+timeout is adequate) holds under this number and is not blocked on the re-run, but the re-run
+itself is required before this section can claim its own reproducible measurement rather than
+borrowing another gate's number. The timeout constant's own PROVISIONAL/owner framing in the
+wrapper file is a pre-existing artifact outside this sprint's file-touch scope (see report) and is
+not edited here.
 
 ## 6. Data Schema Changes
 
@@ -594,15 +708,24 @@ def load_mode_config(project_dir: str) -> str:
     read failure, or schema-invalid content (fail-safe default, §5)."""
 
 def detect_threshold_literals(file_path: str, scan_surface: str) -> list[FlaggedLiteral]:
-    """AD-1 detection (§2, redesigned this pass against committed benchmark evidence — three
+    """AD-1 detection (§2/§2.1, redesigned this pass against committed benchmark evidence - three
     shape-based contexts: comparison operand, slice/truncation argument, and module/class-level
     named assignment (any target name, no vocabulary or case gate)). file_path used only to apply
-    the test/fixture path exclusion and the .py extension gate — never read from disk; operates on
-    scan_surface text only, parsed via ast.parse(scan_surface, ...) with a syntax-error -> return
-    [] (fail-open: an unparsable partial-edit fragment is not flagged, not crashed on). The
-    assignment context is detected via one additional ast.walk pass over the same parsed tree
-    (§5.1) — module-level Assign/AnnAssign nodes at Module body scope, and class-level Assign/
-    AnnAssign nodes at ClassDef body scope, whose value is a numeric or boolean ast.Constant."""
+    the test/fixture path exclusion and the .py extension gate - never read from disk; operates on
+    scan_surface text only.
+
+    Parsing (§2.1, G-1 fix - fragment-robust, not a single ast.parse call):
+      1. ast.parse(scan_surface).
+      2. On IndentationError only: retry ast.parse(textwrap.dedent(scan_surface)).
+      3. On any remaining SyntaxError: fall back to a per-line regex scan for context 3
+         (module/class-level assignment) ONLY - contexts 1-2 have no regex fallback and yield no
+         candidates for an unparsable fragment (fail-open, per §2.1's robustness table).
+    Contexts 1 and 2 are extracted only when a full ast.walk succeeds (strategies 1 or 2); context
+    3 candidates may additionally come from strategy 3's regex fallback, tagged the same as an
+    ast-derived assign_module_or_class candidate with target_name from the regex capture.
+    Module-level Assign/AnnAssign nodes at Module body scope, and class-level Assign/AnnAssign
+    nodes at ClassDef body scope, whose value is a numeric or boolean ast.Constant, feed context 3
+    when an ast.walk is available."""
 
 class FlaggedLiteral(TypedDict):
     line_index: int         # 0-based, within scan_surface
@@ -621,7 +744,14 @@ def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bo
     THRESHOLD-PROVENANCE: — a distinct constant and a distinct marker string from the incumbent's
     has_qualifying_marker_in_window (which uses PROXIMITY_WINDOW = 5 against DOMAIN-BOUNDARY:).
     The two passes of this hook now use two independently-justified, independently-cited window
-    values; this function does not read or depend on the incumbent's PROXIMITY_WINDOW."""
+    values; this function does not read or depend on the incumbent's PROXIMITY_WINDOW.
+
+    Per §4's G-2 resolution: marker presence alone is NOT sufficient. Returns True only if a
+    THRESHOLD-PROVENANCE: line exists in-window AND its trailing content matches the citation
+    pattern (path/URL/DDR-NNNN) OR the named-owner pattern (owner: <name>, name not in the
+    placeholder blocklist {TODO, TBD, unassigned, unknown, none, self, N/A}). A bare
+    'THRESHOLD-PROVENANCE: PROVISIONAL' or '...: TODO' with neither returns False (treated as
+    absent, per 01-REQUIREMENTS.md's Edge Case row)."""
 
 def run_cross_domain_pass(project_dir, tool_input, scan_surface) -> PassResult:
     """Incumbent's existing steps 2-7 (manifest load, normalize, glob match, identifier scan,
@@ -675,7 +805,7 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 | Two independent detection passes, one combined decision | `run()` (§3) | Composes cleanly without duplicating the wrapper/probe/hook-registration machinery for a second hook entry; keeps one `PreToolUse` call, one track-record entry, one deny-schema emission per Claude Code's own one-decision-per-call constraint. |
 | Fail-safe config default (absent mode file → `log_only`, never `blocking`) | `load_mode_config` (§5) | Mirrors the incumbent's "absent manifest → allow" fail-safe posture — an unconfigured or partially-installed hook must always default toward the less disruptive behavior, never the more disruptive one. |
 | AST-based syntactic detection over regex | `detect_threshold_literals` (§2) | Reliably distinguishes "literal is a comparison operand" from "literal merely appears near a comparison token," and now "assignment target is at module/class body scope" from "name token appears anywhere" — same rationale the discarded design already established, extended to the new assignment context. |
-| Shape-only detection, no name-vocabulary or case gate | `detect_threshold_literals` (§2) | Benchmark-measured on two axes: (1) the discarded English-word vocabulary gate produced both false negatives (8/10 words never fire in this repo) and false positives (substring matches inside unrelated identifiers) — dropped, not reintroduced; (2) restricting assignment targets to UPPER_CASE (rule (d)) drops recall on the real I2 incident (a lowercase dataclass field) from 2/2 to 1/2 (`results.md` §4) — case-gating is therefore also rejected, not just vocabulary-gating. Both axes point the same direction: pure syntactic shape, no naming-convention assumption. |
+| Shape-only detection, no name-vocabulary or case gate | `detect_threshold_literals` (§2) | **Vocabulary-gate false-negative/false-positive figures removed this revision (G-4, `05-REVIEW.md`, HIGH)** — the prior "8/10 words never fire, 11 measured false positives" pair was inherited from the discarded name-gate/vocabulary design and does not appear anywhere in `results.md`; the current script implements no vocabulary gate and cannot have produced them. Deleted, not re-derived, because the decision does not need them: restricting assignment targets to UPPER_CASE (rule (d)) alone already drops recall on the real I2 incident (a lowercase dataclass field) from 2/2 to 1/2 (`results.md` §4, cited and verified) — that single, real, cited measurement is sufficient to reject both case-gating and, by the same shape-vs-vocabulary reasoning, name-vocabulary gating. No fabricated number is needed to support a decision the recall table already carries on its own. |
 | Two independently-justified proximity windows, one per pass | `PROXIMITY_WINDOW` (incumbent, 5, unchanged) / `PROXIMITY_WINDOW_THRESHOLD` (new, 2, §4/§7) | The incumbent's window was never measured against this corpus and predates this benchmark; importing it into the new pass on an unmeasured assumption of shared applicability would repeat the same "promoted default" failure mode this repo's CLAUDE.md names explicitly. Measuring and citing a window specific to the new pass's own candidate population (`results.md` §5) is the correct scope for the citation, even though it costs a second constant to maintain. |
 
 **Anti-patterns (do not use), unchanged from incumbent plus three additions:**
@@ -755,18 +885,18 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 5. **NORTH-STAR.md** Success Criteria (same Stop-vs-`PreToolUse` mismatch) — **Applied** (prior
    pass), Danny's personal sign-off obtained.
 6. **`01-REQUIREMENTS.md` L110** (benchmark audit, prior pass) — **Applied** (prior pass).
-7. **`01-REQUIREMENTS.md` Detection Rule Pointer / AC bullets / Edge Cases (this pass, NOT yet
-   applied — reported for separate routing, per this task's constraints):** every place in
-   `01-REQUIREMENTS.md` that says "two shape-based syntactic contexts only... the name-gated
-   default-kwarg/assignment context was removed" is now factually wrong — three contexts exist
-   (comparison, slice/truncation, module/class-level named assignment with no vocabulary or case
-   gate), and assignments are the very shape both real historical incidents have. See the
-   accompanying report for the exact line-level list.
-8. **`04-ROADMAP.md` (this pass, NOT edited here — reported for separate routing):** every slice
-   and Done-When item describing "2 shape-based contexts," reusing the incumbent's
-   `PROXIMITY_WINDOW` for the new pass, the `PROXIMITY_WINDOW` self-scan **not**-flagged fixture,
-   and the dead-but-still-listed `range()` exclusion needs updating to match this document's
-   corrected §2/§4/§7/§8. See the accompanying report for the exact slice-level list.
+7. **`01-REQUIREMENTS.md` Detection Rule Pointer / AC bullets / Edge Cases** — **Applied**
+   (confirmed this pass, correcting stale status; `05-REVIEW.md` G-7 flagged this row as reading
+   "NOT yet applied" when it had in fact already been applied — verified by direct read: all three
+   contexts, name-agnostic, are described consistently throughout `01-REQUIREMENTS.md`). No further
+   edit needed.
+8. **`04-ROADMAP.md`** — **Applied** (confirmed this pass, correcting stale status; same G-7
+   finding). Slice 3's three-context description, Slice 4's independent `PROXIMITY_WINDOW_THRESHOLD`
+   constant, Slice 9's self-scan-**IS**-flagged fixture direction, and the removed `range()`
+   exclusion are all present and consistent in `04-ROADMAP.md` as read this pass. Only this pass's
+   *new* Roadmap fixes (G-2's owner-required marker rule in Slices 4/9, and the vocabulary-figure
+   deletion in Slice 3) are additional corrections applied directly in `04-ROADMAP.md` alongside
+   this document, per the task's own corresponding-fix instruction — see that file.
 
 ## 13. Open Items Carried to Forge
 
@@ -777,18 +907,43 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   validated until that plan runs; running it is Roadmap/forge follow-up, not resolved here.
 - **§2's assignment context** — ADDED this pass (context 3, `assign_module_or_class`), replacing
   the prior revision's complete removal of assignment detection. Cited to `results.md` §4's 2/2
-  recall result. Not carried forward as open — the recall question is resolved by the committed
-  benchmark; only the `{0,1,-1,2}` precision question (above) remains open.
+  recall result **against the whole-file corpus**. Not fully resolved as open, per G-1 below — the
+  three-context *design* is settled; the *recall figure's applicability to the real scan surface*
+  is not yet.
+- **G-1 (`05-REVIEW.md`, CRITICAL) — fragment-vs-whole-file scan surface — PARTIALLY RESOLVED this
+  pass.** §2.1 makes `detect_threshold_literals` fragment-robust (three-strategy parse chain,
+  regex fallback for context 3 only) and traces both incidents through it — I1 expected to hold,
+  I2 expected to hold for single-line fragments, not guaranteed for multi-line fragments spanning a
+  partial class header. **The 2/2 recall claim is NOT YET VALIDATED AT THE REAL SCAN SURFACE** —
+  required forge/benchmark follow-up: re-run `results.md` §4's two-incident method against
+  simulated `new_string`-shaped fragments (changed line(s) + 0/1/3 lines of real context, real
+  indentation) using the fixed three-strategy detector, and record PASS/MISS per fragment variant.
+  Small, precisely-specified, re-runnable — not requiring a full `benchmark`-agent dispatch, but not
+  run as part of this pass. Do not treat 2/2 as validated for `Edit`-fragment input until it runs.
+- **G-2 (`05-REVIEW.md`, CRITICAL) — owner-required contradiction — RESOLVED this pass.** §4's v1
+  citation rule now requires either a checkable citation (path/URL/DDR reference) or a named human
+  owner (`owner: <name>`, name not a placeholder token) — bare marker presence no longer satisfies
+  the check. `01-REQUIREMENTS.md` already stated this correctly and needed no change; Architecture
+  §4 and `04-ROADMAP.md` Slices 4 and 9 are corrected to match. Not carried forward as open.
 - **§2's `range()` exclusion** — REMOVED this pass, cited to `results.md` §3 (fires zero times,
   structurally inert under any of rules (a)-(d)). Not carried forward as open.
 - **§4's proximity window** — RESOLVED this pass with a corrected, cited value: `2` lines
   (`PROXIMITY_WINDOW_THRESHOLD = 2`), cited to `results.md` §5's measured 93.5%-at-1/100%-at-2
   distribution. This supersedes both this document's own prior 5-line (reused-incumbent) value and
   the discarded pre-benchmark 3-line value. Not carried forward as open.
-- **§5.1's 5s timeout** — RESOLVED for this sprint's `ast.parse`/`ast.walk` addition specifically
-  (measured directly against this repo, see §5.1); the timeout constant's pre-existing
+- **§5.1's 5s timeout — G-3 (`05-REVIEW.md`, HIGH) resolved for the discredited-number problem,
+  re-measurement still open.** The prior ~8ms/~76ms pair (contradicted by `scan_thresholds.py`'s
+  own docstring, which names 76ms as unreproducible) is deleted. Disposition now cites Frank's
+  377ms cold re-run (`GATE-LOG.md` attempt 3) — still 13x under the 5,000ms budget, so the
+  timeout-adequacy conclusion is unchanged — but this section still needs its own fresh, committed
+  `ast.parse` measurement against this repo's current corpus rather than borrowing another gate's
+  figure; tracked here as the concrete forge follow-up. The timeout constant's pre-existing
   PROVISIONAL/owner framing in the wrapper file itself is unchanged and out of this sprint's
   file-touch scope.
+- **§10's vocabulary-gate figures — G-4 (`05-REVIEW.md`, HIGH) resolved.** "8/10 words never fire" /
+  "11 measured false positives" deleted, not re-derived — absent from `results.md`, produced by no
+  code in the current design, and not load-bearing for the decision (rule (d)'s I2 recall loss,
+  already cited, is sufficient). Not carried forward as open.
 - **§8's self-scan disposition** — REOPENED and RESOLVED this pass with a real answer, not a
   "moot" one: the new `PROXIMITY_WINDOW_THRESHOLD = 2` constant ships pre-cited (§7); the
   incumbent's `PROXIMITY_WINDOW = 5` does not carry a `THRESHOLD-PROVENANCE:` comment and **will**

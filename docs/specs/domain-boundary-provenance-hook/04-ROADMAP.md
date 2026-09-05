@@ -147,13 +147,23 @@ test/tests/fixtures path component, literal set `{0, 1, -1, 2}`).
 - Syntax error on `ast.parse` → return `[]` (fail-open on unparsable partial-edit fragment, not a
   crash).
 - The assignment context is detected via one additional `ast.walk` pass over the same already-parsed
-  tree (Architecture §5.1) — module-level `Assign`/`AnnAssign` nodes at `Module` body scope, and
-  class-level `Assign`/`AnnAssign` nodes at `ClassDef` body scope, whose value is a numeric or
-  boolean `ast.Constant`. Pure-shape rule (module/class body binding), not a word-list match —
-  Architecture §2 explicitly rejects both the discarded vocabulary gate (measured 8/10 words never
-  fire in this repo, plus 11 measured false positives) and case-restriction to
-  `UPPER_CASE`/`UPPER_SNAKE_CASE` targets (drops recall on the real I2 incident, a lowercase
-  dataclass field, from 2/2 to 1/2, `results.md` §4).
+  tree (Architecture §5.1/§2.1) — module-level `Assign`/`AnnAssign` nodes at `Module` body scope,
+  and class-level `Assign`/`AnnAssign` nodes at `ClassDef` body scope, whose value is a numeric or
+  boolean `ast.Constant`. Pure-shape rule (module/class body binding), not a word-list match.
+  **Correction (G-4, `05-REVIEW.md`, HIGH): the discarded vocabulary gate's "8/10 words never fire /
+  11 measured false positives" figures are deleted from this doc set** — they do not appear in
+  `results.md`, the current script implements no vocabulary gate, and they are not needed: the
+  cited, verified recall loss from case-restriction to `UPPER_CASE`/`UPPER_SNAKE_CASE` targets
+  (drops recall on the real I2 incident, a lowercase dataclass field, from 2/2 to 1/2, `results.md`
+  §4) is sufficient on its own to reject both case-gating and name-vocabulary gating.
+- **Fragment-robustness (G-1, `05-REVIEW.md`, CRITICAL, Architecture §2.1):** `detect_threshold_literals`
+  must implement the three-strategy parse chain — `ast.parse(scan_surface)`, then on
+  `IndentationError` only `ast.parse(textwrap.dedent(scan_surface))`, then on any remaining
+  `SyntaxError` a per-line regex fallback restricted to context 3 (module/class-level assignment)
+  only. Contexts 1-2 have no regex fallback (fail-open on unparsable fragments, unchanged). This is
+  required because the hook's real input (`tool_input.new_string`/`content`) is a fragment, not a
+  whole file, and an indented class-body fragment (I2's real shape) raises `IndentationError` under
+  a bare `ast.parse` call.
 - The `range()`-bound exclusion from the prior draft is REMOVED, not carried forward — Architecture
   §2 cites `results.md` §3: it fires zero times across the entire 445-file, four-rule corpus scan,
   because a `range()` positional argument is a call argument, never itself a comparison operand, a
@@ -178,7 +188,16 @@ test/tests/fixtures path component, literal set `{0, 1, -1, 2}`).
   behavior.
 - [ ] No domain-crossing/import-graph check exists anywhere in this function (structural test: grep
   the function body for import-related AST node types — none gate a flag decision).
-- [ ] Syntax-error input returns `[]`, does not raise.
+- [ ] Syntax-error input returns `[]`, does not raise — but ONLY for inputs that fail all three
+  parse strategies (Architecture §2.1); a plain `IndentationError`-only fragment must NOT return
+  `[]` if strategy 2 (`textwrap.dedent`) or strategy 3 (regex fallback, context 3 only) recovers it.
+- [ ] **Fragment-robustness regression (G-1):** an indented class-body single-line fragment shaped
+  exactly like I2's real incident (e.g. `    filing_text_max_bytes: int = 512_000`, no enclosing
+  `class Foo:` in the fragment) IS flagged via strategy 2 (`textwrap.dedent`) or strategy 3 (regex
+  fallback) — direct regression test that the fix resolves the fragment-vs-whole-file gap Architecture
+  §2.1 identifies, not just a design note.
+- [ ] A module-level single-line fragment (I1's shape, e.g. `_HEAD_BYTES = 65_536` alone) IS flagged
+  via strategy 1 (plain `ast.parse`) unchanged.
 
 **Done When:**
 - [ ] All tests pass.
@@ -218,9 +237,16 @@ incumbent's `PROXIMITY_WINDOW = 5`.
   immediately above it, citing `docs/research/domain-boundary-hook-benchmark/results.md` §5 by exact
   path (Architecture §7/§8) — this satisfies the citation form (option a) for this constant's own
   self-scan.
-- A `THRESHOLD-PROVENANCE: PROVISIONAL — ...` line is a valid, complete citation (satisfies
-  option b) — this function only checks marker presence within the window, not which of the three
-  satisfying forms is used (that distinction is not needed here; presence is presence).
+- **Corrected this pass (G-2, `05-REVIEW.md`, CRITICAL — was: "presence is presence"; that
+  framing is deleted, it was the literal statement of the bug).** A `THRESHOLD-PROVENANCE:` marker
+  line satisfies the check only if its trailing content matches EITHER (a) a citation pattern
+  (file-path-shaped token, URL, or `DDR-\d+` reference) OR (b) a named-owner pattern (`owner:` —
+  case-insensitive, `owner -`/`owner —` also accepted — followed by a name token that is not one of
+  the placeholder tokens `TODO`/`TBD`/`unassigned`/`unknown`/`none`/`self`/`N/A`). A bare
+  `THRESHOLD-PROVENANCE: PROVISIONAL` or `THRESHOLD-PROVENANCE: TODO` with neither a citation nor a
+  named owner does NOT satisfy the check and is treated as absent (flagged) — exactly matching
+  `01-REQUIREMENTS.md` AC2 and its Edge Case row, and Danny's 2026-09-05 ruling that self-assigned
+  or unassigned ownership is invalid. See Architecture §4 for the full mechanical rule.
 - **Self-scan is reopened and resolved, not moot (Architecture §8/§13, G-9).** With assignment
   detection restored (Slice 3), every module-level and class-level `NAME = <literal>` assignment in
   this probe file itself is in scope for the local-threshold pass, unconditionally. Neither
@@ -235,9 +261,19 @@ incumbent's `PROXIMITY_WINDOW = 5`.
   as a same-sprint-or-immediate-follow-up file-touch routing decision, not silently absorbed.
 
 **Tests:**
-- [ ] Marker on same line as literal is detected.
-- [ ] Marker 1-2 lines above/below is detected; 3 lines above/below is not.
+- [ ] Marker on same line as literal, carrying a valid citation (path/URL/DDR reference), is
+  detected as satisfying.
+- [ ] Marker on same line as literal, carrying `owner: <real-name>`, is detected as satisfying.
+- [ ] Marker 1-2 lines above/below (with a valid citation or owner) is detected as satisfying; 3
+  lines above/below is not, regardless of content.
 - [ ] Marker text without non-whitespace content after `THRESHOLD-PROVENANCE:` does not satisfy.
+- [ ] **`THRESHOLD-PROVENANCE: PROVISIONAL` alone (no citation, no owner) does NOT satisfy — direct
+  regression test for G-2's resolution.**
+- [ ] **`THRESHOLD-PROVENANCE: TODO` does NOT satisfy — same, G-2 regression.**
+- [ ] **`THRESHOLD-PROVENANCE: PROVISIONAL — owner: TODO` (placeholder token as the "owner") does
+  NOT satisfy — the placeholder-token blocklist is enforced, not just presence of the substring
+  `owner:`.**
+- [ ] `THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright` (real name) DOES satisfy.
 - [ ] A `DOMAIN-BOUNDARY:` marker or bare `PROVISIONAL` (no `THRESHOLD-PROVENANCE:` marker string)
   does not satisfy this check (distinct marker, not interchangeable — direct regression test for
   Architecture §4's "not `DOMAIN-BOUNDARY:`, not bare `PROVISIONAL`" decision).
@@ -470,7 +506,13 @@ grep-based test satisfying US-4 AC2 / Architecture §8's G-4 disposition.
   `{0, 1, -1, 2}`), both citation-satisfying forms (citation vs. named-owner PROVISIONAL), and the
   unowned-PROVISIONAL-treated-as-absent edge case (Requirements Edge Cases table) each need at least
   one fixture case if not already covered by Slices 3–4's unit tests — this slice is about
-  corpus-level (integration) coverage, not duplicating unit tests.
+  corpus-level (integration) coverage, not duplicating unit tests. **This fixture is now
+  satisfiable end-to-end (G-2, `05-REVIEW.md`, CRITICAL, resolved) — prior to this pass, Slice 4's
+  own spec guaranteed this fixture would fail (`THRESHOLD-PROVENANCE: PROVISIONAL — TODO` passed
+  the shipped check). With Slice 4's owner-required rule fixed, add an explicit corpus case: a
+  literal marked only `THRESHOLD-PROVENANCE: PROVISIONAL` (no citation, no `owner:`) must resolve
+  to `unmarked` (flagged) end-to-end through `run_local_threshold_pass()`/`combine()`, not merely at
+  the unit level.**
 
 **Tests:**
 - [ ] All new fixture cases pass under `run()`/`combine()` end-to-end (not just the unit-level
