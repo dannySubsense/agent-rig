@@ -495,3 +495,46 @@ passes — this hook checks presence only, not correctness (§9).
 
 *This document does not self-lock. Per this repo's workflow, it proceeds to Frank's binding
 spec-gate and human approval before any status change from DRAFT.*
+
+---
+
+## Addendum (2026-09-05): Composed with a Local-Threshold Pass, Mode-Gated
+
+**Everything above this line (§2–§10) is unchanged from the LOCKED 2026-08-22 version — no edit was
+made to that text.** This addendum records what a later sprint (`domain-boundary-provenance-hook`
+extension, `docs/specs/domain-boundary-provenance-hook/`) built on top of it. For the full design,
+read `02-ARCHITECTURE.md` §3, §5, §6, and §11 in that sprint's folder — this addendum summarizes and
+points outward rather than restating that document.
+
+**What was added.** The wrapper and probe described above (`.claude/hooks/domain-boundary-
+provenance.sh`, `scripts/domain_boundary_provenance_probe.py`) are no longer single-purpose. A
+second, independent detection pass now runs inside the same invocation: a same-file scan for
+threshold-shaped numeric/boolean literals (comparison operands, slice/truncation bounds, and
+module- or class-level named assignments) that lack a `THRESHOLD-PROVENANCE:` citation comment
+within a 2-line window. This pass carries no manifest and is not gated by one — it runs against any
+in-scope `.py` file's proposed content, unconditionally. The two passes' results are combined into a
+single decision per invocation (`02-ARCHITECTURE.md` §3).
+
+**The behavior change to this document's own §6/§8 — stated plainly, not softened.** A new
+`docs/tooling/domain-boundary-mode.json` config now gates the deny outcome for *both* passes,
+including the cross-domain check this document describes. §6 step 6 of this document reads an
+unmarked identifier match as an unconditional "deny," and Acceptance Criterion 4 states the same
+thing as an absolute: an in-scope match with no qualifying marker "is denied." **That is no longer
+the whole story as shipped.** Whether an unmarked match actually produces a deny now depends on the
+`mode` field in `domain-boundary-mode.json`:
+
+- When `mode == "blocking"`, the outcome this document describes is exactly what happens: an
+  unmarked match denies the `PreToolUse` call, precisely as §6 step 6 and AC4 state.
+- When `mode == "log_only"` — the mode this hook actually ships and runs under as of this sprint —
+  that same unmarked-match condition no longer produces a deny. Instead the probe records a
+  track-record entry with `decision: "flag"`, and the `PreToolUse` call allows the edit through.
+  Nothing is blocked.
+
+In other words, §6 step 6 and AC4's "deny" language describes the `blocking`-mode behavior only.
+Under the default, currently-live configuration, the same detection still runs and is still logged,
+but it no longer stops the edit. This is a real change to a LOCKED document's stated outcome, not a
+new addition sitting alongside the old text without touching it — it is called out here explicitly
+so a future reader does not take §6/§8 at face value without also checking the mode config. See
+`02-ARCHITECTURE.md` §5 for why `log_only` was chosen as the initial rollout mode, §3 for the exact
+mechanics of the mode-aware `combine()` step, and §6 for the resulting `TrackRecordEntry` schema
+(nested `cross_domain`/`local_threshold` objects, plus the new `mode` and `"flag"` decision fields).
