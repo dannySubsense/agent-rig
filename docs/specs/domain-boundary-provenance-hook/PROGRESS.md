@@ -1,5 +1,33 @@
 # Progress: unsourced-threshold-provenance-hook (domain-boundary-provenance-hook)
 
+## Status: IN_PROGRESS
+
+## Slices
+- [ ] Slice 1: Extract `run_cross_domain_pass()` — IN_PROGRESS
+- [ ] Slice 2: Mode Config Loader — PENDING
+- [ ] Slice 3: `detect_threshold_literals()` — PENDING
+- [ ] Slice 4: `has_threshold_provenance_marker()` — PENDING
+- [ ] Slice 5: `run_local_threshold_pass()` — PENDING
+- [ ] Slice 6: `combine()` — PENDING
+- [ ] Slice 7: `TrackRecordEntry` Schema Migration + `run()` Restructure — PENDING
+- [ ] Slice 8: Wrapper Updates — PENDING
+- [ ] Slice 9: Test Corpus Additions — PENDING
+- [ ] Slice 10: Live Wiring — PENDING
+- [ ] Slice 11: Documentation — PENDING
+- [ ] Slice 12: End-to-End Verification — PENDING
+- [ ] **Frank binding forge-gate** — PENDING. Runs once, only after every slice above is checked
+      off. Do not set `Status: COMPLETE` before this line is checked and its verdict is
+      transcribed into this file's `## Forge Gate` section — "all slices done" is not "sprint done."
+
+## Current
+Slice: 1
+Step: @code-executor
+Last updated: 2026-09-05
+
+## Fix Attempts
+| Test/File | Attempts | Last Error |
+|-----------|----------|------------|
+
 ## Spec Gate
 
 Migrated from GATE-LOG.md, 2026-09-05, per the GATE-LOG→PROGRESS.md consolidation (Danny + ledger).
