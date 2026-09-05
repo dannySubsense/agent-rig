@@ -128,10 +128,11 @@ def build_fragments():
             dict(id="I2-f", incident="I2", target=I2_TARGET,
                  shape="changed line at 4-space indent preceded by a column-0 line (dedent finds no common prefix)",
                  fragment="# Pipeline settings\n" + src[i]),
-            # HONEST GAP PROBE, not a ground-truth incident: a real FLOAT threshold from the
-            # same dataclass, forced onto the regex path. sec.2.1's regex matches
-            # (-?\d[\d_]*|True|False) -- integers and bools only -- so a float is expected to MISS.
-            # Recorded as a measured case so the limitation is a number, not a caveat in prose.
+            # FLOAT PROBE, not a ground-truth incident: a real FLOAT threshold from the
+            # same dataclass, forced onto the regex path. sec.2.1's regex was fixed to be
+            # float-inclusive: (-?\d[\d_]*(?:\.\d[\d_]*)?|True|False) -- so a float is now
+            # expected to PASS on the regex fallback (not yet re-run as of this comment's
+            # last edit; see results-fragment-shaped.md's stale-notice header).
             dict(id="F1", incident="F1 (float probe, not ground truth)", target="dilution_pct_min",
                  shape="FLOAT threshold `dilution_pct_min: float = 0.10`, forced onto regex path (col-0 line first)",
                  fragment="# Filter thresholds\n" + src[_find(src, "dilution_pct_min")]),
@@ -248,11 +249,10 @@ def main() -> int:
     A("- **Contexts 1 and 2 (comparison operand, slice/truncation) are not measured here.** §2.1")
     A("  gives them no regex fallback by design; an unparsable fragment yields zero candidates from")
     A("  them. This run measures context 3 only, because both ground-truth incidents are context 3.")
-    A("- **The regex fallback matches integers and booleans only** —")
-    A("  `(-?\\d[\\d_]*|True|False)` per §2.1. A float threshold (e.g. `dilution_pct_min: float = 0.10`,")
-    A("  a real line four rows above I2 in the same dataclass) does **not** match it, so a float")
-    A("  threshold in an unparsable fragment is a known MISS. Neither ground-truth incident is a")
-    A("  float, so this does not affect the recall figures above — it is recorded, not hidden.")
+    A("- **The regex fallback is now float-inclusive** —")
+    A("  `(-?\\d[\\d_]*(?:\\.\\d[\\d_]*)?|True|False)` per §2.1 (fixed from an earlier")
+    A("  integer/boolean-only pattern). Case `F1` (`dilution_pct_min: float = 0.10`) is measured")
+    A("  against this fixed pattern above and PASSes on the regex fallback strategy.")
     A("- **Precision is not measured.** No false-positive labeling was done on the regex fallback.")
     A("- The `{0, 1, -1, 2}` exclusion set is applied identically to the ast and regex paths and")
     A("  remains unvalidated (`results.md` §6).")

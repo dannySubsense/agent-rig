@@ -32,7 +32,7 @@ I2 from `git show 7d9fdf5:research/pipeline/config.py`) — none is hand-typed.
 | `I2-d` | I2 | changed line + 3 real body lines after (indented, no class line) | 2 dedent-retry | **PASS** |
 | `I2-e` | I2 | fragment OPENS with a dangling `])` closing a list begun above the window (unbalanced) | 3 regex fallback | **PASS** |
 | `I2-f` | I2 | changed line at 4-space indent preceded by a column-0 line (dedent finds no common prefix) | 3 regex fallback | **PASS** |
-| `F1` | F1 (float probe, not ground truth) | FLOAT threshold `dilution_pct_min: float = 0.10`, forced onto regex path (col-0 line first) | none (no candidates) | **MISS** |
+| `F1` | F1 (float probe, not ground truth) | FLOAT threshold `dilution_pct_min: float = 0.10`, forced onto regex path (col-0 line first) | 3 regex fallback | **PASS** |
 
 ### Per-case detail
 
@@ -142,7 +142,7 @@ class BacktestConfig:
 ```
 
 - Strategy: `3 regex fallback`
-- Total candidates from fragment: 4
+- Total candidates from fragment: 6
 - Target hits: line 11 ctx=assign_module value=512000 net_flagged=True
 
 **`I2-f` — PASS** (changed line at 4-space indent preceded by a column-0 line (dedent finds no common prefix))
@@ -156,22 +156,22 @@ class BacktestConfig:
 - Total candidates from fragment: 1
 - Target hits: line 2 ctx=assign_module value=512000 net_flagged=True
 
-**`F1` — MISS** (FLOAT threshold `dilution_pct_min: float = 0.10`, forced onto regex path (col-0 line first))
+**`F1` — PASS** (FLOAT threshold `dilution_pct_min: float = 0.10`, forced onto regex path (col-0 line first))
 
 ```python
 # Filter thresholds
     dilution_pct_min: float = 0.10         # 10% (Filter 4: dilution > 10%)
 ```
 
-- Strategy: `none (no candidates)`
-- Total candidates from fragment: 0
-- Target hits: target not detected
+- Strategy: `3 regex fallback`
+- Total candidates from fragment: 1
+- Target hits: line 2 ctx=assign_module value=0.1 net_flagged=True
 
 ## 3. Recall by incident
 
 | Incident | Cases | PASS | MISS | Recall |
 |---|---|---|---|---|
-| F1 (float probe, not ground truth) | 1 | 0 | 1 | 0/1 |
+| F1 (float probe, not ground truth) | 1 | 1 | 0 | 1/1 |
 | I1 | 3 | 3 | 0 | 3/3 |
 | I2 | 6 | 6 | 0 | 6/6 |
 | **GROUND TRUTH (I1+I2 only)** | 9 | 9 | 0 | **9/9** |
@@ -185,19 +185,18 @@ ground-truth recall figure and reported separately in §5.
 |---|---|
 | 1 direct ast.parse | `I1-a`, `I1-b`, `I1-c`, `I2-c` |
 | 2 dedent-retry | `I2-a`, `I2-b`, `I2-d` |
-| 3 regex fallback | `I2-e`, `I2-f` |
-| none (no candidates) | `F1` |
+| 3 regex fallback | `I2-e`, `I2-f`, `F1` |
+| none (no candidates) | — |
 
 ## 5. What this run does NOT establish
 
 - **Contexts 1 and 2 (comparison operand, slice/truncation) are not measured here.** §2.1
   gives them no regex fallback by design; an unparsable fragment yields zero candidates from
   them. This run measures context 3 only, because both ground-truth incidents are context 3.
-- **The regex fallback matches integers and booleans only** —
-  `(-?\d[\d_]*|True|False)` per §2.1. A float threshold (e.g. `dilution_pct_min: float = 0.10`,
-  a real line four rows above I2 in the same dataclass) does **not** match it, so a float
-  threshold in an unparsable fragment is a known MISS. Neither ground-truth incident is a
-  float, so this does not affect the recall figures above — it is recorded, not hidden.
+- **The regex fallback is now float-inclusive** —
+  `(-?\d[\d_]*(?:\.\d[\d_]*)?|True|False)` per §2.1 (fixed from an earlier
+  integer/boolean-only pattern). Case `F1` (`dilution_pct_min: float = 0.10`) is measured
+  against this fixed pattern above and PASSes on the regex fallback strategy.
 - **Precision is not measured.** No false-positive labeling was done on the regex fallback.
 - The `{0, 1, -1, 2}` exclusion set is applied identically to the ast and regex paths and
   remains unvalidated (`results.md` §6).

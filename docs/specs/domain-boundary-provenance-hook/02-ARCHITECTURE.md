@@ -494,6 +494,8 @@ an unmeasured assumption of shared applicability either. `THRESHOLD-PROVENANCE:`
 for its own pass: 5 lines (incumbent, unchanged, out of scope for re-justification here) and 2
 lines (new, cited to `results.md` §5).
 
+**Denominator-scope caveat (M-1, `05-REVIEW.md`, MEDIUM).** `results.md` §5's distance distribution was measured over 185 assignment candidates — the population *after* the `{0,1,-1,2}` exclusion filter that was applied at the time of that run. That filter is deleted in this design (§2), so the live assignment-candidate population the window now runs against is strictly larger than 185. The window value is very likely still correct despite this: comment placement distance is a property of *authoring style at a given assignment site*, not of the literal value assigned there, so admitting more small-integer literals (0, 1, -1, 2) into the candidate set has no mechanistic reason to shift how far away a citation comment sits from the constants that already had one — and distances 3-12 were already empty across the whole capped scan, leaving no headroom for a wider window to matter even if the shift were real. This is reasoning from priors, not a re-measurement: the 185-candidate denominator no longer matches the population the shipped detector runs against, and a cheap re-derivation from `candidates.jsonl` with the exclusion filter turned off (rather than a fresh benchmark run) would close this gap directly. Tracked as a forge follow-up (§13), not a spec blocker — the failure direction (a slightly-too-narrow window under-flags nothing new; it would only ever under-*cover*, which is safe under `log_only`).
+
 **v1 citation rule for the new check — RESOLVED this revision (G-2, `05-REVIEW.md`, CRITICAL).**
 Prior wording checked marker-presence-plus-non-whitespace-content only, which `#
 THRESHOLD-PROVENANCE: TODO` would satisfy — a direct contradiction of `01-REQUIREMENTS.md` AC2 and
@@ -625,7 +627,7 @@ the prior, superseded audit that were **not reproducible**, and records Frank's 
 **377ms**. Carrying 76ms forward as "measured, reproducible" in this section directly contradicted
 the one committed artifact that names it. That pair is deleted, not softened.
 
-**Corrected disposition: use Frank's re-run figure (377ms, logged in `GATE-LOG.md` attempt 3) as
+**Corrected disposition: use Frank's re-run figure (377ms, logged in `PROGRESS.md` -> Spec Gate -> Cycle 1 -> attempt 3) as
 the only currently-committed, reproducible timing data point for this class of `ast.parse` cost.**
 This is still more than **13x below the 5,000ms budget** (377ms is 7.5% of the budget) — the
 conclusion (timeout is adequate) is unchanged and does not depend on the discredited 8ms/76ms pair.
@@ -638,7 +640,7 @@ than a borrowed cold-re-run figure from a different gate. This is a Roadmap-trac
 largest `.py` file and a synthetic worst-case file, commit the script or the exact command used,
 and cite the result here by path, the same discipline `results.md` already applies to every other
 number in this document. Until that re-run happens, **377ms is the disposition, cited to
-`GATE-LOG.md` attempt 3, not to an unlabeled "measured 2026-09-05" claim** — the conclusion (5s
+`PROGRESS.md` -> Spec Gate -> Cycle 1 -> attempt 3, not to an unlabeled "measured 2026-09-05" claim** — the conclusion (5s
 timeout is adequate) holds under this number and is not blocked on the re-run, but the re-run
 itself is required before this section can claim its own reproducible measurement rather than
 borrowing another gate's number. The timeout constant's own PROVISIONAL/owner framing in the
@@ -976,7 +978,7 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 - **§5.1's 5s timeout — G-3 (`05-REVIEW.md`, HIGH) resolved for the discredited-number problem,
   re-measurement still open.** The prior ~8ms/~76ms pair (contradicted by `scan_thresholds.py`'s
   own docstring, which names 76ms as unreproducible) is deleted. Disposition now cites Frank's
-  377ms cold re-run (`GATE-LOG.md` attempt 3) — still 13x under the 5,000ms budget, so the
+  377ms cold re-run (`PROGRESS.md` -> Spec Gate -> Cycle 1 -> attempt 3) — still 13x under the 5,000ms budget, so the
   timeout-adequacy conclusion is unchanged — but this section still needs its own fresh, committed
   `ast.parse` measurement against this repo's current corpus rather than borrowing another gate's
   figure; tracked here as the concrete forge follow-up. The timeout constant's pre-existing
