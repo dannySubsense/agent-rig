@@ -4,11 +4,14 @@
 
 **Date**: 2026-08-22 (original), amended 2026-09-05
 **Author**: wright
-**Mode**: spec-lite (recommended) — same shape as `first-turn-contract-enforcement`
-(`docs/specs/first-turn-contract-enforcement/INTAKE.md`): one blocking checker script/hook, no UI,
-no product surface, no multi-stakeholder scope. Requirements/UI-spec/roadmap layering is skipped
-because there's no UI to spec and the build is too small to split across three documents; Frank's
-binding gate and human approval are NOT skipped. Danny's call to confirm or override at approval.
+**Mode**: **full sequence — overridden from the original `spec-lite (recommended)`, 2026-09-05.**
+The lite recommendation was written for the narrower 2026-08-22 scope (one blocking checker
+script). After the 2026-09-05 broadening, the design surface grew past "too small to split" —
+AD-1's detection-rule decision alone carries three compared alternatives and four component
+schemas in `02-ARCHITECTURE.md`. Full sequence run without UI-SPEC (Step 5 skipped, no UI/product
+surface either way, same as the lite precedent's own reasoning) — Requirements, Architecture,
+Roadmap, and Review as separate documents, same as e.g. `signpost-pillar-propagation`. Frank's
+binding gate and human approval unchanged either way.
 **DDR**: `docs/specs/agent-rig-ddrs/DDR-006-domain-boundary-provenance-hook.md` (row renamed to
 "Unsourced-Threshold Provenance Hook", 2026-09-05)
 
