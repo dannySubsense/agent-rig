@@ -1,6 +1,9 @@
-# Gate Log: unsourced-threshold-provenance-hook (domain-boundary-provenance-hook)
+# Progress: unsourced-threshold-provenance-hook (domain-boundary-provenance-hook)
 
 ## Spec Gate
+
+Migrated from GATE-LOG.md, 2026-09-05, per the GATE-LOG→PROGRESS.md consolidation (Danny + ledger).
+
 Counter: 3/3
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
@@ -15,7 +18,14 @@ Convergence judgment (attempt 3 only): THRASHING
 Deep-diagnosis evidence: Direct diff of `.gate-snapshots/spec/attempt-1/02-ARCHITECTURE.md` §2 against current HEAD §2 confirms Frank's diagnosis: attempt 1's design had a name-gated assignment context (context 2) capable of seeing named constants, imperfectly. The benchmark-driven correction (post-attempt-2-PASS, pre-attempt-3) deleted that context entirely to resolve measured false positives, without checking whether doing so preserved the hook's ability to detect the incident shape it exists to catch. No individual attempt's fix "recurred" — each attempt's problems are new, introduced by the previous attempt's own fix. This is regression-via-uncoordinated-correction, not oscillation between the same two states.
 Orchestrator independent re-derivation: AGREES — confirmed via direct file diff, not by re-reading Frank's summary. Escalating to Danny: attempt budget (3/3) exhausted, no manual override exists, Frank's FAIL verdict is binding.
 
+**Post-HALT note:** Danny directed a targeted fix (delete the design regression, not the whole sprint), applying DDR-001's decision matrix. A `benchmark` agent produced committed, re-runnable evidence (`docs/research/domain-boundary-hook-benchmark/`) adopting a measured detection rule (2/2 recall on both real incidents, later re-validated at realistic fragment shapes, 9/9). Multiple correction+re-review cycles followed (see commits `95276ec`..`7d6a9f5`). A fresh cold Frank spec-gate was then run against SHA `7d6a9f5` — logged below as attempt 4. **Whether this counts as a new loop (counter reset) or a continuation of the same 3/3-exhausted loop was never explicitly settled with Danny before this attempt ran — flagged here as unresolved, per Frank's own attempt-3 F4 finding that this exact gap makes the counter decorative if not addressed.**
+
+| 4 | 2026-09-05 | FAIL (COLD, no scope brief, SHA `7d6a9f5`) | Layer 1 FAIL, Layer 2 PASS non-PROVISIONAL. F1 (blocking): `02-ARCHITECTURE.md` §0.1 quietly rewrote the binding unsourced-number rule to add a third valid disposition ("a fully-stated executable benchmarking plan") not present in `~/.claude/CLAUDE.md` rule 1 — the `{0,1,-1,2}` exclusion set (60.5% of all candidates, the single highest-leverage constant in the design) has neither a real citation nor a named human owner, riding on this invented option. F2 (blocking, cheap): the shipped regex fallback pattern was widened to match floats in the doc, but the committed script (`scan_thresholds.py`) still has the old integer/boolean-only pattern — doc and evidence describe two different detectors. F3 (non-blocking): one stale sentence about which parse strategy handles the worst-case fragment. F4 (process): this attempt itself — GATE-LOG.md said `3/3, THRASHING, HALT` with no recorded authorization to run a 4th attempt. F5 (carried, out of this sprint's file scope): incumbent's `PROXIMITY_WINDOW = 5` still tagged `owner: wright` (invalid, self-assigned) at `scripts/domain_boundary_provenance_probe.py:50-51`. | none taken — GATE-LOG→PROGRESS.md consolidation superseded the snapshot-before-retry step for this attempt |
+
+**Open, unresolved as of this migration:** (1) F1 — delete or properly own/cite the `{0,1,-1,2}` exclusion set; Danny's recommended fix (delete, ship unfiltered under `log_only`) not yet applied. (2) F2 — re-run `scan_thresholds.py` with the corrected float regex, commit the regenerated output. (3) The counter/authorization question F4 raises — still open, now moot in its original form (GATE-LOG.md's own counter mechanism is retired) but the underlying question (was attempt 3's HALT properly closed before further gate attempts ran) has not been explicitly answered by Danny.
+
 ## Forge Gate
+
 Counter: 0/3
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
