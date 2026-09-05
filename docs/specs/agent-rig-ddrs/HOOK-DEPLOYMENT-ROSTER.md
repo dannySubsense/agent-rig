@@ -17,18 +17,18 @@ while and something depends on it, re-check live rather than trusting the date.
 
 ---
 
-| Repo | SessionStart probe (`session_probe.py`) | Stop-hook C3 contract (`first_turn_contract_probe.py`) | Other hooks | Last verified |
-|---|---|---|---|---|
-| `agent-rig` | Live (`scripts/session_queue_probe.py`) | Live — includes claim-matching (PR #20) + boundary-matching (PR #21) fixes | `no-preamble-no-meta-narration.sh` (DDR-007), `domain-boundary-provenance` (DDR-006), `progress-proof-per-slice` (DDR-008) | 2026-08-28, direct file read + track-record inspection (this session) |
-| `market_data` | Live (`scripts/session_probe.py`, installed 2026-08-12, Slice 10 pilot) | Live — installed 2026-08-28 (this session), current version (post PR #20/#21), smoke-tested via real invocation path, one track-record entry confirmed | None known | 2026-08-28, direct file read on disk + live smoke test (this session) |
-| `department-os` | Unmerged (branch `session-start-hook`) — NOT live on `main` | Live — installed 2026-09-05, current version (post PR #20/#21), smoke-tested via real invocation path, settings.json created fresh (had none). Direct-deploy, same as the 2026-08-28 batch — not via RETROFIT-PROCEDURE.md, no per-repo Frank gate. Installed at `/home/d-tuned/projects/department-os` (current branch `feature/problem-department-mvp`). No SessionStart probe (Components 4/7) — Stop-hook C3 contract only. | — | 2026-09-05, direct file write + smoke test (this session) |
-| `electric-blue` | Not installed | Live — installed 2026-08-28, current version (post PR #20/#21), smoke-tested, settings.json created fresh (had none) | — | 2026-08-28, direct file write + smoke test (this session) |
-| `gap-lens-dilution` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, merged into existing (empty) hooks dict | — | 2026-08-28, direct file write + smoke test (this session) |
-| `gap-lens-dilution-filter` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, merged alongside existing `PreToolUse` hook (untouched) | `PreToolUse` (pre-existing, unrelated) | 2026-08-28, direct file write + smoke test (this session) |
-| `ask-edgar-repo` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, settings.json created fresh | — | 2026-08-28, direct file write + smoke test (this session) |
-| `sonic-store` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, settings.json created fresh | — | 2026-08-28, direct file write + smoke test (this session) |
-| `quant-foundry` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, settings.json created fresh | — | 2026-08-28, direct file write + smoke test (this session) |
-| `runtime/agent-lore` | Not installed | Live — installed 2026-08-28, current version, smoke-tested, settings.json created fresh | — | 2026-08-28, direct file write + smoke test (this session) |
+| Repo | SessionStart probe (`session_probe.py`) | Stop-hook C3 contract (`first_turn_contract_probe.py`) | Committed? | Other hooks | Last verified |
+|---|---|---|---|---|---|
+| `agent-rig` | Live (`scripts/session_queue_probe.py`) | Live — includes claim-matching (PR #20) + boundary-matching (PR #21) fixes | Yes, on `main` | `no-preamble-no-meta-narration.sh` (DDR-007), `domain-boundary-provenance` (DDR-006), `progress-proof-per-slice` (DDR-008) | 2026-08-28, direct file read + track-record inspection |
+| `market_data` | Live (`scripts/session_probe.py`, installed 2026-08-12, Slice 10 pilot) | Live on disk, current version, smoke-tested at install | **No** — `.claude/settings.json` modified-uncommitted, `.claude/hooks/first-turn-contract.sh` + `scripts/first_turn_contract_probe.py` untracked | None known | 2026-09-05, `git status --porcelain -uall` (this session) |
+| `department-os` | Unmerged (branch `session-start-hook`) — NOT live on `main` | Live on disk, current version, smoke-tested (exit 0) | **No** — committed on feature branch `adopt-first-turn-contract-probe` (`b4fb114`, PR #9 opened) but `b4fb114` is NOT an ancestor of `origin/main` | — | 2026-09-05, `git merge-base --is-ancestor b4fb114 origin/main` → false (this session) |
+| `electric-blue` | Not installed | Live on disk, current version, smoke-tested at install | **No** — `scripts/first_turn_contract_probe.py` + track-record file untracked | — | 2026-09-05, `git status --porcelain -uall` (this session) |
+| `gap-lens-dilution` | Not installed | Live on disk, current version, smoke-tested at install | **No** — `scripts/first_turn_contract_probe.py` untracked | — | 2026-09-05, `git status --porcelain -uall` (this session) |
+| `gap-lens-dilution-filter` | Not installed | Live on disk, current version, smoke-tested at install | **No** — `.claude/settings.json` modified-uncommitted, hook script + track-record untracked | `PreToolUse` (pre-existing, unrelated) | 2026-09-05, `git status --porcelain -uall` (this session) |
+| `ask-edgar-repo` | Not installed | Live on disk, current version, smoke-tested at install | **No** — all hook files untracked | — | 2026-09-05, `git status --porcelain -uall` (this session) |
+| `sonic-store` | Not installed | Live on disk, current version, smoke-tested at install | **No** — all hook files untracked | — | 2026-09-05, `git status --porcelain -uall` (this session) |
+| `quant-foundry` | Not installed | Live on disk, current version, smoke-tested at install | **No** — all hook files untracked | — | 2026-09-05, `git status --porcelain -uall` (this session) |
+| `runtime/agent-lore` | Not installed | Live, current version, smoke-tested | **Yes, merged to `main`** (`9fa9b1a`, PR #1) | — | 2026-09-05, `git log`/`git branch --show-current` (this session) |
 
 **Note on this batch (2026-08-28):** these 7 installs, plus `market_data`, were done directly by
 agent-rig (wright) reaching into each repo's filesystem — not via each resident agent running
