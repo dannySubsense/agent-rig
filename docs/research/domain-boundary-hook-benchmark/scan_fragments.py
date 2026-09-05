@@ -130,9 +130,8 @@ def build_fragments():
                  fragment="# Pipeline settings\n" + src[i]),
             # FLOAT PROBE, not a ground-truth incident: a real FLOAT threshold from the
             # same dataclass, forced onto the regex path. sec.2.1's regex was fixed to be
-            # float-inclusive: (-?\d[\d_]*(?:\.\d[\d_]*)?|True|False) -- so a float is now
-            # expected to PASS on the regex fallback (not yet re-run as of this comment's
-            # last edit; see results-fragment-shaped.md's stale-notice header).
+            # float-inclusive: (-?\d[\d_]*(?:\.\d[\d_]*)?|True|False) -- re-run 2026-09-05,
+            # PASSes on the regex fallback (strategy 3). See results-fragment-shaped.md.
             dict(id="F1", incident="F1 (float probe, not ground truth)", target="dilution_pct_min",
                  shape="FLOAT threshold `dilution_pct_min: float = 0.10`, forced onto regex path (col-0 line first)",
                  fragment="# Filter thresholds\n" + src[_find(src, "dilution_pct_min")]),

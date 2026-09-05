@@ -1,197 +1,206 @@
-# Spec Review: Unsourced-Threshold Provenance Hook (Pass 3 — narrow verification)
+# Spec Review: Unsourced-Threshold Provenance Hook (Pass 4 — pre-Cycle-2 verification)
 
-**Status**: COMPLETE (not a HALT) — 1 HIGH internal contradiction, 3 MEDIUM, 2 LOW
+**Status**: COMPLETE (not a HALT) — 0 CRITICAL, 2 HIGH, 3 MEDIUM, 2 LOW
 **Date**: 2026-09-05
 **Reviewer**: @spec-reviewer (independent)
-**Scope**: narrow, skeptical verification pass against commit `859531d`. Prior passes' clean
-objectives (three detection contexts, `PROXIMITY_WINDOW_THRESHOLD = 2`, out-of-scope boundary,
-`{0,1,-1,2}` disposition honesty) were re-read this pass and show **no regression** — they are
-not re-litigated below.
-**Docs read in full**: INTAKE, INTERVIEW, NORTH-STAR, 01, 02, 04, `results.md`,
+**Scope**: verification pass against working-tree state at commit `e7223e9`, targeting the two
+attempt-4 fixes (F1 exclusion-set deletion, F2 regex fix) plus an unscoped hostile sweep.
+Prior passes' clean objectives (three detection contexts, `PROXIMITY_WINDOW_THRESHOLD = 2` as a
+value, fragment-shaped 9/9 recall, out-of-scope boundary, owner-or-citation marker rule) were
+re-read and show **no regression**; they are not re-litigated except where the exclusion deletion
+demonstrably changed their basis (M-1).
+**Docs/artifacts read**: INTAKE, INTERVIEW, NORTH-STAR, 01, 02, 04, PROGRESS, `results.md`,
 `results-fragment-shaped.md`, plus direct reads of `scan_thresholds.py`, `scan_fragments.py`,
-`domain_boundary_provenance_probe.py`, `domain-boundary-provenance.sh`.
+`candidates.jsonl`, `scripts/domain_boundary_provenance_probe.py`.
 
 ---
 
-## Objective 1 — Does §2.1's discharge language match `results-fragment-shaped.md`?
+## 1. Targeted Objectives — Verdicts
 
-**Mostly yes. The headline number is accurate; one adjacent corroboration claim is not.**
-
-| Architecture §2.1 claim | Evidence file | Verdict |
-|---|---|---|
-| "9/9 PASS across both ground-truth incidents" | §3 recall table: GROUND TRUTH (I1+I2 only) 9 cases, 9 PASS | ✅ Accurate |
-| "I1: 3/3, I2: 6/6" | §3 table, exact match | ✅ Accurate |
-| "covering single-line, multi-context, and the worst case" | §2 matrix cases `I1-a`…`I2-f` | ✅ Accurate |
-| "worst case … recovered via strategy 2 (dedent-retry) or strategy 3 (regex fallback) depending on exact slice boundaries" | `I2-a` (the case labelled "worst case") ran **strategy 2** only; strategy 3 ran on `I2-e`/`I2-f` | ⚠️ Imprecise, not false (L-1) |
-| "real execution against fragments sliced live from the working tree and from `git show 7d9fdf5:…`" | §2 preamble states exactly this | ✅ Accurate |
-| "corroborated by a **byte-identical corpus regression** (same file referenced above)" | **No such regression appears anywhere in `results-fragment-shaped.md`** (§1–§5 contain: rationale, fragment matrix, recall, strategy attribution, non-establishments). Grep of the whole benchmark directory for `byte-identical` / `corpus regression` / `regress` returns **zero matches** | ❌ **M-1 — unsupported citation** |
-| "F1 excluded from ground truth" handling | §3 note + §5 bullet 2, consistent | ✅ Accurate |
-
-The 9/9 figure and its scope claim survive verification. The "byte-identical corpus regression"
-clause does not — it is an uncited assertion attached to a cited one, and a cold reviewer reading
-the referenced file will not find it. Same clause is repeated in §13's G-1 bullet.
-
-## Objective 2 — Is the "contexts 1/2 not covered, no fallback by design" caveat consistent?
-
-**Inside `02-ARCHITECTURE.md`: yes, and stated four times consistently** (§2.1 robustness table,
-§2.1 "Scope of what was confirmed", §7 `detect_threshold_literals` docstring, §13 G-1 bullet).
-`results-fragment-shaped.md` §5 says the same. **Nothing overstates contexts 1/2.** No finding.
-
-Two adjacent weaknesses, neither an overstatement:
-- The caveat exists **only** in `02-ARCHITECTURE.md`. `01-REQUIREMENTS.md` and `04-ROADMAP.md`
-  describe all three contexts symmetrically with no note that two of them silently yield nothing
-  on an unparsable fragment (L-2). Requirements US-1 AC1/AC3 and the Edge Cases table read as if
-  all three contexts fire equally at the real scan surface.
-- The one place the doc set *does* diverge on fallback is in the **opposite** direction — see M-2
-  below, where §2 flatly denies a fallback exists at all.
-
-## Objective 3 — Is the float-regex fix honestly flagged as unbenchmarked?
-
-**Yes. This is the cleanest part of the pass.** §2.1's fix paragraph opens "in direct response to a
-measured gap, **not itself re-benchmarked**", labels its own no-new-false-positive argument as
-"stated as reasoning rather than measurement", and closes by saying the F1 rerun against the fixed
-pattern "remains open". §13's G-1 bullet repeats the caveat. Verified against source: the benchmark
-script still carries the **pre-fix** pattern (`scan_thresholds.py` L278:
-`r"(-?\d[\d_]*|True|False)\s*(?:#.*)?$"`), which corroborates that the fix is spec-only. No
-overstatement found. ✅
-
-One consequence is unflagged: because the fix is spec-only, `results-fragment-shaped.md` §5 now
-asserts `"The regex fallback matches integers and booleans only — (-?\d[\d_]*|True|False) **per
-§2.1**"` — attributing to §2.1 a pattern §2.1 no longer contains. The machine-generated evidence
-file and the spec now disagree about what the spec says (M-3).
-
-## Objective 4 — New drift from the last two correction passes
-
-**M-2 (HIGH — the one a cold Frank will hit first).** `02-ARCHITECTURE.md` **L320** still reads, in
-bold, as a standing design decision:
-
-> **AST-based, Python-only, no regex fallback** — same posture as the prior pass
-
-§2.1 (L161–189) specifies a per-line **regex fallback** as parse strategy 3, and §7's docstring,
-§13, and Roadmap Slice 3 all implement it. This is a stale carry-forward the fragment-robustness
-pass did not sweep. It is not merely awkward: it is the *same sentence shape* the prior review
-already had to correct once, and it directly contradicts the fix that discharged this pass's
-CRITICAL. Related, lower-severity echoes of the same unswept claim:
-
-| Location | Text | Issue |
-|---|---|---|
-| `02-ARCHITECTURE.md` L320 | "no regex fallback" | **Contradicts §2.1** — must be scoped to "no regex fallback for contexts 1–2" |
-| `02-ARCHITECTURE.md` §10 Patterns row "AST-based syntactic detection over regex" | no mention of strategy 3 | Understates shipped design |
-| `01-REQUIREMENTS.md` L124 | "Detection is Python-only, **AST-based**." | Requirements never mentions the three-strategy chain or the regex path at all |
-| `04-ROADMAP.md` Slice 3, Impl. Note 2 | "Syntax error on `ast.parse` → return `[]` (fail-open…)" | Unqualified; contradicted 11 lines later by the same slice's own fragment-robustness note. Slice 3's *test* list has it right |
-
-**M-4 (§13 self-inconsistency).** §13 bullet 2 ("§2's assignment context") still reads: *"Not fully
-resolved as open, per G-1 below — … the recall figure's applicability to the real scan surface is
-**not yet** [established]."* §13 bullet 3 immediately below says G-1 is **RESOLVED for context 3**
-with 9/9. Two consecutive bullets in the same open-items list give opposite dispositions of the
-same question. Bullet 2 is stale from the pre-rerun revision.
-
-**Cross-check of §13's open-items list against Requirements/Roadmap** (otherwise clean):
-
-| §13 open item | Requirements | Roadmap | Status |
+| # | Objective | Verdict | Evidence |
 |---|---|---|---|
-| `{0,1,-1,2}` precision unvalidated | L125–128 states "NOT YET BENCHMARKED", plan pointer | Slice 3 note; Deferred item | ✅ Consistent |
-| Assignment context (c) adopted | Detection Rule Pointer + US-1 AC4 + Edge Case row | Slice 3 goal/tests | ✅ Consistent |
-| G-1 fragment robustness | **Silent** | Slice 3 impl-note + 2 named regression tests | ⚠️ L-2 |
-| G-2 owner-required marker | AC2 + Edge Case row | Slices 4 & 9, 4 named regression tests | ✅ Consistent |
-| `range()` exclusion removed | L128–131 | Slice 3 note ("dead code, not implemented") | ✅ Consistent |
-| `PROXIMITY_WINDOW_THRESHOLD = 2` | Constraints + Assumes | Slices 4 & 9 | ✅ Consistent |
-| §5.1 timeout re-measurement | Out of Scope: no latency SLA | Slice 12 test ("runtime recorded") | ✅ Consistent |
-| G-4 vocabulary figures deleted | not restated (correct) | Slice 3 note | ✅ Consistent |
-| G-9 self-scan: `PROXIMITY_WINDOW = 5` IS flagged | Edge Case row (hook's own constants) | Slices 4, 9 tests + Deferred routing item | ✅ Consistent |
-| G-5 `mode` non-nullable | US-2/US-3 ACs | Slice 8 Done-When | ✅ Consistent |
-| Float-regex fix unbenchmarked | **Silent** | **Silent** | ⚠️ L-3 (arch-only; acceptable, but Slice 3 has no float test case) |
+| 1 | `{0,1,-1,2}` fully removed from all spec docs, nothing treats it as active, no replacement constant | **PASS** | grep across `docs/`: every hit in 01/02/04 is an explicit REMOVED/historical framing. 01 L128-133, L208-210; 02 L268, L290-334, L778-780, L943-946; 04 L134-135, L175-179, L258, L511, L624, L672. No filter replaced it — no new constant introduced. |
+| 2 | §0.1 rule-1 restatement accurate (three dispositions, no invented fourth) | **PASS** | 02 L42-53: names exactly (a) citation, (b) named-human-owner PROVISIONAL, (c) deletion; explicitly deletes the "executable benchmarking plan" fourth option and names its only load-bearing use. |
+| 3 | Volume increase handled consistently; no stale "excluded" assertion | **PASS** | 04 Slice 3 test L185-187 is direction-reversed ("Literals `0, 1, -1, 2` ARE flagged"); Slice 9 L511 says "no fixture should assert it"; Slice 12 L623-625 removes the deferred benchmarking plan; Deferred L672-674 marks it REMOVED-not-deferred. No surviving "is excluded" assertion in any spec doc. |
+| 4 | Regex fix real in `scan_thresholds.py`; doc's claim about it matches reality | **PASS (code) / FAIL (evidence-doc consistency — see H-1)** | `scan_thresholds.py:276-279` = `(-?\d[\d_]*(?:\.\d[\d_]*)?\|True\|False)`, float-inclusive as §2.1 describes. Value-parse branch L320 is `float(raw) if "." in raw else int(raw)` — the silent-drop bug named in §2.1 is genuinely fixed, not just the pattern. |
+| 5 | PROGRESS.md Cycle 1/2 framing internally consistent | **PARTIAL — see M-2** | Attempts 1-4 preserved; Cycle 2 counter 0/3 present; but the Post-HALT note still asserts the counter question is unresolved. |
+| 6 | Unscoped hostile sweep | **2 HIGH, 3 MEDIUM, 2 LOW below** | |
 
-## Objective 5 — Cold-Frank exposure
-
-Ranked by what a hostile, unscoped reviewer catches first:
-
-1. **M-2 (L320).** A bolded, unqualified "no regex fallback" in the same document that specifies a
-   regex fallback. Single highest-probability gate finding this pass.
-2. **M-1.** The one number-adjacent claim in §2.1 that is *not* in the cited file. This doc set is
-   being judged on citation discipline; an uncited corroboration clause riding alongside a
-   correctly-cited 9/9 is exactly the shape a source-axis reviewer looks for.
-3. **M-4.** Two adjacent §13 bullets contradicting each other on the same resolved question.
-4. **M-3.** Evidence file attributes a superseded regex to §2.1; nothing on the file's face marks
-   it as a pre-fix run.
-5. **L-2.** Requirements/Roadmap carry no contexts-1/2 degradation caveat.
-
-Everything else read clean: `results.md` corpus (445 files, 10 roots, "Missing corpus roots: none"),
-the recall table, the 60.5% share table, the §5 proximity distribution, the marker rule's mirroring
-across 02/01/04, the `mode` fail-safe default, and the LOCKED-doc behavior-change disclosure (§3/§5/
-§11 + Slice 11's revised addendum rule + Slice 6's named `test_cross_domain_pass_flag_under_log_only`).
+**Independent verification of the one new number (856).** 02 §2 L267-274 states 856 was
+"re-derived directly from `candidates.jsonl`" and not re-run. I did not take that on trust and did
+not use the same route: `results.md` §3's own committed table gives rule (c) total 2173,
+test/fixture-path exclusion 1317, `range()` exclusion 0 — 2173 − 1317 = **856**, exactly. The
+figure is reproducible from the committed evidence by a second, independent path. No finding.
 
 ---
 
-## Gaps
+## 2. Findings
 
-| ID | Sev | Gap | Impact | Requested fix |
-|---|---|---|---|---|
-| M-2 | **HIGH** | `02-ARCHITECTURE.md` L320 asserts "no regex fallback"; §2.1 specifies one | Direct self-contradiction on the fix that discharged this pass's CRITICAL | Rewrite L320 as "AST-first, Python-only; regex fallback **only** for context 3 per §2.1 — contexts 1–2 have none". Sweep §10's pattern row, `01-REQUIREMENTS.md` L124, and `04-ROADMAP.md` Slice 3 impl-note 2 in the same edit |
-| M-1 | MED | "corroborated by a byte-identical corpus regression" (§2.1, repeated in §13) is unsupported — zero matches in the benchmark directory | An uncited claim inside the sprint's most-scrutinised discharge paragraph | Either commit the regression artifact and cite it by path, or delete the clause. Do not soften it |
-| M-3 | MED | `results-fragment-shaped.md` §5 cites `(-?\d[\d_]*\|True\|False)` "per §2.1"; §2.1 no longer contains that pattern | Machine-generated evidence and spec disagree about the spec's own content | Add a dated "pre-float-fix run" note where §2.1 cites the file (the file itself is machine-generated — do not hand-edit) |
-| M-4 | MED | §13 bullet 2 says fragment applicability "not yet" established; bullet 3 says RESOLVED for context 3 | Self-contradicting open-items list | Rewrite bullet 2 to defer to bullet 3 |
-| L-1 | LOW | §2.1: worst case "recovered via strategy 2 or 3"; `I2-a` used strategy 2 | Imprecision in an otherwise exact citation | State strategy 2 for `I2-a`; cite `I2-e`/`I2-f` for strategy 3 |
-| L-2 | LOW | Contexts-1/2 no-fallback caveat appears only in `02-ARCHITECTURE.md` | Requirements/Roadmap read as if all 3 contexts are fragment-robust | One sentence in `01-REQUIREMENTS.md` Detection Rule Pointer; one line in Roadmap Slice 3 |
-| L-3 | LOW | No float-literal test case in Slice 3 despite the §2.1 regex widening | The fix ships untested and unbenchmarked | Add a Slice 3 test: float assignment on the regex-fallback path IS flagged |
+### H-1 (HIGH) — the F2 doc↔script mismatch was fixed in one script and left in the other's output prose
 
-## Risks
+`scan_fragments.py` imports the regex from `scan_thresholds.py` (L45-47), so its **detector** is
+now float-inclusive too. But three artifacts still assert the old integer/boolean-only pattern as
+current:
+
+- `scan_fragments.py:133` — the F1 case comment: "§2.1's regex matches `(-?\d[\d_]*|True|False)`
+  — integers and bools only — so a float is expected to MISS."
+- `scan_fragments.py:252` — a hardcoded `A(...)` line that **emits** into §5 of any regenerated
+  `results-fragment-shaped.md`: "The regex fallback matches integers and booleans only —
+  `(-?\d[\d_]*|True|False)` per §2.1."
+- `results-fragment-shaped.md:196-200` (committed) — the same claim, plus §2's `F1 — MISS` row and
+  §3's `F1 ... 0/1` recall row, which the fixed detector no longer reproduces.
+
+**Why this is the same defect class Frank's F2 named, one layer over**: a committed evidence
+artifact states, by value, a detector shape that the shipped detector no longer has. Anyone
+re-running `scan_fragments.py` today gets a results file whose §5 prose contradicts its own §3
+table. Architecture §2.1 L208-210 discloses that the F1 *rerun* is open — it does **not** disclose
+that the committed fragment results doc and the fragment script's own prose emitters now state a
+false thing about the pattern. A cold reviewer who checks script-vs-doc (which attempt 4 did
+explicitly) will land here.
+**Fix (cheap, no rerun required)**: update `scan_fragments.py` L133/L252 prose to the fixed
+pattern and reframe F1 as "expected PASS, not yet re-run", and add a dated stale-notice header to
+`results-fragment-shaped.md` §5 pointing at 02 §2.1's fix note.
+
+### H-2 (HIGH) — the sole citation for the only live timing number points at a deleted file
+
+`02-ARCHITECTURE.md` §5.1 (L629, L640) and §13 (L978-979) cite **`GATE-LOG.md` attempt 3** as the
+source for the 377ms `ast.parse` figure — "377ms is the disposition, cited to `GATE-LOG.md`
+attempt 3". `GATE-LOG.md` **no longer exists** anywhere in this sprint directory (glob: no match);
+it was consolidated into `PROGRESS.md` on 2026-09-05 per PROGRESS L5. The number itself survives
+(PROGRESS.md Spec Gate, Cycle 1 attempt 3 row), so this is a broken citation path, not an
+unsourced number — but it is a citation-by-path to a file a checker cannot open, in a document
+whose entire subject is citation discipline. **Fix**: repoint both references to
+`PROGRESS.md` → Spec Gate → Cycle 1 → attempt 3.
+
+### M-1 (MEDIUM) — `PROXIMITY_WINDOW_THRESHOLD = 2`'s cited population was measured *with* the now-deleted exclusion applied
+
+`results.md` §5 computes the comment-distance distribution over "assignment candidates (net of
+exclusions): **185**" — and "net of exclusions" in that script includes `EXCLUDED_VALUES =
+{0,1,-1,2}` (`scan_thresholds.py:97-98`). The adopted design no longer applies that filter, so the
+live assignment-candidate population is strictly larger than the 185 the window was measured over.
+02 §4 L482-485 nonetheless claims 2 lines "captures 100% of the real comment-to-constant distances
+observed in this exact corpus."
+
+The value is very likely still right (added candidates are small idiomatic literals, which are
+less likely to carry citation comments, and 3-12 was empty across the whole capped scan), and the
+failure direction is benign under `log_only`. But the *claim's scope* no longer matches the
+*design's scope* — which is precisely the promoted-default shape this repo's rule 1 exists to
+catch, and it is currently unstated. **Fix**: one sentence in §4 naming that the 185 denominator
+was exclusion-filtered, that the shipped population is wider, and that the window is retained on
+the 3-12-empty margin — or a cheap re-derivation from `candidates.jsonl` with the filter off.
+
+### M-2 (MEDIUM) — PROGRESS.md contradicts itself on whether the cycle/counter question is resolved
+
+- L7 (Cycle authorization note): Danny "explicitly authorized ... closing out the original
+  3-attempt cycle ... and starting a new gate cycle."
+- L29 item (3): "**RESOLVED 2026-09-05**".
+- L25 (Post-HALT note), unedited: "Whether this counts as a new loop (counter reset) or a
+  continuation of the same 3/3-exhausted loop **was never explicitly settled with Danny** before
+  this attempt ran — flagged here as unresolved."
+
+Same file, two live statements, opposite claims, on the one question the attempt-4 F4 process
+finding was about. Objective 5 otherwise passes (attempts 1-4 preserved as history, Cycle 2 counter
+present at 0/3). **Fix**: amend L25 to past tense with a forward pointer to L7.
+
+### M-3 (MEDIUM) — the benchmark directory has no record of the deletion decision
+
+`scan_thresholds.py:97` still reads "Existing exclusion: the literal values {0, 1, -1, 2} — NOT YET
+BENCHMARKED per §2", and `results.md:160-161` still reads "remains unvalidated ... open for a human
+decision." Both are accurate *as a record of that run* and the spec docs correctly frame the table
+as historical — but a reader arriving at `docs/research/domain-boundary-hook-benchmark/` first (the
+"check the input before the instrument" path) is told the exclusion is live and pending. **Fix**: a
+2-line dated note at the top of `results.md` recording the 2026-09-05 deletion decision and
+pointing at 02 §2. Do not edit the machine-generated body.
+
+### L-1 (LOW) — Roadmap misattributes the incumbent `PROXIMITY_WINDOW = 5` to the wrapper file
+
+`04-ROADMAP.md` Deferred, L678-681: "that constant sits in `.claude/hooks/domain-boundary-
+provenance.sh`'s already-LOCKED ... sibling file territory." Verified by direct read:
+`PROXIMITY_WINDOW = 5` is at **`scripts/domain_boundary_provenance_probe.py:51`**, which is also
+what 02 §7/§8 and Slice 4 L227/L285 say. The roadmap's Deferred bullet is the only place naming the
+wrong file. Cosmetic, but it is a file-touch-scope statement, so it should be exact.
+
+### L-2 (LOW) — PROGRESS.md Forge Gate carries unfilled template placeholders
+
+L42-44: `Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING` and
+`Orchestrator independent re-derivation: AGREES | DISAGREES` sit below an empty Forge Gate table.
+Harmless, but reads as an unfilled field rather than a template in a doc that is otherwise the
+sprint's ground truth.
+
+---
+
+## 3. Requirements → Architecture Coverage
+
+| Requirement | Architecture coverage | Status |
+|---|---|---|
+| US-1 (flag unmarked threshold-shaped literals) | §2 three contexts, §2.1 parse chain, §7 `detect_threshold_literals` | ✅ |
+| US-1 AC (no domain-crossing precondition) | §3 "No manifest coupling"; §7 `run_local_threshold_pass` gated on `.py` + non-test only | ✅ |
+| US-2 (`log_only` first) | §5 mode config, fail-safe default; §6 `mode` non-nullable | ✅ |
+| US-3 (fail-open, append-only log) | §3 pseudocode, §6 schema, §5.1 timeout disposition | ✅ (timeout re-measurement open, §13, tracked) |
+| US-4 (presence only, no soundness claim) | §4 marker rule; §8 G-4 → grep test | ✅ |
+| Constraint: no literal-value exclusion | §2 disposition, §7 comment L778-780 | ✅ |
+
+## 4. Architecture → Roadmap Coverage
+
+Every §2-§7 component maps to exactly one slice; spot-checked `load_mode_config`→2,
+`detect_threshold_literals`→3, `has_threshold_provenance_marker`→4, `combine`→6, schema→7, wrapper
+mode-read→8, self-scan fixtures→9, wiring→10, addendum/roster→11, e2e→12. No circular dependencies.
+Exclusion-removal is propagated into Slices 3, 9, 12 and Deferred. ✅ (one file-path error, L-1.)
+
+## 5. Risks
 
 | Risk | L | I | Mitigation |
 |---|---|---|---|
-| M-2 read as a live design decision by an implementer → strategy 3 never built → I2's real shape missed at the real scan surface | M | **H** | Fix M-2 before the gate; Slice 3's two named fragment regression tests are the backstop |
-| Float fix ships on reasoning, not measurement (CLAUDE.md rule 1 territory) | M | M | Honestly flagged in §2.1/§13; add L-3's test; rerun `scan_fragments.py` post-implementation |
-| `{0,1,-1,2}` precision unvalidated → real threshold at those values unflagged | M | M | Named risk, executable plan, `log_only` bounds cost |
-| Contexts 1–2 silently yield nothing on unparsable fragments → unmeasured recall loss | M | M | Accepted by design and stated; Slice 12 track-record data is the observation path |
-| §5.1's 377ms is a borrowed cold-re-run figure, not this doc's measurement | L | L | Conclusion (5s adequate) holds at 7.5% of budget; re-measurement tracked in §13 + Slice 12 |
-| Benchmark corpus drift changes cited volume/window numbers | L | L | §11 names this; margins (100%@2, 9/9) are wide |
+| Fragment evidence doc read as current, stating a superseded pattern (H-1) | H | M | Fix prose + stale notice; rerun F1 when convenient |
+| Window `2` over-claimed against a widened population (M-1) | M | L | Name the denominator change; `log_only` bounds cost |
+| 856-candidate volume makes the `log_only` log unusably noisy in triage | M | M | Per-repo triage is already the explicit design; Slice 12 records observed volume |
+| Precision still unmeasured at any scale | H | M | Named in §2/§13 and both results docs; not discharged |
+| Broken `GATE-LOG.md` citation propagates into forge docs (H-2) | M | L | Repoint before approval |
 
-## Assumptions
+## 6. Assumptions
 
 | Assumption | Impact if wrong |
 |---|---|
-| `results-fragment-shaped.md` is the pre-float-fix run (inferred from `scan_thresholds.py` L278 still carrying the old pattern) | If the script was fixed post-generation, the file is stale in a second, undisclosed way |
-| Real `Edit` `new_string` fragments resemble the 9 sliced shapes tested | Recall at the real surface differs from 9/9 |
-| Contexts 1–2's silent-miss cost is acceptable under `log_only` | Unmeasured false negatives accumulate unnoticed |
+| Removing the value filter does not shift the 2-line comment-distance distribution | Window under-covers; some cited constants flagged anyway (noise, not miss) |
+| `scan_fragments.py`'s imported (now-fixed) regex needs no rerun to remain trustworthy | F1's committed MISS row stays contradicted by the shipped code |
+| 445-file corpus is representative of consuming repos | Volume/window figures shift on retrofit; §11 already states this is not stress-tested |
 
-## Open Questions
+## 7. Open Questions
 
-| Question | Status | Needs |
+| Question | Status | Resolution |
 |---|---|---|
-| Does the "byte-identical corpus regression" artifact exist and, if so, where? | Open | Author (wright) — path, or delete the clause |
-| Route the `PROXIMITY_WINDOW = 5` self-scan finding: same-sprint file touch, or separate pass? | Open | Danny (already surfaced in §11/§13/Deferred) |
-| Rerun `scan_fragments.py` against the widened float regex before or after forge? | Open | Danny |
+| Is `results-fragment-shaped.md` regenerated (F1 rerun) before or after forge? | Open | Danny/Frank call; H-1's prose fix is required either way |
+| Route for the incumbent's unmarked `PROXIMITY_WINDOW = 5` (same-sprint vs. follow-up) | Open | Danny — already surfaced in 02 §11, 04 Deferred |
+| Does the timeout re-measurement (§5.1) block forge-start or land inside Slice 12? | Open | Currently written as a forge-tracked item, not a gate blocker |
 
-## Approval Checklist
+## 8. Approval Checklist
 
-### 01-REQUIREMENTS
-- [ ] Human-reviewed; ACs testable; Out of Scope acceptable
-- [ ] L124 "AST-based" scoped for the regex fallback (M-2)
-- [ ] Contexts-1/2 fragment caveat added (L-2)
+### Requirements (01)
+- [ ] Reviewed by human
+- [ ] Acceptance criteria testable — reviewer finds them testable as written
+- [ ] Out of scope acceptable
 
-### 02-ARCHITECTURE
-- [ ] Human-reviewed
-- [ ] **L320 "no regex fallback" corrected (M-2, HIGH)**
-- [ ] "byte-identical corpus regression" cited or deleted (M-1)
-- [ ] §13 bullet 2 reconciled with bullet 3 (M-4)
-- [ ] §2.1 worst-case strategy attribution corrected (L-1); pre-fix-run note added (M-3)
+### Architecture (02)
+- [ ] Reviewed by human
+- [ ] H-2 citation repointed (`GATE-LOG.md` → `PROGRESS.md`)
+- [ ] M-1 window-denominator caveat added to §4
 
-### 03-UI-SPEC
-- [x] N/A — non-interactive `PreToolUse` hook, no UI surface. Deliberate, not a gap
+### Roadmap (04)
+- [ ] Reviewed by human
+- [ ] L-1 file path corrected in Deferred
 
-### 04-ROADMAP
-- [ ] Human-reviewed; sequence and slice sizing accepted
-- [ ] Slice 3 impl-note 2 (`return []`) qualified (M-2); float test added (L-3)
+### Evidence (`docs/research/domain-boundary-hook-benchmark/`)
+- [ ] H-1 prose fixed in `scan_fragments.py` + stale notice in `results-fragment-shaped.md`
+- [ ] M-3 deletion-decision note added to `results.md`
+
+### Process (PROGRESS.md)
+- [ ] M-2 Post-HALT note amended; L-2 placeholders cleared
 
 ### Overall
-- [ ] All open questions resolved
-- [ ] All risks accepted or mitigated
-- [ ] Ready for Frank's binding spec-gate
+- [ ] Open questions routed
+- [ ] Ready for Frank Cycle 2 attempt 1
 
 ---
 
-**Verdict**: no HALT. Requirements → Architecture → Roadmap coverage is complete and traceable, and
-the 9/9 fragment-recall discharge is real and accurately numbered. The doc set is **not yet** ready
-for a cold gate: M-2 is a bolded self-contradiction on the exact fix under review, and M-1 is an
-uncited claim sitting inside the cited paragraph. Fix M-1/M-2/M-4 (and preferably M-3, L-1/L-2/L-3
-in the same sweep) before submitting.
+*No HALT. The documents are mutually consistent on the sprint's substance; every finding above is a
+stale statement or a citation path, all cheap to fix, none requiring a design change.*
