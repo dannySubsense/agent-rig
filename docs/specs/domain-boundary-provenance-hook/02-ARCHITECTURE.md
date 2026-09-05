@@ -81,9 +81,9 @@ the prior framing and nothing about re-hosting the rule changes that disposition
 
 **AST-based, Python-only, no regex fallback** — same posture as the prior pass: syntactic
 detection needs a real parse tree to reliably distinguish "is this a comparison operand" from
-"is this token merely near a `<`", and Python's stdlib `ast` module is zero-dependency and
-already used nowhere else in this repo's hook tooling but is a stdlib import with no new
-dependency cost (§8).
+"is this token merely near a `<`". Python's stdlib `ast` module is a new import for this probe
+file (not currently used anywhere in this repo's hook tooling), but it is stdlib, so it carries
+no new third-party dependency cost (§9).
 
 **Scope note**: per Out of Scope in `01-REQUIREMENTS.md`, Python-only is an accepted narrowing,
 not a silent gap — Bash/TS/JSON thresholds in this repo are not scanned by v1 of either check.
@@ -139,6 +139,27 @@ pass (per the incumbent's own step 2 "absent → allow" rule, unchanged). The ne
 independently of manifest presence, since its entire premise (per the DDR-0014 amendment) is that
 manifest-based gating is exactly the mechanism that let same-file thresholds go unscanned.
 
+**Reconciliation with the LOCKED doc's recorded rejection of unscoped blocking (05-REVIEW.md
+G-7).** `docs/tooling/domain-boundary-provenance-hook.md` §3 explicitly rejected "`PreToolUse`,
+unscoped (every `Edit`/`Write`)" as a *blocking* check, on false-positive-noise grounds — the
+manifest glob scope was called "required to keep this both correct and low-noise." The new
+local-threshold pass is, by shape, exactly that rejected surface: it runs on every `.py`
+`Edit`/`Write`, with no manifest gate. This document does not treat that as settled by silence.
+The reconciliation is: **the LOCKED §3 rejection was scoped to a check that blocks**; §5's
+`log_only` default is the mechanism that keeps this pass outside the scope of that rejection *for
+now* — under `log_only`, an unscoped match never blocks anything, so the noise the LOCKED doc
+warned about surfaces only as track-record log entries (Slice 12), not as disrupted edits. This is
+not the same shape under a different name; it is the same shape with the one property (blocking)
+that made the rejection apply, deliberately withheld pending data. **What would justify promoting
+it to blocking despite the LOCKED rejection**: real track-record data (accumulated under
+`log_only`, per repo, per §5) showing the false-positive rate on that repo's own `.py` edits is low
+enough that a repo owner's manual triage judges blocking acceptable for their codebase — the same
+per-repo promotion decision the DDR-0014 amendment's Rollout section already requires for the
+cross-domain check. Absent that data, the correct reading of the LOCKED rejection is "do not ship
+this pass in blocking mode," which §5 already guarantees as the initial state. No promotion
+decision is made or implied by this document; this paragraph exists so a future promoter meets the
+LOCKED doc's argument explicitly rather than rediscovering or silently overriding it.
+
 ## 4. Citation Marker for the New Check
 
 **Decision: new marker, `THRESHOLD-PROVENANCE:`. Does not reuse `DOMAIN-BOUNDARY:` or bare
@@ -178,12 +199,21 @@ consistency, values re-justified independently, not copied):
   (case-sensitive, exact string) followed by non-whitespace content on the same line.
 - The marker must appear within **3 lines** (inclusive) above or below the line containing the
   flagged literal, counted within the same scan surface (`tool_input.content`/`new_string`) — not
-  the incumbent's 5-line window. **PROVISIONAL — owner: wright.** A tighter window than the
-  incumbent's is deliberate, not arbitrary-different-for-its-own-sake: threshold literals are
-  typically single-line assignments or comparisons with no natural multi-line block the way a
-  cross-domain read's surrounding context often has, so a tighter default is being tried first;
-  like the incumbent's window, this is unmeasured and owned by wright for revision once real
+  the incumbent's 5-line window. The window bound is held in a new constant,
+  `PROXIMITY_WINDOW_THRESHOLD = 3` (§7), named distinctly from the incumbent's own
+  `PROXIMITY_WINDOW = 5` (probe L51) so the two module-level constants do not collide (§7's
+  addition rationale). **PROVISIONAL — owner: wright.** A tighter window than the incumbent's is
+  deliberate, not arbitrary-different-for-its-own-sake: threshold literals are typically
+  single-line assignments or comparisons with no natural multi-line block the way a cross-domain
+  read's surrounding context often has, so a tighter default is being tried first; like the
+  incumbent's window, this is unmeasured and owned by wright for revision once real
   false-positive/negative data exists (Roadmap Slice 10, unchanged from prior pass's plan).
+  **Self-scan consequence of this name (resolved, see §8 G-4 disposition):** because
+  `PROXIMITY_WINDOW_THRESHOLD` contains the name-gate word `threshold`, the constant's own
+  assignment line is itself a "named threshold" match under §2 context 2 once the local-threshold
+  pass goes live and scans this probe file. It must therefore carry a real
+  `THRESHOLD-PROVENANCE:` marker line (not a bare `PROVISIONAL` comment) within 3 lines of its
+  assignment. The required comment text is specified exactly in §7.
 - Same location rule as the incumbent: citation lives in the same file as the flagged literal, not
   a separate doc.
 
@@ -305,6 +335,32 @@ interface TrackRecordEntry {
 populated by a live wiring (§5) — there is no historical data this migration needs to preserve or
 reconcile, so the schema change is a clean cutover, not a versioned-log concern.
 
+**Resolution of 05-REVIEW.md G-5 (`mode` nullability): `mode` stays non-nullable
+(`"log_only" | "blocking"`, no `| null`). The wrapper, not just the probe, must read the mode
+config.** Rationale for keeping it non-nullable rather than widening the type: `mode` is the field
+every downstream reader (triage, promotion decisions, Roadmap Slice 12's end-to-end verification)
+uses to interpret every other field in the entry — a `null` mode on a `probe_error` row would mean
+"we don't know whether this crash happened under log_only or blocking," which is exactly the kind
+of ambiguity this schema exists to prevent, and it is avoidable: the mode config
+(`docs/tooling/domain-boundary-mode.json`, §5) is a small, static, already-fail-safe-specified
+file that either component can read independently without needing the probe to have run
+successfully first.
+
+**Concrete requirement**: `.claude/hooks/domain-boundary-provenance.sh` (the wrapper) reads
+`docs/tooling/domain-boundary-mode.json` itself, at the point it constructs any `probe_error`
+`TrackRecordEntry` (i.e. whenever the wrapper detects the probe invocation failed, timed out, or
+produced no parseable output) — this is a **new** wrapper responsibility this sprint adds, not a
+pre-existing one. It applies the identical fail-safe default `load_mode_config` uses (§7): file
+absent, unreadable, or schema-invalid → `"log_only"`; otherwise the file's `mode` value verbatim.
+A minimal shell-native read (e.g. `grep`/`sed` extraction of the `"mode"` value, or `jq -r` if
+available, falling back to `"log_only"` on any non-zero exit or empty result) is sufficient — the
+wrapper does not need a full JSON parser, only this one field, and correctness on malformed input
+means "fail toward log_only," not "fail toward crashing the wrapper itself." This closes the gap
+Roadmap Slice 8 currently leaves open (wrapper "never reads the mode config file"): after this
+sprint, both the probe (`load_mode_config`, §7, for all non-`probe_error` entries) and the wrapper
+(this new read, for `probe_error` entries only) independently supply a real `mode` value, and
+`TrackRecordEntry.mode` is never `null` in any code path.
+
 ## 7. New Function Signatures
 
 ```python
@@ -327,11 +383,31 @@ class FlaggedLiteral(TypedDict):
     context: str            # "comparison" | "named_threshold" | "slice_truncation"
     literal_repr: str       # e.g. "50000", "True"
 
+# THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright, unmeasured. Proximity window (lines)
+# above/below a match, for the local-threshold pass only (§2/§4). Independent of the incumbent's
+# PROXIMITY_WINDOW (probe L51, value 5, cross-domain purpose) — named PROXIMITY_WINDOW_THRESHOLD,
+# not PROXIMITY_WINDOW, to avoid a module-level name collision (two constants of the same name in
+# the same file is a Python bug: the second assignment would silently shadow the first).
+PROXIMITY_WINDOW_THRESHOLD = 3
+# ^ This comment is deliberately written as the exact text to land in
+#   scripts/domain_boundary_provenance_probe.py (Roadmap Slice 4). It is required to start with
+#   the literal marker `THRESHOLD-PROVENANCE:` (not a bare `PROVISIONAL —` line) because the
+#   constant's own name contains the name-gate word "threshold" (§2 context 2) — once the local-
+#   threshold pass is live, an edit to this file that assigns `PROXIMITY_WINDOW_THRESHOLD` is
+#   itself a context-2 match, and the required qualifying marker for that check's own detection
+#   rule (§4) is `THRESHOLD-PROVENANCE:`, not `PROVISIONAL —` (that string alone does not contain
+#   the marker and would not satisfy `has_threshold_provenance_marker`, causing the probe to flag
+#   its own source line). See §8 G-4 for the full self-scan resolution and why the incumbent's
+#   `PROXIMITY_WINDOW = 5` (probe L51) does NOT need the same treatment.
+
 def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
     """3-line window (§4), same shape as the incumbent's has_qualifying_marker_in_window but
-    against THRESHOLD-PROVENANCE: and PROXIMITY_WINDOW=3, kept as a separate function/constant
-    rather than parameterizing the incumbent's — the two windows are independently PROVISIONAL
-    and must be revisable independently without an accidental shared-constant coupling."""
+    against THRESHOLD-PROVENANCE: and PROXIMITY_WINDOW_THRESHOLD (=3, above), kept as a separate
+    function/constant rather than parameterizing the incumbent's (`PROXIMITY_WINDOW`, probe
+    L51) — the two windows are independently PROVISIONAL and must be revisable independently
+    without an accidental shared-constant coupling. Verified by direct read of the live file
+    (2026-09-05) that `PROXIMITY_WINDOW_THRESHOLD` does not collide with any other existing name
+    in `scripts/domain_boundary_provenance_probe.py`."""
 
 def run_cross_domain_pass(project_dir, tool_input, scan_surface) -> PassResult:
     """Incumbent's existing steps 2-7 (manifest load, normalize, glob match, identifier scan,
@@ -364,7 +440,7 @@ design — see §8 for per-item disposition.
 | **G-6** (`base_ref` undefined) | The discarded design's Stop-hook trigger needed a git base ref to find "session-changed files." | **Moot.** This design keeps `PreToolUse` on `Edit`/`Write` (the incumbent's trigger) — there is no "changed files since session start" concept at all; the scan surface is the single tool call's own `content`/`new_string`, exactly as the incumbent already does. No base-ref resolution is needed anywhere in this document. |
 | **G-7** (`run()` takes `mode` as param AND reads config) | Same ambiguity risk exists in principle. | **Addressed directly**, not just moot: §7 specifies `run()` calls `load_mode_config()` itself, once, at the top, then passes the resulting `mode` string into `combine()` as a plain argument — config is read exactly once, by `run()`, never re-read or re-passed ambiguously. |
 | **G-8** (`ProbeResult.decision` can't express `probe_error`) | The discarded design's `ProbeResult` type omitted `probe_error`. | **Addressed.** §6's `TrackRecordEntry.decision` explicitly lists `"allow" \| "flag" \| "deny" \| "probe_error"` as one flat union, matching the incumbent's own existing pattern (its `TrackRecordEntry.decision` already includes `probe_error`) — no separate `ProbeResult` type with a narrower union is introduced by this design; `PassResult`/`CombinedResult` (§7) are per-pass/pre-decision structures, not the final logged decision. |
-| **G-9** (self-scan undefined) | Whether the new probe's own PROVISIONAL constants (a lookback bound, an exclusion set) get scanned by its own detection rule once live. | **Applies, and is now answerable concretely**: the local-threshold pass (§2) runs on any `.py` file, unconditionally except for test paths — `scripts/domain_boundary_provenance_probe.py` is not excluded, so an edit to it is self-scanned like any other file. Its own `PROXIMITY_WINDOW = 5` (incumbent, unchanged) and this document's new `PROXIMITY_WINDOW = 3` constant (§4) both already carry `# PROVISIONAL — owner: wright` comments in the source/this doc — Roadmap must verify (carried to 04-ROADMAP, not decided here) that those comments, once written into the probe file exactly as worded, actually land within 3 lines of their respective assignment per §2's context-2 name-gate (`_WINDOW` matches no threshold word in the current constant names — **flagged**: `PROXIMITY_WINDOW` does not contain limit/cap/threshold/cutoff/retry/budget/timeout/max/min, so context 2's name gate as specified would NOT flag it, meaning the self-scan produces a false negative on exactly the constant G-9 asks about). This is a real detection-rule gap this document surfaces rather than hides: `PROXIMITY_WINDOW` is a threshold by function but not by name. Not resolved by renaming (out of scope for this pass — renaming the incumbent's own `PROXIMITY_WINDOW` is an unrelated-file edit this sprint doesn't need); flagged to Roadmap as an explicit fixture case ("named constant that is a threshold by role but not by name — document as an accepted v1 detection gap, not a bug"). |
+| **G-9 / G-4** (self-scan, and 05-REVIEW.md's G-3/G-4 rename consequence) | Whether the new probe's own PROVISIONAL constants get scanned by its own detection rule once live, and — per 05-REVIEW.md G-4 — whether renaming the new constant away from `PROXIMITY_WINDOW` to satisfy G-3 (name-collision fix) silently flips this row's original "false negative" conclusion into a false positive on the *new* constant. | **Resolved with two distinct, definite answers — one per constant, since after the G-3 rename they are no longer analogous cases:** (1) **The incumbent's `PROXIMITY_WINDOW = 5` (probe L51, unchanged by this sprint)** — its name contains no name-gate word (`limit`/`cap`/`threshold`/`cutoff`/`retry`/`retries`/`budget`/`timeout`/`max`/`min`), so §2 context 2 does NOT match it. This is an accepted v1 detection gap (a threshold by role, not by name) exactly as originally found — **unaffected by the rename**, because this constant was never renamed. Its existing `# §5 — PROVISIONAL, owner: wright` comment (probe L50) needs no change and does not need to contain `THRESHOLD-PROVENANCE:`, because context 2 never fires on it in the first place. (2) **The new constant, renamed to `PROXIMITY_WINDOW_THRESHOLD = 3` per G-3 (§7)** — its name DOES contain `threshold`, so §2 context 2 fires on its own assignment line once the local-threshold pass scans this probe file (self-scan, per G-9's original question). This is the opposite situation from case (1) and requires an actual qualifying marker, not just an accepted gap: the comment immediately above the assignment (§7) is written to start with the literal string `THRESHOLD-PROVENANCE:` (not a bare `PROVISIONAL —` line) specifically so it satisfies `has_threshold_provenance_marker`'s check within the 3-line window (§4). A bare `# PROVISIONAL — owner: wright` comment, as this document's prior draft used, does NOT contain the required marker string and would NOT have satisfied the check — that was this document's own error, corrected in §7's exact comment text. Roadmap Slice 4's Done-When must require the comment be written verbatim as specified in §7, and Slice 9's fixture corpus must add a case for `PROXIMITY_WINDOW_THRESHOLD`'s own assignment resolving to "cited" (not "flagged"), distinct from the existing `PROXIMITY_WINDOW` false-negative fixture case (which remains, unchanged, for case (1)). |
 | **G-4** (US-4 AC2 no verification path) | "No log message implies soundness" has no test. | **Still applies, unchanged from before** — this is a requirements-level testability gap independent of which design implements it. Not this document's to resolve; flagged to Roadmap the same way the review already did (a grep-based test asserting the deny/flag `reason` string template contains no soundness-implying language, e.g. no "verified correct"/"sound"/"validated" claims beyond presence-check wording). |
 
 ## 9. Dependencies
@@ -438,9 +514,12 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   disposition from the prior pass, re-hosted here).
 - **§4's 3-line window** — PROVISIONAL, owner wright, unmeasured, deliberately independent from
   the incumbent's 5-line window.
-- **§8's `PROXIMITY_WINDOW` self-scan false-negative** — an accepted, explicitly documented v1
-  detection gap (constant is a threshold by role, not by name), not a blocking issue, but must be
-  captured as a named fixture case in the roadmap's test corpus, not silently absent from it.
+- **§8's self-scan disposition (two constants, two outcomes)** — the incumbent's
+  `PROXIMITY_WINDOW = 5` remains an accepted, explicitly documented v1 detection gap (threshold by
+  role, not by name; unaffected by this sprint). The new `PROXIMITY_WINDOW_THRESHOLD = 3` (§7) is
+  a name-gate match and must carry the exact `THRESHOLD-PROVENANCE:`-prefixed comment specified in
+  §7 to avoid self-flagging. Both must be captured as distinct named fixture cases in the
+  roadmap's test corpus (Slice 9), not silently absent from it.
 - **§11's roster/LOCKED-doc addendum updates** — Roadmap-level housekeeping, not architecture.
 
 ---
