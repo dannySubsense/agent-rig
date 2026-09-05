@@ -4,7 +4,11 @@
 
 Migrated from GATE-LOG.md, 2026-09-05, per the GATE-LOG→PROGRESS.md consolidation (Danny + ledger).
 
-Counter: 3/3
+**Cycle authorization note (2026-09-05):** Danny explicitly authorized (this session, via direct instruction) closing out the original 3-attempt cycle below — which ended in a THRASHING HALT at attempt 3, then received a substantive redesign (detection rule fixed against committed benchmark evidence) — and starting a new gate cycle for the redesigned detection rule. This is authorized because the redesign is substantively different work, not a retry of the same design (see the attempt-4 findings and the redesign summary in the Post-HALT note below). This closes the gap both attempt 3's THRASHING finding and attempt 4's F4 flagged: continuing to add attempts to the same counter after a HALT, without recorded human authorization, makes the attempt-limit mechanism decorative.
+
+### Cycle 1 (attempts 1-4, ended: redesign + fixes applied)
+
+Counter: 3/3 (exhausted, HALT — see Convergence judgment below; attempt 4 was a cold re-check against the post-redesign state, not part of the original counted cycle)
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
 |---|---|---|---|---|
@@ -22,7 +26,11 @@ Orchestrator independent re-derivation: AGREES — confirmed via direct file dif
 
 | 4 | 2026-09-05 | FAIL (COLD, no scope brief, SHA `7d6a9f5`) | Layer 1 FAIL, Layer 2 PASS non-PROVISIONAL. F1 (blocking): `02-ARCHITECTURE.md` §0.1 quietly rewrote the binding unsourced-number rule to add a third valid disposition ("a fully-stated executable benchmarking plan") not present in `~/.claude/CLAUDE.md` rule 1 — the `{0,1,-1,2}` exclusion set (60.5% of all candidates, the single highest-leverage constant in the design) has neither a real citation nor a named human owner, riding on this invented option. F2 (blocking, cheap): the shipped regex fallback pattern was widened to match floats in the doc, but the committed script (`scan_thresholds.py`) still has the old integer/boolean-only pattern — doc and evidence describe two different detectors. F3 (non-blocking): one stale sentence about which parse strategy handles the worst-case fragment. F4 (process): this attempt itself — GATE-LOG.md said `3/3, THRASHING, HALT` with no recorded authorization to run a 4th attempt. F5 (carried, out of this sprint's file scope): incumbent's `PROXIMITY_WINDOW = 5` still tagged `owner: wright` (invalid, self-assigned) at `scripts/domain_boundary_provenance_probe.py:50-51`. | none taken — GATE-LOG→PROGRESS.md consolidation superseded the snapshot-before-retry step for this attempt |
 
-**Open, unresolved as of this migration:** (1) F1 — **RESOLVED 2026-09-05**: `{0,1,-1,2}` exclusion set deleted entirely from `02-ARCHITECTURE.md`/`01-REQUIREMENTS.md`/`04-ROADMAP.md` (Danny's decision — ship unfiltered under `log_only`); §0.1's invented fourth rule-1 disposition also deleted. (2) F2 — **RESOLVED 2026-09-05**: `scan_thresholds.py`'s regex fallback pattern fixed to match floats (and its value-parsing branch fixed to not silently drop a matched float); whole-corpus re-run confirmed `results.md`/`candidates.jsonl` unchanged (regex fallback never fires on a whole file in this corpus), and a direct function-level test confirms the fixed pattern now matches a float fragment the old pattern missed. (3) The counter/authorization question F4 raises — still open, now moot in its original form (GATE-LOG.md's own counter mechanism is retired) but the underlying question (was attempt 3's HALT properly closed before further gate attempts ran) has not been explicitly answered by Danny.
+**Open, unresolved as of this migration:** (1) F1 — **RESOLVED 2026-09-05**: `{0,1,-1,2}` exclusion set deleted entirely from `02-ARCHITECTURE.md`/`01-REQUIREMENTS.md`/`04-ROADMAP.md` (Danny's decision — ship unfiltered under `log_only`); §0.1's invented fourth rule-1 disposition also deleted. (2) F2 — **RESOLVED 2026-09-05**: `scan_thresholds.py`'s regex fallback pattern fixed to match floats (and its value-parsing branch fixed to not silently drop a matched float); whole-corpus re-run confirmed `results.md`/`candidates.jsonl` unchanged (regex fallback never fires on a whole file in this corpus), and a direct function-level test confirms the fixed pattern now matches a float fragment the old pattern missed. (3) The counter/authorization question F4 raises — **RESOLVED 2026-09-05**: see "Cycle authorization note" above — Danny explicitly authorized closing Cycle 1 and starting Cycle 2 for the redesigned detection rule, this session.
+
+### Cycle 2 (post-redesign, starting now)
+
+Counter: 0/3 (Cycle 2)
 
 ## Forge Gate
 
