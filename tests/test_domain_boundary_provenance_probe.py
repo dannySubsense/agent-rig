@@ -873,6 +873,97 @@ def test_new_threshold_window_constant_not_flagged_as_unmarked_on_self_scan():
 
 
 # ---------------------------------------------------------------------------
+# Slice 5: run_local_threshold_pass()
+# ---------------------------------------------------------------------------
+
+def test_run_local_threshold_pass_non_py_file_does_not_run():
+    result = probe.run_local_threshold_pass("Write", "app.txt", "if retries > 3:\n", "log_only")
+    assert result["ran"] is False
+    assert result["matches_found"] is None
+    assert result["matches_cited"] is None
+    assert result["unmarked"] == []
+    assert result["detail"]["file_scanned"] is False
+
+
+def test_run_local_threshold_pass_test_path_excluded():
+    result = probe.run_local_threshold_pass(
+        "Write", "tests/fixtures/app.py", "if retries > 3:\n", "log_only"
+    )
+    assert result["ran"] is False
+    assert result["detail"]["file_scanned"] is False
+
+
+def test_run_local_threshold_pass_unmarked_literal_flagged():
+    result = probe.run_local_threshold_pass(
+        "Write", "app.py", "MAX_RETRIES = 500\n", "log_only"
+    )
+    assert result["ran"] is True
+    assert result["matches_found"] == 1
+    assert result["matches_cited"] == 0
+    assert len(result["unmarked"]) == 1
+    assert result["unmarked"][0][1] == "500"
+    assert result["detail"]["file_scanned"] is True
+
+
+def test_run_local_threshold_pass_marked_literal_cited():
+    source = "MAX_RETRIES = 500  # THRESHOLD-PROVENANCE: docs/foo.md\n"
+    result = probe.run_local_threshold_pass("Write", "app.py", source, "log_only")
+    assert result["ran"] is True
+    assert result["matches_found"] == 1
+    assert result["matches_cited"] == 1
+    assert result["unmarked"] == []
+
+
+def test_run_local_threshold_pass_no_manifest_coupling(tmp_path):
+    # No domain-boundary-manifest.json anywhere near the fixture — this pass must not
+    # consult one, and its output must be identical whether or not one exists.
+    manifest_path = tmp_path / "domain-boundary-manifest.json"
+    assert not manifest_path.exists()
+    result = probe.run_local_threshold_pass(
+        "Write", "app.py", "MAX_RETRIES = 500\n", "log_only"
+    )
+    assert result["ran"] is True
+    assert result["matches_found"] == 1
+    assert not manifest_path.exists()
+
+
+def test_run_local_threshold_pass_manifest_present_produces_identical_result(tmp_path, monkeypatch):
+    """Independent-review gap: the sibling test above only proves the ABSENT-manifest case.
+    "No manifest coupling" (Architecture §3) is a claim about identical behavior regardless
+    of manifest presence — this complements it by writing a real, well-formed
+    domain-boundary-manifest.json into a CLAUDE_PROJECT_DIR and confirming
+    run_local_threshold_pass's output for the same inputs is byte-identical either way. The
+    function takes no project_dir argument and never reads CLAUDE_PROJECT_DIR itself, but we
+    set it anyway to simulate the realistic caller environment (run()/main() do read it for
+    other passes) and confirm this pass is genuinely blind to it."""
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    _write_manifest(tmp_path)
+    assert (tmp_path / "docs" / "tooling" / "domain-boundary-manifest.json").is_file()
+    result = probe.run_local_threshold_pass(
+        "Write", "app.py", "MAX_RETRIES = 500\n", "log_only"
+    )
+    assert result == {
+        "ran": True,
+        "matches_found": 1,
+        "matches_cited": 0,
+        "unmarked": [(0, "500")],
+        "detail": {"file_scanned": True},
+    }
+
+
+def test_run_local_threshold_pass_mode_parameter_does_not_affect_output():
+    """Architecture §3 forbids the mode-based deny->flag downgrade from happening inside this
+    function — it belongs solely in combine() (Slice 6). Confirm `mode` is a true no-op here:
+    identical scan_surface with mode="log_only" vs mode="blocking" (and an arbitrary
+    unrecognized value) must produce byte-identical PassResults."""
+    source = "MAX_RETRIES = 500\n"
+    result_log_only = probe.run_local_threshold_pass("Write", "app.py", source, "log_only")
+    result_blocking = probe.run_local_threshold_pass("Write", "app.py", source, "blocking")
+    result_other = probe.run_local_threshold_pass("Write", "app.py", source, "not-a-real-mode")
+    assert result_log_only == result_blocking == result_other
+
+
+# ---------------------------------------------------------------------------
 # Plain assert-based runner (used if pytest is not installed)
 # ---------------------------------------------------------------------------
 

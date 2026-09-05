@@ -652,6 +652,59 @@ def run_cross_domain_pass(project_dir, tool_input, scan_surface) -> PassResult:
     }
 
 
+def run_local_threshold_pass(tool_name, raw_file_path, scan_surface, mode) -> PassResult:
+    """New (Architecture §7). Gated on: `raw_file_path` ends with `.py`, and no path
+    component is test/tests/fixtures (§2 exclusion). Not gated by manifest presence.
+
+    Composes `detect_threshold_literals` (§2/§2.1) with `has_threshold_provenance_marker`
+    (§4) to determine which flagged literals are cited and which are not. `mode` is
+    accepted per the §7 signature but is not consulted here — the mode-based deny->flag
+    downgrade happens only in `combine()` (Slice 6), per Architecture §3's pseudocode.
+    """
+    if not isinstance(raw_file_path, str) or not raw_file_path.endswith(".py"):
+        return {
+            "ran": False,
+            "matches_found": None,
+            "matches_cited": None,
+            "unmarked": [],
+            "detail": {"file_scanned": False},
+        }
+
+    if _is_test_or_fixture_path(raw_file_path):
+        return {
+            "ran": False,
+            "matches_found": None,
+            "matches_cited": None,
+            "unmarked": [],
+            "detail": {"file_scanned": False},
+        }
+
+    flagged = detect_threshold_literals(raw_file_path, scan_surface)
+    if not flagged:
+        return {
+            "ran": True,
+            "matches_found": 0,
+            "matches_cited": 0,
+            "unmarked": [],
+            "detail": {"file_scanned": True},
+        }
+
+    lines = scan_surface.split("\n")
+    unmarked = [
+        (literal["line_index"], literal["literal_repr"])
+        for literal in flagged
+        if not has_threshold_provenance_marker(lines, literal["line_index"])
+    ]
+
+    return {
+        "ran": True,
+        "matches_found": len(flagged),
+        "matches_cited": len(flagged) - len(unmarked),
+        "unmarked": unmarked,
+        "detail": {"file_scanned": True},
+    }
+
+
 def run(stdin_data):
     session_id = stdin_data.get("session_id")
     tool_name = stdin_data.get("tool_name")
