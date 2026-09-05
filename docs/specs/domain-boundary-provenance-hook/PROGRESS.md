@@ -7,8 +7,8 @@
 - [x] Slice 2: Mode Config Loader — COMPLETE (2026-09-05, commit `baa2261`). QC found one FAIL (missing schemaVersion validation), fixed and re-verified PASS. 171/171 tests passing.
 - [x] Slice 3: `detect_threshold_literals()` — COMPLETE (2026-09-05, commit `dcbd346`). QC found one FAIL (missing type annotations), fixed and re-verified PASS. 2/2 real-incident recall confirmed by direct execution. 186/186 tests passing.
 - [x] Slice 4: `has_threshold_provenance_marker()` — COMPLETE (2026-09-05, commit `b21fd11`). Real bug found (N/A owner regex bypass) + annotation fix, both re-verified PASS. 202/202 tests passing.
-- [ ] Slice 5: `run_local_threshold_pass()` — IN_PROGRESS
-- [ ] Slice 6: `combine()` — PENDING
+- [x] Slice 5: `run_local_threshold_pass()` — COMPLETE (2026-09-05, commit `b05bd46`). Clean PASS, no fix cycle. No-manifest-coupling and mode-no-op verified by direct execution. 209/209 tests passing.
+- [ ] Slice 6: `combine()` — IN_PROGRESS
 - [ ] Slice 7: `TrackRecordEntry` Schema Migration + `run()` Restructure — PENDING
 - [ ] Slice 8: Wrapper Updates — PENDING
 - [ ] Slice 9: Test Corpus Additions — PENDING
@@ -20,7 +20,7 @@
       transcribed into this file's `## Forge Gate` section — "all slices done" is not "sprint done."
 
 ## Current
-Slice: 5
+Slice: 6
 Step: @code-executor
 Last updated: 2026-09-05
 
