@@ -11,8 +11,8 @@
 - [x] Slice 6: `combine()` — COMPLETE (2026-09-05, commit `e090723`). Real bug found (signature drift causing "violation in None") + mode fail-safe hardening, both re-verified PASS. F1 named regression test (Frank attempt-1 finding) + blocking-mode companion confirmed real. 217/217 tests passing.
 - [x] Slice 7: `TrackRecordEntry` Schema Migration + `run()` Restructure — COMPLETE (2026-09-05, commit `09e2569`). 19 test failures diagnosed as stale expectations/wrong fixtures (not implementation bugs), fixed and QC-verified by direct execution — no weakened assertions. Both passes + combine() now genuinely wired into run(). 222/222 tests passing.
 - [x] Slice 8: Wrapper Updates — COMPLETE (2026-09-05, commit `56da5f4`). Real bug found (hidden `head` dependency in grep/sed fallback) + fixed, QC-verified byte-for-byte fail-safe parity with Python. 25/25 wrapper tests, 222/222 Python tests passing.
-- [ ] Slice 9: Test Corpus Additions — IN_PROGRESS
-- [ ] Slice 10: Live Wiring — PENDING
+- [x] Slice 9: Test Corpus Additions — COMPLETE (2026-09-05, commit `51c6d8c`). Soundness-language check took 3 fix iterations (own independent verification caught 2 real regressions the fix reports missed) before correct redesign (exclude docstrings/comments, scan only reason-message strings). Adversarial final QC confirmed real mutations still caught. 236/236 tests, 25/25 wrapper tests passing.
+- [ ] Slice 10: Live Wiring — IN_PROGRESS
 - [ ] Slice 11: Documentation — PENDING
 - [ ] Slice 12: End-to-End Verification — PENDING
 - [ ] **Frank binding forge-gate** — PENDING. Runs once, only after every slice above is checked
@@ -20,7 +20,7 @@
       transcribed into this file's `## Forge Gate` section — "all slices done" is not "sprint done."
 
 ## Current
-Slice: 9
+Slice: 10
 Step: @code-executor
 Last updated: 2026-09-05
 
