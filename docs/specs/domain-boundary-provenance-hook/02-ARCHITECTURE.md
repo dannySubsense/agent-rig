@@ -493,9 +493,12 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   is modified or removed, since none currently exists for this hook family.
 - **`docs/tooling/domain-boundary-provenance-hook.md`**: this LOCKED doc's §2–§10 remain the
   authoritative spec for the cross-domain pass; it is not rewritten by this sprint. A short
-  addendum section should be appended (Roadmap concern, not this document's) pointing at this
-  architecture doc for the composed local-threshold behavior, so a future reader of the LOCKED doc
-  isn't misled into thinking the hook is still single-purpose.
+  addendum section should be appended (Roadmap Slice 11's concern, not this document's) pointing
+  at this architecture doc for the composed local-threshold behavior, and explicitly stating the
+  mode-gated deny semantics (§3/§5 above): under `log_only`, the condition §6 step 6/AC4 call
+  "denied" instead resolves to `decision: "flag"` and the call is allowed — a real behavior change
+  to this LOCKED doc's stated outcome, named here rather than left implicit. This is what §5's
+  pointer to this bullet resolves to.
 - **`docs/tooling/domain-boundary-manifest.json`** (F2 correction, Frank spec-gate attempt 1):
   **this file does not exist and has never been tracked in this repo** — confirmed by direct
   check. No repo-root manifest exists in agent-rig; this is deliberate, not an oversight — the

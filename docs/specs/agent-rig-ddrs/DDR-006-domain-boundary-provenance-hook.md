@@ -1,8 +1,8 @@
 # DDR-006 — Unsourced-Threshold Provenance Hook (implementation-side record, renamed 2026-09-05, was "Domain-Boundary Provenance Hook")
 
 **Status**: **Corrected 2026-09-05 — v1 already SHIPPED, currently unwired; extension in
-spec-gate.** v1 (domain-crossing-only scope) was specced, forged, Frank-forge-gate PASSED (attempt
-3/3 + supplementary), and merged — PR #11, `.claude/hooks/domain-boundary-provenance.sh` +
+spec-gate.** v1 (domain-crossing-only scope) was specced (Frank spec-gate PASS attempt 3/3 +
+supplementary), forged (Frank forge-gate PASS attempt 1/3, binding), and merged — PR #11, `.claude/hooks/domain-boundary-provenance.sh` +
 `scripts/domain_boundary_provenance_probe.py`, LOCKED spec at
 `docs/tooling/domain-boundary-provenance-hook.md`. **It is built but not currently wired into
 `.claude/settings.json`** — confirmed by direct read, no live entry. A 2026-09-05 scope-broadening

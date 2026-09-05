@@ -611,8 +611,6 @@ soundness-implying language) are both carried into Slices 4/9 as named fixture/t
 rather than left as unaddressed review notes. Architecture §6's resolution of G-5 (`mode`
 non-nullable, wrapper reads mode config for `probe_error` entries) is carried into Slice 8's
 Done-When explicitly, replacing the prior draft's "write `null` for `mode`" framing. Architecture
-§12's five contradictions flagged to `01-REQUIREMENTS.md` are requirements-doc and North-Star-doc
-corrections outside this roadmap's file-touch scope (Architecture doc is explicit these are "not
-silently patched here") and are not slices in this roadmap — they are a prerequisite housekeeping
-item for whoever next revises `01-REQUIREMENTS.md`/`NORTH-STAR.md`, not an implementation slice, and
-are noted here so they aren't lost between documents.
+§12's five contradictions flagged to `01-REQUIREMENTS.md`/`NORTH-STAR.md` have all been Applied
+(confirmed in both documents directly — Frank spec-gate attempt 2 verified this against current
+file content, not this roadmap's prior claim) — nothing outstanding there as of 2026-09-05.

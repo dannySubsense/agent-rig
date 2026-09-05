@@ -78,8 +78,9 @@ so that soundness judgment stays the job of `benchmark`, Frank, and a human, per
       the new local-threshold pass identically, since neither has run against live traffic before
       this sprint.
 - [ ] Given a repo owner has explicitly configured the hook to `blocking` mode, when it runs and
-      finds an unresolved flagged literal (from either pass), then the session-ending action is
-      blocked.
+      finds an unresolved flagged literal (from either pass), then the Edit/Write tool call is
+      denied (`decision: "deny"`, the same `PreToolUse` block payload the incumbent's cross-domain
+      pass already uses — not a session-ending action; this hook has no `Stop` trigger).
 - [ ] No repo's hook installation ships in `blocking` mode as its initial configuration.
 
 **US-3**
