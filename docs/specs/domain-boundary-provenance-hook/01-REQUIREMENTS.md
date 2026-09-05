@@ -54,9 +54,11 @@ so that soundness judgment stays the job of `benchmark`, Frank, and a human, per
 
 **US-1**
 - [ ] Given a code change introducing a numeric or boolean literal that matches the detection rule
-      for "threshold-shaped" (rule finalized in `02-ARCHITECTURE.md` §2 — two shape-based
-      syntactic contexts only, Python-only, no name-gating; see that section for the exact
-      contexts and exclusions), when the hook runs, then the hook flags the literal if no citation,
+      for "threshold-shaped" (rule finalized in `02-ARCHITECTURE.md` §2, corrected against
+      committed benchmark evidence — three shape-based syntactic contexts: comparison operand,
+      slice/truncation argument, and module/class-level named assignment (`NAME = <literal>`, no
+      vocabulary or case gate); Python-only; see that section for the exact contexts and
+      exclusions), when the hook runs, then the hook flags the literal if no citation,
       PROVISIONAL-with-owner tag, or evidence of removal is present at or adjacent to its
       definition.
 - [ ] Given a threshold-shaped literal that already carries a citation or a PROVISIONAL tag
@@ -64,6 +66,12 @@ so that soundness judgment stays the job of `benchmark`, Frank, and a human, per
 - [ ] Given a literal that does not match the threshold-shaped detection rule (e.g. a loop bound
       or array index, per Architecture §2's own exclusions), when the hook runs, then it is not
       flagged.
+- [ ] Given a qualifying module-level or class-level named assignment (`NAME = <numeric/bool
+      literal>`, any target name, no vocabulary or case restriction), when the hook runs, then the
+      literal is flagged if unmarked — this context was re-added in Architecture §2 (a
+      vocabulary-free, shape-based form) after cold Frank measured the prior comparison/
+      slice-only rule at 0/2 recall against the two real historical incidents this hook exists to
+      catch, both of which are named-constant assignments.
 - [ ] The new local-threshold detection pass fires identically regardless of whether the literal
       was defined locally in the same file/module or read/imported from elsewhere — no code path
       in this pass conditions flagging on a domain-crossing or import check. This applies only to
@@ -102,17 +110,28 @@ so that soundness judgment stays the job of `benchmark`, Frank, and a human, per
 ## Detection Rule Pointer
 
 The detection rule for "threshold-shaped literal" (previously an open architecture-level design
-question in this document) is finalized in `02-ARCHITECTURE.md` §2 (revised per benchmark audit,
-2026-09-05): two shape-based syntactic contexts only (comparison operand, slice/truncation
-argument) — the name-gated default-kwarg/assignment context was removed, measured to produce both
-false negatives (8/10 candidate words never fire in this repo) and false positives (substring
-matches inside unrelated identifiers). Detection is Python-only, AST-based, with explicit
-exclusions: `range()` bounds (a Python language fact, cited to the language reference, not a
-benchmarked value), non-slice indexing, test/fixture paths, and the literal set `{0, 1, -1, 2}`
-(NOT YET BENCHMARKED — ships with a fully-specified executable validation plan in Architecture §2;
-not to be treated as validated until that plan runs). This document does not restate that rule's
-substance — see Architecture §2 for the authoritative definition and disposition of every
-constant.
+question in this document) is finalized in `02-ARCHITECTURE.md` §2, corrected this pass against
+committed, reproducible benchmark evidence (`docs/research/domain-boundary-hook-benchmark/`,
+commit `929865d`): three shape-based syntactic contexts, name-agnostic — (1) comparison operand,
+(2) slice/truncation argument, and (3) module/class-level named assignment (`NAME = <numeric/bool
+literal>`, any target name, no vocabulary or case gate). Context 3 was re-added this pass, in a
+vocabulary-free, shape-based form, after cold Frank's attempt-3 spec-gate found the prior
+two-context-only rule structurally incapable of catching either of the two real historical
+incidents this hook exists to prevent (`_HEAD_BYTES = 65_536` and `filing_text_max_bytes: int =
+512_000`, both named-constant assignments) — measured recall 0/2 under the two-context rule, 2/2
+under the corrected three-context rule (Architecture §2, `results.md` §4).
+
+Detection is Python-only, AST-based. Explicit exclusions: non-slice indexing, test/fixture paths,
+and the literal set `{0, 1, -1, 2}` (NOT YET BENCHMARKED for precision — ships with a
+fully-specified executable validation plan in Architecture §2; not to be treated as validated
+until that plan runs). The `range()`-bound exclusion previously listed here has been removed: the
+committed benchmark measured it firing zero times across the entire 445-file corpus under every
+candidate rule, confirming it is structurally inert (a `range()` argument can never match any of
+the three detection contexts), so it is deleted rather than carried forward as inert ceremony
+(Architecture §2, cited to `results.md` §3).
+
+This document does not restate the rule's full substance — see Architecture §2 for the
+authoritative definition and disposition of every constant.
 
 The incumbent's existing manifest-gated cross-domain check (schema, trigger, scan surface,
 `DOMAIN-BOUNDARY:` marker) is untouched by this sprint — see `02-ARCHITECTURE.md` §1. Only the new
@@ -125,6 +144,7 @@ same-file/local-threshold detection pass is new work.
 | Literal is a loop bound, array index, or other non-threshold numeric use | Not flagged — excluded by the detection rule's own scope (threshold/cap/limit/cutoff/retry-count/budget only, per Architecture §2's exclusions) |
 | Literal already has a citation, but the citation link/reference is broken or wrong | Not flagged by this hook — correctness of citations is `benchmark`'s/Frank's/a human's job, not this check's |
 | Literal is defined in the same file/module with no import involved | Flagged the same as any cross-boundary literal if it otherwise matches the new local-threshold detection rule — domain-crossing is not a precondition for this new pass |
+| Literal appears as a qualifying module-level or class-level named assignment (`NAME = <literal>`), any target name, any case | Flagged if unmarked — this is one of the three detection contexts (Architecture §2, context 3); assignments are not exempt, and no vocabulary or naming-convention gate narrows which assignment targets qualify |
 | Hook's internal scan exceeds its timeout or throws an exception | Fail open — session not blocked, error appended to track-record log |
 | Repo has hook newly wired live with pre-existing unlabeled magic numbers throughout | All matching literals flagged in `log_only` mode; no blocking until repo owner explicitly promotes to `blocking` after triage |
 | A PROVISIONAL tag exists but does not name a human owner | Treated as absent — flagged, since the amended check requires a *named-owner* PROVISIONAL marker, not a bare "TODO" or unowned tag |
@@ -175,7 +195,10 @@ same-file/local-threshold detection pass is new work.
   before this sprint.
 - Must: every predetermined constant this sprint's own code introduces carries a citable
   precedent or an explicit PROVISIONAL tag with a named owner — no exception for the hook's own
-  artifacts, per this repo's Decision Discipline.
+  artifacts, per this repo's Decision Discipline. The detection rule's own three syntactic
+  contexts, the `{0, 1, -1, 2}` exclusion's leverage figure, and the citation-proximity window
+  (`PROXIMITY_WINDOW_THRESHOLD = 2`) are cited to `02-ARCHITECTURE.md` §2/§4, not restated here —
+  see that section for the authoritative citation trail (`results.md` §§2-5).
 - Must not: implement or imply a soundness/correctness judgment on existing citations within this
   check's logic or output.
 - Must not: expand this sprint's scope to include retrofit work into other repos.
@@ -186,4 +209,11 @@ same-file/local-threshold detection pass is new work.
   `THRESHOLD-PROVENANCE:` marker (distinct from the incumbent's `DOMAIN-BOUNDARY:` and from bare
   `PROVISIONAL`) that recognizes a named-owner PROVISIONAL tag as one of its satisfying forms; this
   is an architecture-level finding, not a requirements gap.
+- Assumes: the new local-threshold pass's citation-proximity window is
+  `PROXIMITY_WINDOW_THRESHOLD = 2` lines (inclusive, above or below the flagged literal) — a new,
+  distinct constant from the incumbent's unrelated `PROXIMITY_WINDOW = 5`, cited to
+  `docs/research/domain-boundary-hook-benchmark/results.md` §5's measured comment-to-assignment
+  distance distribution (93.5% coverage at distance 1, 100.0% at distance 2, zero additional
+  comments at any distance 3–12). This document does not restate that measurement — see
+  Architecture §4.
 </content>

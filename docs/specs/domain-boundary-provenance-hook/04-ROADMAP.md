@@ -21,8 +21,8 @@ file, or a new hook registration.
 |---|---|
 | `run_cross_domain_pass()` extraction (incumbent steps 2–7, logic unchanged) | — |
 | `load_mode_config()` + `docs/tooling/domain-boundary-mode.json` | — |
-| `detect_threshold_literals()` (§2 AST rule, 2 shape-based contexts + exclusions) | — |
-| `has_threshold_provenance_marker()` (§4, 5-line window reusing incumbent's `PROXIMITY_WINDOW`, `THRESHOLD-PROVENANCE:` marker) | — |
+| `detect_threshold_literals()` (§2 AST rule, 3 syntactic contexts — comparison operand, slice/truncation, module/class-level named assignment with no vocabulary/case gate — + exclusions) | — |
+| `has_threshold_provenance_marker()` (§4, new independent `PROXIMITY_WINDOW_THRESHOLD = 2` window, `THRESHOLD-PROVENANCE:` marker) | — |
 | `run_local_threshold_pass()` | `detect_threshold_literals`, `has_threshold_provenance_marker` |
 | `combine()` (§3 combination rule, mode-aware) | `run_cross_domain_pass`, `run_local_threshold_pass`, `load_mode_config` |
 | `TrackRecordEntry` schema migration (§6, nested `cross_domain`/`local_threshold`) | `combine` |
@@ -31,7 +31,7 @@ file, or a new hook registration.
 | `.claude/settings.json` wiring (new `PreToolUse` entry) | wrapper (unchanged path, already correct) |
 | `docs/tooling/domain-boundary-provenance-hook.md` addendum | `run()` restructure, wiring |
 | `HOOK-DEPLOYMENT-ROSTER.md` status update | wiring |
-| Test corpus additions (`tests/fixtures/domain_boundary_corpus.json` + new local-threshold fixtures, incl. `PROXIMITY_WINDOW` self-scan not-flagged case) | `detect_threshold_literals`, `has_threshold_provenance_marker`, `combine` |
+| Test corpus additions (`tests/fixtures/domain_boundary_corpus.json` + new local-threshold fixtures, incl. `PROXIMITY_WINDOW` self-scan FLAGGED case) | `detect_threshold_literals`, `has_threshold_provenance_marker`, `combine` |
 
 No circular dependencies: each unit depends only on units listed above it.
 
@@ -43,13 +43,13 @@ No circular dependencies: each unit depends only on units listed above it.
 |---|---|---|---|
 | 1 | Extract incumbent's existing cross-domain logic into `run_cross_domain_pass()` — pure refactor, no behavior change | — | `scripts/domain_boundary_provenance_probe.py`, `tests/test_domain_boundary_provenance_probe.py` (existing tests must still pass unmodified) |
 | 2 | Mode config loader + committed config file | — | `scripts/domain_boundary_provenance_probe.py` (add `load_mode_config`), `docs/tooling/domain-boundary-mode.json` (new), `tests/test_domain_boundary_provenance_probe.py` (add cases) |
-| 3 | `detect_threshold_literals()` — AST detection, 2 shape-based contexts + exclusions | — | `scripts/domain_boundary_provenance_probe.py` (add fn + `FlaggedLiteral`), `tests/test_domain_boundary_provenance_probe.py` (add cases) |
-| 4 | `has_threshold_provenance_marker()` — 5-line window (reuses incumbent's `PROXIMITY_WINDOW`), `THRESHOLD-PROVENANCE:` marker | — | `scripts/domain_boundary_provenance_probe.py` (add fn only, no new constant) |
+| 3 | `detect_threshold_literals()` — AST detection, 3 syntactic contexts (comparison operand, slice/truncation argument, module/class-level named assignment) + exclusions | — | `scripts/domain_boundary_provenance_probe.py` (add fn + `FlaggedLiteral`), `tests/test_domain_boundary_provenance_probe.py` (add cases) |
+| 4 | `has_threshold_provenance_marker()` — 2-line window (`PROXIMITY_WINDOW_THRESHOLD = 2`, new independent constant), `THRESHOLD-PROVENANCE:` marker | — | `scripts/domain_boundary_provenance_probe.py` (add fn + new module-level constant `PROXIMITY_WINDOW_THRESHOLD = 2`) |
 | 5 | `run_local_threshold_pass()` — composes Slices 3–4, gated on `.py` + non-test path, not manifest | Slices 3, 4 | `scripts/domain_boundary_provenance_probe.py` (add fn + `PassResult`) |
 | 6 | `combine()` — two-pass combination rule, mode-aware, labeled concatenated reason text | Slices 1, 2, 5 | `scripts/domain_boundary_provenance_probe.py` (add fn + `CombinedResult`) |
 | 7 | `TrackRecordEntry` schema migration + `run()` restructure — single write per invocation, both passes' findings folded in | Slice 6 | `scripts/domain_boundary_provenance_probe.py` (edit `run()`, `write_track_record`, `build_track_record_entry`) |
 | 8 | Wrapper updates — `write_probe_error` fallback entry shape matches migrated schema, and the wrapper itself reads the mode config for `mode`; timeout-comment and any hardcoded schema fields updated | Slice 7 | `.claude/hooks/domain-boundary-provenance.sh` |
-| 9 | Test corpus additions — new local-threshold fixtures (one per context + each exclusion), the `PROXIMITY_WINDOW` self-scan not-flagged case documented as a fixture, and a grep-based test for US-4 AC2 (no soundness-implying language in reason/log text, G-4) | Slices 1–8 | `tests/fixtures/domain_boundary_corpus.json` (edit, add cases), `tests/test_domain_boundary_provenance_corpus.py` (edit, add assertions), new grep-based test file or added case in existing suite |
+| 9 | Test corpus additions — new local-threshold fixtures (one per context + each exclusion), the `PROXIMITY_WINDOW` self-scan FLAGGED case documented as a fixture, and a grep-based test for US-4 AC2 (no soundness-implying language in reason/log text, G-4) | Slices 1–8 | `tests/fixtures/domain_boundary_corpus.json` (edit, add cases), `tests/test_domain_boundary_provenance_corpus.py` (edit, add assertions), new grep-based test file or added case in existing suite |
 | 10 | Live wiring — `.claude/settings.json` gains `PreToolUse` entry (currently absent) | Slices 1–9 | `.claude/settings.json` |
 | 11 | Documentation — LOCKED spec addendum + roster status update | Slice 10 | `docs/tooling/domain-boundary-provenance-hook.md` (addendum section, additive only — §2–§10 untouched), `HOOK-DEPLOYMENT-ROSTER.md` (status row update) |
 | 12 | End-to-end verification — live run against agent-rig's own codebase under `log_only` | Slices 1–11 | none new — verification only |
@@ -123,10 +123,15 @@ returns `"log_only"` on any absence, read failure, or schema-invalid content (fa
 
 ### Slice 3: `detect_threshold_literals()`
 
-**Goal:** AST-based detection of threshold-shaped literals per Architecture §2 — the three
-contexts (comparison operand; name-gated default-kwarg/assignment; slice/truncation argument) and
-the four explicit exclusions (`range()` bounds, non-slice-stop index, test/tests/fixtures path
-component, literal set `{0, 1, -1, 2}`).
+**Goal:** AST-based detection of threshold-shaped literals per Architecture §2, rewritten this pass
+against committed benchmark evidence — **three syntactic contexts, one of which is
+assignment-based, all name-agnostic**: (1) comparison operand, (2) slice/truncation argument, and
+(3) module-level or class-level named assignment (`NAME = <numeric/bool literal>`, any target name,
+**no vocabulary gate, no case restriction**). Context 3 is the corrected addition — Architecture §2
+cites `results.md` §4's recall table showing this is the only rule achieving 2/2 recall on the two
+real historical incidents (`_HEAD_BYTES = 65_536`, `filing_text_max_bytes: int = 512_000`), both of
+which are assignments. Plus the three remaining explicit exclusions (non-slice-stop index,
+test/tests/fixtures path component, literal set `{0, 1, -1, 2}`).
 
 **Depends On:** —
 
@@ -141,25 +146,36 @@ component, literal set `{0, 1, -1, 2}`).
   contract).
 - Syntax error on `ast.parse` → return `[]` (fail-open on unparsable partial-edit fragment, not a
   crash).
-- Name-gated context (former context 2) is REMOVED per Architecture §2's redesign — measured
-  8/10 words never fire in this repo and substring matching produced 11 measured false positives
-  (`cap` inside `escaped_rest`, `min` inside `REMINDER_PATH`/`REMINDER_TEXT`/`_load_reminder`).
-  Only two shape-based contexts remain: comparison operand, slice/truncation argument.
-- `{0, 1, -1, 2}` exclusion set is NOT YET BENCHMARKED — carries the full executable validation
-  plan from Architecture §2 (unfiltered scan of roster corpus, JSONL dump, 200-row stratified
-  hand-labeled sample, exclude only if measured precision < 5%). Not to be treated as validated
-  until that plan runs. `range()` bound exclusion is a language fact (Python spec: `range()` takes
-  1-3 positional args), not a benchmarked value — no PROVISIONAL tag needed for it.
+- The assignment context is detected via one additional `ast.walk` pass over the same already-parsed
+  tree (Architecture §5.1) — module-level `Assign`/`AnnAssign` nodes at `Module` body scope, and
+  class-level `Assign`/`AnnAssign` nodes at `ClassDef` body scope, whose value is a numeric or
+  boolean `ast.Constant`. Pure-shape rule (module/class body binding), not a word-list match —
+  Architecture §2 explicitly rejects both the discarded vocabulary gate (measured 8/10 words never
+  fire in this repo, plus 11 measured false positives) and case-restriction to
+  `UPPER_CASE`/`UPPER_SNAKE_CASE` targets (drops recall on the real I2 incident, a lowercase
+  dataclass field, from 2/2 to 1/2, `results.md` §4).
+- The `range()`-bound exclusion from the prior draft is REMOVED, not carried forward — Architecture
+  §2 cites `results.md` §3: it fires zero times across the entire 445-file, four-rule corpus scan,
+  because a `range()` positional argument is a call argument, never itself a comparison operand, a
+  slice bound, or a module/class-level assignment target under any candidate rule. It was never a
+  live exclusion; it is dead code and is not implemented.
+- `{0, 1, -1, 2}` exclusion set is NOT YET BENCHMARKED for precision — carries the full executable
+  validation plan from Architecture §2 (unfiltered scan of the roster corpus already committed in
+  `candidates.jsonl`, 200-row stratified hand-labeled sample, exclude a value only if measured
+  precision < 5%). Leverage is measured (60.5% of all rule-(c) candidates fall inside this set,
+  `results.md` §3) but correctness is not — do not treat as validated until that plan runs.
 
 **Tests:**
-- [ ] Each of the 2 shape-based contexts flags a matching literal (one case per context).
-- [ ] `range()` bounds (all 3 positional argument positions) are not flagged.
+- [ ] Each of the 3 syntactic contexts flags a matching literal (one case per context, including a
+  module-level assignment case and a class-level assignment case for context 3).
 - [ ] Non-slice-stop index (`x[i]`) is not flagged; slice-stop (`x[:50000]`) is flagged.
 - [ ] Literals `0, 1, -1, 2` are never flagged in any context (current unbenchmarked exclusion set).
 - [ ] Files under a `test`/`tests`/`fixtures` path component produce no flags.
-- [ ] A name-shaped assignment (e.g. `MAX_RETRIES = 500`) that is not itself a comparison operand
-  or slice/truncation argument is NOT flagged — regression test confirming the name-gated context
-  was actually removed, not just left unused.
+- [ ] A qualifying module-level or class-level named assignment (e.g. `MAX_RETRIES = 500`, and a
+  lowercase-named equivalent such as `filing_text_max_bytes = 512_000`) IS flagged, with
+  `context: "assign_module_or_class"` — direct regression test for the corrected rule (c) adopted in
+  Architecture §2, confirming assignment detection is present, not the prior draft's removed
+  behavior.
 - [ ] No domain-crossing/import-graph check exists anywhere in this function (structural test: grep
   the function body for import-related AST node types — none gate a flag decision).
 - [ ] Syntax-error input returns `[]`, does not raise.
@@ -168,59 +184,78 @@ component, literal set `{0, 1, -1, 2}`).
 - [ ] All tests pass.
 - [ ] Function signature matches Architecture §7 exactly:
   `detect_threshold_literals(file_path: str, scan_surface: str) -> list[FlaggedLiteral]`.
-- [ ] `FlaggedLiteral` TypedDict matches Architecture §7 exactly (`line_index`, `context`,
-  `literal_repr`).
+- [ ] `FlaggedLiteral` TypedDict matches Architecture §7 exactly (`line_index`, `context` —
+  `"comparison" | "slice_truncation" | "assign_module_or_class"` — `literal_repr`).
 
 ---
 
 ### Slice 4: `has_threshold_provenance_marker()`
 
-**Goal:** Citation check against the new `THRESHOLD-PROVENANCE:` marker (Architecture §4), reusing
-the incumbent's existing 5-line `PROXIMITY_WINDOW` constant rather than introducing a second window
-constant.
+**Goal:** Citation check against the new `THRESHOLD-PROVENANCE:` marker (Architecture §4), using a
+new, independent module-level constant `PROXIMITY_WINDOW_THRESHOLD = 2` — not a reuse of the
+incumbent's `PROXIMITY_WINDOW = 5`.
 
 **Depends On:** —
 
 **Files:**
-- `scripts/domain_boundary_provenance_probe.py` — edit, add `has_threshold_provenance_marker`
-  (no new module-level constant — reuses the incumbent's existing `PROXIMITY_WINDOW = 5`, probe
-  L51, per Architecture §4/§7)
+- `scripts/domain_boundary_provenance_probe.py` — edit, add `has_threshold_provenance_marker` and
+  the new module-level constant `PROXIMITY_WINDOW_THRESHOLD = 2` (distinct from, and does not read
+  or depend on, the incumbent's existing `PROXIMITY_WINDOW = 5`, probe L51, per Architecture §4/§7)
 
 **Implementation Notes:**
 - Marker string is exact, case-sensitive `THRESHOLD-PROVENANCE:` followed by non-whitespace content
   on the same comment line.
-- Window is 5 lines inclusive above or below the flagged literal's line (the incumbent's existing
-  `PROXIMITY_WINDOW` value), within `scan_surface` only. The prior draft's separate
-  `PROXIMITY_WINDOW_THRESHOLD = 3` constant is dropped — benchmark-measured wrong (13/40, 32.5%, of
-  real commented constants in this repo start their comment 4-5 lines above the assignment, so a
-  3-line window would miss them) and internally self-contradictory (a required 5-line comment block
-  cannot land within a 3-line window of the literal it documents — the self-refuting bug from the
-  prior draft). See Architecture §4 for the full correction.
+- Window is 2 lines inclusive above or below the flagged literal's line
+  (`PROXIMITY_WINDOW_THRESHOLD = 2`), within `scan_surface` only. This value is cited to
+  `docs/research/domain-boundary-hook-benchmark/results.md` §5's measured comment-to-assignment
+  distance distribution over rule (c)'s 185 net-of-exclusion assignment candidates: 93.5% coverage
+  at distance 1, 100.0% coverage at distance 2, and zero additional real comments at any distance
+  3–12. A 2-line window captures every real citation observed in this corpus; no recall is gained by
+  going wider. This replaces both this document's own prior 5-line (reused-incumbent) value and the
+  discarded pre-benchmark 3-line value, each measured wrong or self-contradictory — see Architecture
+  §4 for the full correction history.
+- `PROXIMITY_WINDOW_THRESHOLD = 2` ships with an inline `THRESHOLD-PROVENANCE:` comment on the line
+  immediately above it, citing `docs/research/domain-boundary-hook-benchmark/results.md` §5 by exact
+  path (Architecture §7/§8) — this satisfies the citation form (option a) for this constant's own
+  self-scan.
 - A `THRESHOLD-PROVENANCE: PROVISIONAL — ...` line is a valid, complete citation (satisfies
   option b) — this function only checks marker presence within the window, not which of the three
   satisfying forms is used (that distinction is not needed here; presence is presence).
-- **No self-scan special case remains (Architecture §8, resolved).** With the name-gated context
-  removed (Slice 3) and no new window constant introduced, no module-level constant in this probe
-  file is flagged by the local-threshold pass purely because of its name. No special comment
-  obligation applies to `PROXIMITY_WINDOW` beyond what the incumbent already carries.
+- **Self-scan is reopened and resolved, not moot (Architecture §8/§13, G-9).** With assignment
+  detection restored (Slice 3), every module-level and class-level `NAME = <literal>` assignment in
+  this probe file itself is in scope for the local-threshold pass, unconditionally. Neither
+  `PROXIMITY_WINDOW = 5` (incumbent, unchanged) nor `PROXIMITY_WINDOW_THRESHOLD = 2` (this slice) is
+  in `{0, 1, -1, 2}`, so neither is exclusion-protected. `PROXIMITY_WINDOW_THRESHOLD = 2` carries its
+  own citation comment (above) and is therefore marked, not flagged. The incumbent's
+  `PROXIMITY_WINDOW = 5` is **out of this sprint's file-touch scope** (Architecture §1: the
+  incumbent's existing lines are not edited) and does **not** currently carry a
+  `THRESHOLD-PROVENANCE:` comment — it **will** be flagged (`unmarked`,
+  `context: "assign_module_or_class"`) the first time this hook scans its own source file. This is a
+  true positive against a real, pre-existing unlabeled constant, reported to Danny (Architecture §11)
+  as a same-sprint-or-immediate-follow-up file-touch routing decision, not silently absorbed.
 
 **Tests:**
 - [ ] Marker on same line as literal is detected.
-- [ ] Marker 1-5 lines above/below is detected; 6 lines above/below is not.
+- [ ] Marker 1-2 lines above/below is detected; 3 lines above/below is not.
 - [ ] Marker text without non-whitespace content after `THRESHOLD-PROVENANCE:` does not satisfy.
 - [ ] A `DOMAIN-BOUNDARY:` marker or bare `PROVISIONAL` (no `THRESHOLD-PROVENANCE:` marker string)
   does not satisfy this check (distinct marker, not interchangeable — direct regression test for
   Architecture §4's "not `DOMAIN-BOUNDARY:`, not bare `PROVISIONAL`" decision).
-- [ ] `PROXIMITY_WINDOW = 5` (an assignment, not a comparison/slice literal) is not itself flagged
-  by the local-threshold pass when this probe file is scanned (self-scan regression, Architecture
-  §8).
+- [ ] `PROXIMITY_WINDOW = 5` (the incumbent's own existing assignment, unmodified and uncommented by
+  this sprint) IS flagged by the local-threshold pass when this probe file is scanned, with
+  `unmarked` populated and `context: "assign_module_or_class"` — self-scan regression confirming the
+  restored assignment-detection behavior, direction-reversed from the prior draft's "not flagged"
+  claim (Architecture §8/§13, G-9).
+- [ ] `PROXIMITY_WINDOW_THRESHOLD = 2` (this slice's own new constant) is NOT flagged as unmarked —
+  its accompanying `THRESHOLD-PROVENANCE:` citation comment satisfies the check within the 2-line
+  window.
 
 **Done When:**
 - [ ] All tests pass.
 - [ ] Function signature matches Architecture §7 exactly.
-- [ ] No new module-level window constant is introduced — `has_threshold_provenance_marker` uses
-  the incumbent's existing `PROXIMITY_WINDOW` (structural check: no `PROXIMITY_WINDOW_THRESHOLD`
-  or equivalent second constant exists in the committed source).
+- [ ] `PROXIMITY_WINDOW_THRESHOLD = 2` exists as a new, independent module-level constant, carrying
+  its own `THRESHOLD-PROVENANCE:` citation comment — structural check confirms it is not merely an
+  alias or re-read of the incumbent's `PROXIMITY_WINDOW`.
 
 ---
 
@@ -402,9 +437,9 @@ constructs. `mode` is never `null`.**
 ### Slice 9: Test Corpus Additions
 
 **Goal:** Extend the existing fixture corpus and test suites with local-threshold-pass cases,
-combination-rule cases, the documented `PROXIMITY_WINDOW` self-scan not-flagged case (Architecture
-§8, simplified this revision — no second window constant exists to need a distinct "cited" case),
-and a grep-based test satisfying US-4 AC2 / Architecture §8's G-4 disposition.
+combination-rule cases, the documented `PROXIMITY_WINDOW` self-scan FLAGGED case (Architecture §8/
+§13, G-9 reopened and resolved this pass — a real, non-trivial finding, not a moot one), and a
+grep-based test satisfying US-4 AC2 / Architecture §8's G-4 disposition.
 
 **Depends On:** Slices 1–8
 
@@ -416,34 +451,41 @@ and a grep-based test satisfying US-4 AC2 / Architecture §8's G-4 disposition.
   string template (no "verified correct"/"sound"/"validated"-type soundness-implying language)
 
 **Implementation Notes:**
-- Include a fixture case matching Architecture §8's G-9 finding: `PROXIMITY_WINDOW` (the
-  incumbent's own constant, value 5, unchanged) is an assignment, not a comparison operand or
-  slice/truncation argument, so it is never in scope for the redesigned shape-only rule (§2) — no
-  name-gate to fire on since that context was removed entirely. Document this as a fixture asserting
-  the constant is NOT flagged, with a code comment pointing at Architecture §8 so a future reader
-  doesn't mistake the fixture for an oversight. There is no second, "self-scan cited" case to add —
-  the prior draft's `PROXIMITY_WINDOW_THRESHOLD` constant and its associated cited-case fixture no
-  longer exist, since no second window constant is introduced by this design (§4/§7).
+- Include a fixture case matching Architecture §8's G-9 finding, direction-reversed from the prior
+  draft: `PROXIMITY_WINDOW = 5` (the incumbent's own existing constant, unmodified, out of this
+  sprint's file-touch scope) IS a module-level named assignment under the redesigned rule (c) and
+  carries no `THRESHOLD-PROVENANCE:` comment — the local-threshold pass therefore flags it as
+  `unmarked`, `context: "assign_module_or_class"`, the first time this probe file's own source is
+  scanned. Document this as a fixture asserting the constant IS flagged (`unmarked` populated,
+  `matches_found` ≥ 1), with a code comment pointing at Architecture §8/§13 so a future reader
+  understands this is a confirmed self-scan finding, not an oversight, and is reported to Danny for
+  routing (Architecture §11) rather than silently fixed by this fixture alone. Separately, add a
+  fixture confirming the new `PROXIMITY_WINDOW_THRESHOLD = 2` constant (Slice 4) is NOT flagged, since
+  it ships with its own inline `THRESHOLD-PROVENANCE:` citation comment.
 - Grep-based test (G-4/US-4 AC2): assert that no track-record `reason` string, hook output string,
   or user-facing log message anywhere in the probe/wrapper source asserts or implies a citation's
   correctness — check literal string templates, not runtime output alone.
-- Each of the two shape-based detection contexts, each of the four exclusions, both citation-satisfying forms
-  (citation vs. named-owner PROVISIONAL), and the unowned-PROVISIONAL-treated-as-absent edge case
-  (Requirements Edge Cases table) each need at least one fixture case if not already covered by
-  Slices 3–4's unit tests — this slice is about corpus-level (integration) coverage, not
-  duplicating unit tests.
+- Each of the three syntactic detection contexts (comparison, slice/truncation, module/class-level
+  assignment), each of the three remaining exclusions (non-slice-stop index, test-path component,
+  `{0, 1, -1, 2}`), both citation-satisfying forms (citation vs. named-owner PROVISIONAL), and the
+  unowned-PROVISIONAL-treated-as-absent edge case (Requirements Edge Cases table) each need at least
+  one fixture case if not already covered by Slices 3–4's unit tests — this slice is about
+  corpus-level (integration) coverage, not duplicating unit tests.
 
 **Tests:**
 - [ ] All new fixture cases pass under `run()`/`combine()` end-to-end (not just the unit-level
   functions from Slices 3–6).
-- [ ] `PROXIMITY_WINDOW` self-scan fixture case passes (confirms the constant is not flagged,
-  since it is never a comparison/slice literal under the redesigned shape-only rule).
+- [ ] `PROXIMITY_WINDOW` self-scan fixture case passes (confirms the constant IS flagged as
+  `unmarked`, `context: "assign_module_or_class"`, since it is a module-level named assignment under
+  the restored assignment-detection rule and carries no citation comment).
+- [ ] `PROXIMITY_WINDOW_THRESHOLD` self-scan fixture case passes (confirms the constant is NOT
+  flagged as unmarked, since it carries its own citation comment).
 - [ ] Grep-based soundness-language test passes.
 
 **Done When:**
 - [ ] All tests pass.
 - [ ] Corpus file diff is additive only — no existing fixture case removed or altered.
-- [ ] Corpus contains the `PROXIMITY_WINDOW` self-scan not-flagged case — verified by direct
+- [ ] Corpus contains the `PROXIMITY_WINDOW` self-scan FLAGGED case — verified by direct
   read of the corpus file, not assumed from test pass/fail alone.
 
 ---
@@ -544,7 +586,8 @@ follow-up edit to `02-ARCHITECTURE.md`, tracked separately.
   in this slice.
 - [ ] At least one live run against this repo's own pre-existing same-file magic numbers surfaces a
   `"flag"` decision in the track-record log (confirms the widened blast radius US-2 anticipates is
-  actually observed, not just theorized).
+  actually observed, not just theorized) — expected to include the `PROXIMITY_WINDOW` self-scan
+  finding (Slice 9) when `scripts/domain_boundary_provenance_probe.py` itself is next edited.
 
 **Done When:**
 - [ ] Verification run(s) complete, log entries confirmed schema-valid by direct inspection.
@@ -588,6 +631,11 @@ follow-up edit to `02-ARCHITECTURE.md`, tracked separately.
 - Any rewrite, retirement, or redesign of the incumbent's manifest-gated cross-domain check itself
   (schema, trigger, scan surface, `DOMAIN-BOUNDARY:` marker, decision logic) — untouched by this
   sprint per Architecture §1/§11.
+- Adding a `THRESHOLD-PROVENANCE:` citation comment to the incumbent's own `PROXIMITY_WINDOW = 5`
+  constant (Slice 9's self-scan finding) — that constant sits in `.claude/hooks/domain-boundary-
+  provenance.sh`'s already-LOCKED/Frank-forge-gate-PASSED sibling file territory and is out of this
+  sprint's file-touch scope per Architecture §1/§11; it is reported to Danny for a separate routing
+  decision, not silently fixed as part of this roadmap.
 
 ---
 
@@ -597,17 +645,31 @@ No HALT triggered. Both prior docs (`01-REQUIREMENTS.md`, `02-ARCHITECTURE.md`, 
 2026-09-05) are complete and internally consistent under the extend-not-replace design confirmed by
 Danny's settled decision (Architecture §0). Every new component named in Architecture §2–§7
 (`load_mode_config`, `detect_threshold_literals`, `FlaggedLiteral`, `has_threshold_provenance_marker`,
-`run_cross_domain_pass`, `run_local_threshold_pass`, `PassResult`, `combine`, `CombinedResult`, the
-migrated `TrackRecordEntry`, the mode config file, the `.claude/settings.json` wiring, the LOCKED-doc
-addendum, and the roster update) maps to exactly one slice above. No circular dependencies exist in
-the Dependency Map. Each slice touches concrete, already-existing or precisely-named-new file paths
-(no placeholder paths) and has testable Done-When criteria. Architecture §8's G-9 self-scan finding (no module-level constant is ever flagged
-purely by name under the redesigned shape-only rule — `PROXIMITY_WINDOW` is confirmed not-flagged
-by a dedicated fixture, and no second window constant exists to require a "cited" case) and §8's
-G-4 finding (no soundness-implying language) are both carried into Slices 4/9 as named fixture/test
-obligations rather than left as unaddressed review notes. Architecture §6's resolution of G-5 (`mode`
+`PROXIMITY_WINDOW_THRESHOLD`, `run_cross_domain_pass`, `run_local_threshold_pass`, `PassResult`,
+`combine`, `CombinedResult`, the migrated `TrackRecordEntry`, the mode config file, the
+`.claude/settings.json` wiring, the LOCKED-doc addendum, and the roster update) maps to exactly one
+slice above. No circular dependencies exist in the Dependency Map. Each slice touches concrete,
+already-existing or precisely-named-new file paths (no placeholder paths) and has testable Done-When
+criteria. Architecture §2/§8/§13's corrected detection rule (three syntactic contexts — comparison
+operand, slice/truncation, module/class-level named assignment with no vocabulary/case gate — cited
+to `results.md` §4's 2/2 recall on both real historical incidents) is carried into Slice 3 as the
+authoritative design, replacing the prior revision's two-context rule that cold Frank's attempt-3
+found structurally incapable of catching either incident. Architecture §4's corrected
+`PROXIMITY_WINDOW_THRESHOLD = 2` (cited to `results.md` §5's measured 93.5%-at-1/100%-at-2
+distribution, a new independent constant rather than a reuse of the incumbent's `PROXIMITY_WINDOW =
+5`) is carried into Slice 4. Architecture §8/§13's reopened and resolved G-9 self-scan finding — the
+incumbent's own `PROXIMITY_WINDOW = 5` constant IS flagged (unmarked) the first time the composed
+hook scans its own source file, a direction reversal from the prior revision's "resolved, no tag
+needed" disposition — is carried into Slices 4 and 9 as named, tested fixture obligations, and into
+Deferred as a named-but-out-of-scope follow-up routing item, rather than left as an unaddressed
+review note. The dead `range()` exclusion (Architecture §2, cited to `results.md` §3: fires zero
+times across the full corpus) is removed from Slice 3's implementation notes and tests, not carried
+forward as inert ceremony. Architecture §8's G-4 finding (no soundness-implying language) is carried
+into Slice 9 as a named fixture/test obligation. Architecture §6's resolution of G-5 (`mode`
 non-nullable, wrapper reads mode config for `probe_error` entries) is carried into Slice 8's
 Done-When explicitly, replacing the prior draft's "write `null` for `mode`" framing. Architecture
-§12's five contradictions flagged to `01-REQUIREMENTS.md`/`NORTH-STAR.md` have all been Applied
-(confirmed in both documents directly — Frank spec-gate attempt 2 verified this against current
-file content, not this roadmap's prior claim) — nothing outstanding there as of 2026-09-05.
+§12's five contradictions flagged to `01-REQUIREMENTS.md`/`NORTH-STAR.md` in the prior pass remain
+Applied per that document's own record; §12 item 8 (this roadmap's own "2 shape-based contexts" /
+reused-`PROXIMITY_WINDOW` / not-flagged-self-scan / dead-`range()`-exclusion drift, reported by
+Architecture but not applied there) is the correction this document itself makes, in full, in this
+revision.
