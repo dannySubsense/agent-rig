@@ -3,8 +3,8 @@
 ## Status: IN_PROGRESS
 
 ## Slices
-- [ ] Slice 1: Extract `run_cross_domain_pass()` — IN_PROGRESS
-- [ ] Slice 2: Mode Config Loader — PENDING
+- [x] Slice 1: Extract `run_cross_domain_pass()` — COMPLETE (2026-09-05, commit `3a5de4e`). QC found one FAIL (missing PassResult TypedDict), fixed and re-verified PASS. 162/162 tests passing.
+- [ ] Slice 2: Mode Config Loader — IN_PROGRESS
 - [ ] Slice 3: `detect_threshold_literals()` — PENDING
 - [ ] Slice 4: `has_threshold_provenance_marker()` — PENDING
 - [ ] Slice 5: `run_local_threshold_pass()` — PENDING
@@ -20,7 +20,7 @@
       transcribed into this file's `## Forge Gate` section — "all slices done" is not "sprint done."
 
 ## Current
-Slice: 1
+Slice: 2
 Step: @code-executor
 Last updated: 2026-09-05
 
