@@ -36,6 +36,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from typing import TypedDict
 
 TRACK_RECORD_RELATIVE_PATH = os.path.join(
     "docs", "tooling", "domain-boundary-provenance-track-record.jsonl"
@@ -270,6 +271,119 @@ def build_deny_reason(file_path, unmarked_matches):
     )
 
 
+class PassResult(TypedDict):
+    ran: bool
+    matches_found: int | None
+    matches_cited: int | None
+    unmarked: list[tuple[int, str]]
+    detail: dict
+
+
+def run_cross_domain_pass(project_dir, tool_input, scan_surface) -> PassResult:
+    """Incumbent's existing steps 2-7 (manifest load, normalize, glob match, identifier scan,
+    DOMAIN-BOUNDARY: window check), extracted verbatim into a function, no logic change.
+
+    Returns a PassResult dict: `ran`, `matches_found`, `matches_cited`, `unmarked`, `detail`.
+    `detail` carries the incumbent's own per-step track-record fields (`manifest_status`,
+    `file_in_scope`, `relative_path`) so callers can reconstruct the exact prior track-record
+    entry shape.
+    """
+    raw_file_path = tool_input.get("file_path")
+
+    # §6 step 2.
+    manifest, manifest_status = load_manifest(project_dir)
+    if manifest is None:
+        return {
+            "ran": False,
+            "matches_found": None,
+            "matches_cited": None,
+            "unmarked": [],
+            "detail": {
+                "manifest_status": "absent_or_invalid",
+                "file_in_scope": None,
+                "relative_path": raw_file_path,
+            },
+        }
+
+    # §6 step 3.
+    relative_path, in_repo = normalize_file_path(project_dir, raw_file_path)
+    if not in_repo:
+        return {
+            "ran": False,
+            "matches_found": None,
+            "matches_cited": None,
+            "unmarked": [],
+            "detail": {
+                "manifest_status": "matched",
+                "file_in_scope": False,
+                "relative_path": raw_file_path,
+            },
+        }
+
+    globs = manifest.get("pipelineConfigGlobs") or []
+    if not match_globs(relative_path, globs):
+        return {
+            "ran": False,
+            "matches_found": None,
+            "matches_cited": None,
+            "unmarked": [],
+            "detail": {
+                "manifest_status": "matched",
+                "file_in_scope": False,
+                "relative_path": relative_path,
+            },
+        }
+
+    # §6 step 4.
+    if not scan_surface:
+        return {
+            "ran": True,
+            "matches_found": 0,
+            "matches_cited": 0,
+            "unmarked": [],
+            "detail": {
+                "manifest_status": "matched",
+                "file_in_scope": True,
+                "relative_path": relative_path,
+            },
+        }
+
+    # §6 steps 5-7.
+    identifiers = manifest.get("externalSourceIdentifiers") or []
+    matches = find_identifier_matches(scan_surface, identifiers)
+    if not matches:
+        return {
+            "ran": True,
+            "matches_found": 0,
+            "matches_cited": 0,
+            "unmarked": [],
+            "detail": {
+                "manifest_status": "matched",
+                "file_in_scope": True,
+                "relative_path": relative_path,
+            },
+        }
+
+    lines = scan_surface.split("\n")
+    unmarked = [
+        (idx, identifier)
+        for idx, identifier in matches
+        if not has_qualifying_marker_in_window(lines, idx)
+    ]
+
+    return {
+        "ran": True,
+        "matches_found": len(matches),
+        "matches_cited": len(matches) - len(unmarked),
+        "unmarked": unmarked,
+        "detail": {
+            "manifest_status": "matched",
+            "file_in_scope": True,
+            "relative_path": relative_path,
+        },
+    }
+
+
 def run(stdin_data):
     session_id = stdin_data.get("session_id")
     tool_name = stdin_data.get("tool_name")
@@ -300,81 +414,27 @@ def run(stdin_data):
 
     raw_file_path = tool_input.get("file_path")
 
-    # §6 step 2.
-    manifest, manifest_status = load_manifest(project_dir)
-    if manifest is None:
-        write_track_record(
-            project_dir,
-            build_track_record_entry(
-                session_id,
-                tool_name,
-                raw_file_path,
-                "absent_or_invalid",
-                None,
-                None,
-                None,
-                "allow",
-                None,
-                None,
-            ),
-        )
-        emit_allow()
-        return
-
-    # §6 step 3.
-    relative_path, in_repo = normalize_file_path(project_dir, raw_file_path)
-    if not in_repo:
-        write_track_record(
-            project_dir,
-            build_track_record_entry(
-                session_id,
-                tool_name,
-                raw_file_path,
-                "matched",
-                False,
-                None,
-                None,
-                "allow",
-                None,
-                None,
-            ),
-        )
-        emit_allow()
-        return
-
-    globs = manifest.get("pipelineConfigGlobs") or []
-    if not match_globs(relative_path, globs):
-        write_track_record(
-            project_dir,
-            build_track_record_entry(
-                session_id,
-                tool_name,
-                relative_path,
-                "matched",
-                False,
-                None,
-                None,
-                "allow",
-                None,
-                None,
-            ),
-        )
-        emit_allow()
-        return
-
-    # §6 step 4.
+    # §6 step 4 (scan surface must be computed before the cross-domain pass runs, since it
+    # takes `scan_surface` as an argument, per Architecture §7's signature).
     scan_surface = get_scan_surface(tool_name, tool_input)
-    if not scan_surface:
+
+    result = run_cross_domain_pass(project_dir, tool_input, scan_surface)
+    detail = result["detail"]
+    relative_path = detail["relative_path"]
+    manifest_status = detail["manifest_status"]
+    file_in_scope = detail["file_in_scope"]
+
+    if not result["ran"]:
         write_track_record(
             project_dir,
             build_track_record_entry(
                 session_id,
                 tool_name,
-                relative_path,
-                "matched",
-                True,
-                0,
-                0,
+                relative_path if relative_path is not None else raw_file_path,
+                manifest_status,
+                file_in_scope,
+                result["matches_found"],
+                result["matches_cited"],
                 "allow",
                 None,
                 None,
@@ -383,34 +443,7 @@ def run(stdin_data):
         emit_allow()
         return
 
-    # §6 steps 5-7.
-    identifiers = manifest.get("externalSourceIdentifiers") or []
-    matches = find_identifier_matches(scan_surface, identifiers)
-    if not matches:
-        write_track_record(
-            project_dir,
-            build_track_record_entry(
-                session_id,
-                tool_name,
-                relative_path,
-                "matched",
-                True,
-                0,
-                0,
-                "allow",
-                None,
-                None,
-            ),
-        )
-        emit_allow()
-        return
-
-    lines = scan_surface.split("\n")
-    unmarked = [
-        (idx, identifier)
-        for idx, identifier in matches
-        if not has_qualifying_marker_in_window(lines, idx)
-    ]
+    unmarked = result["unmarked"]
 
     if unmarked:
         reason = build_deny_reason(relative_path, unmarked)
@@ -420,10 +453,10 @@ def run(stdin_data):
                 session_id,
                 tool_name,
                 relative_path,
-                "matched",
-                True,
-                len(matches),
-                len(matches) - len(unmarked),
+                manifest_status,
+                file_in_scope,
+                result["matches_found"],
+                result["matches_cited"],
                 "deny",
                 reason,
                 None,
@@ -438,10 +471,10 @@ def run(stdin_data):
             session_id,
             tool_name,
             relative_path,
-            "matched",
-            True,
-            len(matches),
-            len(matches),
+            manifest_status,
+            file_in_scope,
+            result["matches_found"],
+            result["matches_cited"],
             "allow",
             None,
             None,

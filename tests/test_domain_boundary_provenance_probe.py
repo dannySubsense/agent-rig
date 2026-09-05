@@ -416,6 +416,77 @@ def test_non_edit_write_tool_allows_unconditionally(monkeypatch, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Slice 1 — direct unit tests for run_cross_domain_pass()'s PassResult
+# ---------------------------------------------------------------------------
+
+def test_cross_domain_pass_no_manifest_returns_ran_false(tmp_path):
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    result = probe.run_cross_domain_pass(
+        str(tmp_path), {"file_path": str(target)}, "EXTERNAL_CAP_V1 = 5\n"
+    )
+    assert result["ran"] is False
+    assert result["matches_found"] is None
+    assert result["matches_cited"] is None
+    assert result["unmarked"] == []
+    assert result["detail"]["manifest_status"] == "absent_or_invalid"
+
+
+def test_cross_domain_pass_out_of_scope_file_returns_ran_false(tmp_path):
+    _write_manifest(tmp_path)
+    unrelated = tmp_path / "src" / "app.py"
+    unrelated.parent.mkdir(parents=True, exist_ok=True)
+    result = probe.run_cross_domain_pass(
+        str(tmp_path), {"file_path": str(unrelated)}, "EXTERNAL_CAP_V1 = 5\n"
+    )
+    assert result["ran"] is False
+    assert result["matches_found"] is None
+    assert result["matches_cited"] is None
+    assert result["unmarked"] == []
+    assert result["detail"]["manifest_status"] == "matched"
+    assert result["detail"]["file_in_scope"] is False
+
+
+def test_cross_domain_pass_in_scope_no_identifier_match(tmp_path):
+    _write_manifest(tmp_path)
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+    result = probe.run_cross_domain_pass(
+        str(tmp_path), {"file_path": str(target)}, "totally unrelated content\n"
+    )
+    assert result["ran"] is True
+    assert result["matches_found"] == 0
+    assert result["matches_cited"] == 0
+    assert result["unmarked"] == []
+    assert result["detail"]["file_in_scope"] is True
+
+
+def test_cross_domain_pass_match_with_citation(tmp_path):
+    _write_manifest(tmp_path)
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+    content = (
+        "# DOMAIN-BOUNDARY: sourced from market_data's daily_universe view, see DDR-0014\n"
+        "EXTERNAL_CAP_V1 = 5\n"
+    )
+    result = probe.run_cross_domain_pass(str(tmp_path), {"file_path": str(target)}, content)
+    assert result["ran"] is True
+    assert result["matches_found"] == 1
+    assert result["matches_cited"] == 1
+    assert result["unmarked"] == []
+
+
+def test_cross_domain_pass_match_with_no_citation(tmp_path):
+    _write_manifest(tmp_path)
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+    content = "EXTERNAL_CAP_V1 = 5\n"
+    result = probe.run_cross_domain_pass(str(tmp_path), {"file_path": str(target)}, content)
+    assert result["ran"] is True
+    assert result["matches_found"] == 1
+    assert result["matches_cited"] == 0
+    assert len(result["unmarked"]) == 1
+    assert result["unmarked"][0][1] == "EXTERNAL_CAP_V1"
+
+
+# ---------------------------------------------------------------------------
 # Plain assert-based runner (used if pytest is not installed)
 # ---------------------------------------------------------------------------
 
