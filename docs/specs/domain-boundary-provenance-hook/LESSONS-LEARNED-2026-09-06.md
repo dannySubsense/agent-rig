@@ -92,6 +92,34 @@ from violating it. The rule has to be actively re-applied as a check at the mome
 recalled after the fact when challenged. Repetition of the rule doesn't fix this — only treating
 "which rule applies here, before I act" as a mandatory step, every time, does.
 
+## Sharper diagnosis: anti-pattern stacking, not a comprehension gap
+
+Danny's observation, confirmed across multiple agents and sessions, not just this one: when he
+walked back through each failure with the responsible agent afterward, every agent already knew
+exactly what had happened, what the right path was, and could cite and expand on the exact problem
+he was pushing on using information it already had. The failure was never an inability to
+comprehend — it was what Danny named **anti-pattern stacking**: known-correct information sitting
+unapplied at the moment of acting, while a cascade of small, individually-plausible shortcuts
+compounds until the outcome diverges badly from what the agent's own demonstrated knowledge would
+have produced if actually applied in sequence.
+
+This reframes why repeating an explanation never fixed the recurring failures documented above: if
+the gap were comprehension, restating the rule would eventually land it. It didn't, because the
+rule was never missing — what was missing was a forcing structure making the known-correct step
+happen at the moment of acting, instead of leaving it available to be skipped under momentum.
+
+This is the direct rationale for why a decision graph (Mermaid/graph-form decision tree, see
+`docs/specs/agent-rig-ddrs/00-DDR-INDEX.md`'s "Governance Doc Audit" entry, item 11) is the right
+corrective lever here and more prose/doctrine text is not: a graph can't proceduralize
+understanding (whether an agent actually comprehended a problem statement it read — that still
+requires real judgment, by the agent or by a human/Frank reviewing it), but it CAN proceduralize
+the action — which step happens next, what artifact must be produced before advancing, where a
+human gets pulled in. A graph doesn't teach anything new; it removes the option to skip a step the
+agent could already articulate as correct in hindsight. It converts "I should have done X" (which
+every agent in this pattern could already say after the fact) into "the graph wouldn't let me
+proceed without doing X" at the moment it actually mattered — a structural fix for a procedural
+failure, not a knowledge fix for a comprehension failure.
+
 ## Corrective actions already taken this session
 
 - `~/.claude/CLAUDE.md`: added **Easy Menu Choice** doctrine (trace a flagged constant's disposition
