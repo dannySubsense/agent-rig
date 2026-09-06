@@ -6,8 +6,9 @@ A `PreToolUse` hook (`Edit`/`Write`), extending the existing, Frank-forge-gate-P
 `scripts/domain_boundary_provenance_probe.py`, LOCKED spec
 `docs/tooling/domain-boundary-provenance-hook.md`) rather than a new hook, that flags any numeric
 or boolean literal used in code as a threshold, cap, limit, cutoff, retry count, or budget when it
-lacks, at or adjacent to its definition, a citation, a named-owner `PROVISIONAL — unvalidated`
-marker, or removal — regardless of whether the value was defined locally or crossed an ownership
+lacks, at or adjacent to its definition, a real citation or removal (a named-owner `PROVISIONAL —
+unvalidated` marker is never a valid disposition, per `~/.claude/CLAUDE.md` rule 1) — regardless of
+whether the value was defined locally or crossed an ownership
 boundary. Per DDR-0014's 2026-09-05 amendment (spec-of-record), the domain-crossing precondition
 is dropped entirely; it is one flagged case among all threshold-shaped literals, not a trigger
 condition. The incumbent's existing manifest-gated cross-domain pass is left untouched — this
@@ -22,7 +23,7 @@ only; retrofit into `gap-lens-dilution-filter` or other repos is separate follow
 As a repo maintainer running Claude Code sessions,
 I want a `PreToolUse` hook (composed into the incumbent domain-boundary-provenance hook's existing
 invocation) that scans proposed `Edit`/`Write` content for threshold-shaped literals lacking a
-citation, PROVISIONAL tag, or removal,
+real citation or removal (a named-owner PROVISIONAL tag is never a valid disposition),
 so that unsourced numbers (PROMOTED DEFAULT per `~/.claude/CLAUDE.md` rule 1) are caught
 mechanically instead of depending on someone remembering to run `benchmark` or an audit.
 
@@ -45,8 +46,8 @@ auditable after the fact.
 
 **US-4**
 As a repo maintainer,
-I want the check to verify only presence/absence of a citation, PROVISIONAL tag, or removal — not
-judge whether an existing citation is actually correct,
+I want the check to verify only presence/absence of a real citation or removal — not judge
+whether an existing citation is actually correct,
 so that soundness judgment stays the job of `benchmark`, Frank, and a human, per DDR-0014's own
 "What it is not" boundary.
 
@@ -58,11 +59,12 @@ so that soundness judgment stays the job of `benchmark`, Frank, and a human, per
       committed benchmark evidence — three shape-based syntactic contexts: comparison operand,
       slice/truncation argument, and module/class-level named assignment (`NAME = <literal>`, no
       vocabulary or case gate); Python-only; see that section for the exact contexts and
-      exclusions), when the hook runs, then the hook flags the literal if no citation,
-      PROVISIONAL-with-owner tag, or evidence of removal is present at or adjacent to its
-      definition.
-- [ ] Given a threshold-shaped literal that already carries a citation or a PROVISIONAL tag
-      naming a human owner, when the hook runs, then it does not flag that literal.
+      exclusions), when the hook runs, then the hook flags the literal if no real citation or
+      evidence of removal is present at or adjacent to its definition (a named-owner PROVISIONAL
+      tag does not suppress the flag — no such disposition exists in this check).
+- [ ] Given a threshold-shaped literal that already carries a real citation at or adjacent to its
+      definition, when the hook runs, then it does not flag that literal — a named-owner
+      PROVISIONAL tag has no suppressing effect; only a citation or removal does.
 - [ ] Given a literal that does not match the threshold-shaped detection rule (e.g. a loop bound
       or array index, per Architecture §2's own exclusions), when the hook runs, then it is not
       flagged.
@@ -154,9 +156,9 @@ same-file/local-threshold detection pass is new work.
 | Literal appears as a qualifying module-level or class-level named assignment (`NAME = <literal>`), any target name, any case | Flagged if unmarked — this is one of the three detection contexts (Architecture §2, context 3); assignments are not exempt, and no vocabulary or naming-convention gate narrows which assignment targets qualify |
 | Hook's internal scan exceeds its timeout or throws an exception | Fail open — session not blocked, error appended to track-record log |
 | Repo has hook newly wired live with pre-existing unlabeled magic numbers throughout | All matching literals flagged in `log_only` mode; no blocking until repo owner explicitly promotes to `blocking` after triage |
-| A PROVISIONAL tag exists but does not name a human owner | Treated as absent — flagged, since the amended check requires a *named-owner* PROVISIONAL marker, not a bare "TODO" or unowned tag |
+| A PROVISIONAL tag exists, named-owner or not | Treated as absent — flagged, since the amended check accepts only a real citation or removal; no PROVISIONAL tag of any form (owned or unowned) suppresses the flag |
 | Threshold-shaped literal is removed entirely (e.g. inlined logic without a magic number) | Not flagged — removal is one of the three satisfying conditions |
-| Hook's own code introduces an internal constant (e.g. a scan timeout value) | That constant itself must carry a citation or PROVISIONAL tag per this repo's Decision Discipline — no exception for the sprint's own artifacts |
+| Hook's own code introduces an internal constant (e.g. a scan timeout value) | Applies to constants THIS SPRINT introduces (e.g. `PROXIMITY_WINDOW_THRESHOLD = 2`, cited to `02-ARCHITECTURE.md` §2/§4 — though the citation covers only the preceding-direction half of the window, per the constant's own comment at `scripts/domain_boundary_provenance_probe.py` ~L62-73, and Frank's spec-gate found `results.md`'s cited measurements not independently reproducible from a committed script/corpus, per `PROGRESS.md`) — that constant itself must carry a real citation, or be deleted/redesigned to remove the need for it, no named-owner PROVISIONAL tag, and no exception for the sprint's own artifacts, per this repo's Decision Discipline. Pre-existing incumbent constants (e.g. `PROXIMITY_WINDOW = 5` in `scripts/domain_boundary_provenance_probe.py`, currently carrying an invalid `owner: wright` PROVISIONAL tag) belong to the already-shipped, locked incumbent sprint this sprint's `NORTH-STAR.md` leaves untouched (mechanism only — no constants-exemption is granted) — out of scope for this sprint's own compliance claim and Done-When criteria, tracked as a DDR-INDEX backlog entry (`docs/specs/agent-rig-ddrs/00-DDR-INDEX.md`, "Incumbent domain-boundary-provenance hook's `PROXIMITY_WINDOW = 5` constant carries an invalid self-named-owner PROVISIONAL tag") |
 
 ## Out of Scope
 
@@ -201,8 +203,9 @@ same-file/local-threshold detection pass is new work.
   cross-domain pass and the new local-threshold pass, since neither has run against live traffic
   before this sprint.
 - Must: every predetermined constant this sprint's own code introduces carries a citable
-  precedent or an explicit PROVISIONAL tag with a named owner — no exception for the hook's own
-  artifacts, per this repo's Decision Discipline. The detection rule's own three syntactic
+  precedent, or is deleted/redesigned to remove the need for it — no named-owner PROVISIONAL tag
+  is a valid disposition, ever, and no exception for the hook's own artifacts, per this repo's
+  Decision Discipline. The detection rule's own three syntactic
   contexts and the citation-proximity window (`PROXIMITY_WINDOW_THRESHOLD = 2`) are cited to
   `02-ARCHITECTURE.md` §2/§4, not restated here — see that section for the authoritative citation
   trail (`results.md` §§2-5). There is no literal-value exclusion in this design (`{0, 1, -1, 2}`

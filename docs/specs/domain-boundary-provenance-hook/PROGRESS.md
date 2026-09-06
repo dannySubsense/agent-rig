@@ -89,10 +89,27 @@ Counter: 1/3 (Cycle 2)
 
 ## Forge Gate
 
-Counter: 0/3
+Counter: 2/3
+
+**⚠️ CAVEAT — no independently-checkable artifacts back attempts 1 and 2.** Independent QC
+(2026-09-06) confirmed: no `.gate-snapshots/forge/` directory exists anywhere in this repo. The
+only snapshot directory for this sprint is `.gate-snapshots/spec/attempt-1/`. There is no forge
+attempt-1 or attempt-2 snapshot, no verdict file, and no GATE-LOG entry. The rows below rest
+entirely on the orchestrating agent's own commit messages (commits `f8a887a` and `a25157f`) —
+same author, not independent evidence, and not verifiable by anyone else after the fact. The SHAs
+themselves are real and in the correct order, so the attempts happened in some form, but the
+FAIL/HALT verdict text below has zero artifact-level backing. This is a known gap against this
+project's own gate-snapshot procedure — it is being stated plainly here, not papered over with
+retroactively-manufactured snapshot directories, which would be worse than the gap itself. The
+Snapshot column's prior "created retroactively" claim for attempt 2 was itself inaccurate — no
+such directory was ever created; it is corrected below to reflect that.
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
 |---|---|---|---|---|
+| 1 | 2026-09-05/06 | FAIL | Cold Frank, SHA `f8a887a`. F1 (blocking): wrapper `timeout` PROVISIONAL-owner tag invalid, no committed measurement. F2 (blocking): `01-REQUIREMENTS.md`/roadmap Slice 12 checked complete against a test never actually run — no real Claude-Code-triggered `.py` scan existed in the log; §14 cited timing figures ("60ms/140ms") that appear nowhere in the doc set. F3 (blocking): `PROXIMITY_WINDOW = 5` self-assigned `owner: wright` tag, invalid per Danny's ruling. F4 (non-blocking): stale test-path exclusion set vs. benchmark's, zero-row impact. This attempt's findings drove the fix that became commit `08deb2d` — that fix overreached and deleted the incumbent's `PROXIMITY_WINDOW` mechanism outright, which was itself wrong and is the subject of attempt 2. | **none exists.** No `.gate-snapshots/forge/attempt-1/` was ever created. This row is a retroactive narrative record only, sourced from commit `f8a887a`'s own commit message (same author, not independently verifiable) — not from a snapshot or verdict file. |
+| 2 | 2026-09-06 | HALT | Cold Frank, SHA `dda9a89`. F1/F3 (blocking): commit `08deb2d` deleted the incumbent's `PROXIMITY_WINDOW = 5` and its window-based `has_qualifying_marker_in_window` logic, plus the tests proving it — a scope violation, since the Locked North Star explicitly says the incumbent stays untouched. F2 (blocking, HALT-triggering): North Star/`01-REQUIREMENTS.md` still described a named-owner PROVISIONAL tag as a valid satisfying form while the shipped code no longer accepted one — an unresolved divergence between two rulings Frank could not adjudicate himself. F4 (blocking): this exact forge-gate attempt-1 finding/fix cycle went unlogged (see attempt 1's row, added retroactively). F5 (non-blocking): `_TRUNCATION_METHODS`'s comment falsely claimed `ljust` had a corpus citation. F6 (non-blocking): PROGRESS/Roadmap Done-When items asserted obligations (owner-satisfies tests, old test counts) that `08deb2d` had already deleted. | **none exists.** No `.gate-snapshots/forge/attempt-2/` was ever created — a prior version of this row incorrectly claimed one had been "created retroactively"; that claim was false and is corrected here. This row is a retroactive narrative record only, sourced from commit `a25157f`'s own commit message (same author, not independently verifiable) — not from a snapshot or verdict file. |
+
+**Fixes applied since attempt 2, before attempt 3:** incumbent `PROXIMITY_WINDOW`/`has_qualifying_marker_in_window` and its tests/corpus cases restored byte-identical to commit `09e2569` (commit `a25157f`); North Star/Requirements owner-tag language corrected to citation-or-removal only, per Danny's direct ruling 2026-09-06 (commit `ee422d6`); `_TRUNCATION_METHODS` comment corrected to stop claiming a false `ljust` citation. This section (F4) and the slice/Done-When rows below (F6) updated to match current live file state as part of this same fix pass.
 
 Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
 Deep-diagnosis evidence:

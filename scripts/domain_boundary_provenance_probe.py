@@ -307,15 +307,16 @@ TEST_PATH_COMPONENTS = {"test", "tests", "fixtures"}
 _TEST_FILENAME_RE = re.compile(r"^(test_.*|.*_test|conftest)\.py$")
 
 _COMPARISON_OPS = (ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq)
-# Narrowed 2026-09-06 to only the cited/verified members: `ljust` is the only
-# attribute-call truncation method with an actual citation/corpus hit; slice syntax
-# (`x[:n]`) is detected separately via `_walk_comparison_and_slice_contexts`'s
-# `ast.Subscript`/`ast.Slice` handling, not via this set. `rjust`, `zfill`, `truncate`,
-# `read`, `head` had no citation and no corpus evidence they ever fire — removed rather
-# than kept as unverified guesses. This is a deliberate narrowing to only verified-real
-# cases; it means calls to those five methods with a literal argument are no longer
-# flagged by this context (comparison/slice contexts still catch any literal misuse via
-# their own paths where applicable).
+# Narrowed 2026-09-06: `rjust`, `zfill`, `truncate`, `read`, `head` had no citation and
+# no corpus evidence they ever fire — removed rather than kept as unverified guesses.
+# `ljust` is kept as a design choice, NOT because it has a corpus hit — it doesn't
+# (candidates.jsonl has zero `ljust` matches; its only reference anywhere in this doc
+# set is one illustrative example in Architecture §2, and `ljust` pads rather than
+# truncates, so even that example is imprecise). Slice syntax (`x[:n]`) is detected
+# separately via `_walk_comparison_and_slice_contexts`'s `ast.Subscript`/`ast.Slice`
+# handling, not via this set. This is a narrowing to only the members either measured
+# or explicitly named in the architecture doc; `ljust`'s presence is not itself
+# evidence-backed and should not be cited as if it were.
 _TRUNCATION_METHODS = {"ljust"}
 
 # §2.1 strategy 3 — per-line regex fallback, context 3 (module/class-level assignment)
