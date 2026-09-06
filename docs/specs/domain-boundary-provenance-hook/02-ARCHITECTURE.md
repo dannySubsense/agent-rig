@@ -494,7 +494,7 @@ an unmeasured assumption of shared applicability either. `THRESHOLD-PROVENANCE:`
 for its own pass: 5 lines (incumbent, unchanged, out of scope for re-justification here) and 2
 lines (new, cited to `results.md` §5).
 
-**Denominator-scope caveat (M-1, `05-REVIEW.md`, MEDIUM).** `results.md` §5's distance distribution was measured over 185 assignment candidates — the population *after* the `{0,1,-1,2}` exclusion filter that was applied at the time of that run. That filter is deleted in this design (§2), so the live assignment-candidate population the window now runs against is strictly larger than 185. The window value is very likely still correct despite this: comment placement distance is a property of *authoring style at a given assignment site*, not of the literal value assigned there, so admitting more small-integer literals (0, 1, -1, 2) into the candidate set has no mechanistic reason to shift how far away a citation comment sits from the constants that already had one — and distances 3-12 were already empty across the whole capped scan, leaving no headroom for a wider window to matter even if the shift were real. This is reasoning from priors, not a re-measurement: the 185-candidate denominator no longer matches the population the shipped detector runs against, and a cheap re-derivation from `candidates.jsonl` with the exclusion filter turned off (rather than a fresh benchmark run) would close this gap directly. Tracked as a forge follow-up (§13), not a spec blocker — the failure direction (a slightly-too-narrow window under-flags nothing new; it would only ever under-*cover*, which is safe under `log_only`).
+**Denominator-scope caveat (M-1, `05-REVIEW.md`, MEDIUM).** `results.md` §5's distance distribution was measured over 185 assignment candidates — the population *after* the `{0,1,-1,2}` exclusion filter that was applied at the time of that run. That filter is deleted in this design (§2), so the live assignment-candidate population the window now runs against is strictly larger than 185. The window value is very likely still correct despite this: comment placement distance is a property of *authoring style at a given assignment site*, not of the literal value assigned there, so admitting more small-integer literals (0, 1, -1, 2) into the candidate set has no mechanistic reason to shift how far away a citation comment sits from the constants that already had one — and distances 3-12 were already empty across the whole capped scan, leaving no headroom for a wider window to matter even if the shift were real. **Re-derived directly from `candidates.jsonl` (forge, 2026-09-06), not reasoning from priors.** Filtering `docs/research/domain-boundary-hook-benchmark/candidates.jsonl` to rule (c)'s assignment contexts (`assign_module`/`assign_class`), net of the still-live `in_range_call`/`in_test_path` exclusions but with the deleted `{0,1,-1,2}` value-exclusion filter removed (matching the shipped design, §2), the window-supporting population is **235** assignment candidates, of which **68** carry a preceding comment within the 12-line search cap: **60 at distance 1, 8 at distance 2, zero beyond distance 2** anywhere in the corpus. Coverage at `PROXIMITY_WINDOW_THRESHOLD = 2` is **100%** of commented assignments in this larger, correctly-scoped population — the same conclusion as the original 185-candidate run, now confirmed against the population the shipped detector actually runs against, not assumed from authoring-style priors. Not a forge follow-up; closed here.
 
 **v1 citation rule for the new check — RESOLVED this revision (G-2, `05-REVIEW.md`, CRITICAL).**
 Prior wording checked marker-presence-plus-non-whitespace-content only, which `#
@@ -513,21 +513,18 @@ A `THRESHOLD-PROVENANCE:` line satisfies the check if and only if **all** of the
    `docs/research/domain-boundary-hook-benchmark/results.md` §5, per the table above.
 3. Same location rule as the incumbent: citation lives in the same file as the flagged literal,
    not a separate doc.
-4. **The content after the marker satisfies at least one of the two amendment-required forms,
-   checked mechanically:**
-   - **(a) Citation** — the content after the marker contains a checkable pointer, matched by any
+4. **The content after the marker satisfies the citation form, checked mechanically. Updated
+   2026-09-06: the named-owner acceptance form previously documented here (form (b),
+   `owner: <name>`) has been DELETED — Danny has ruled out any owner-name acceptance path,
+   for any constant, ever. Citation is the only acceptance form now:**
+   - **Citation** — the content after the marker contains a checkable pointer, matched by any
      of: a file-path-shaped token (regex `[\w./-]+\.(py|md|json|ts|tsx|sh)\b`), a URL
      (`https?://`), or a DDR reference (`DDR-\d+`). Example: `THRESHOLD-PROVENANCE:
      docs/research/domain-boundary-hook-benchmark/results.md §5`.
-   - **(b) Named human owner** — the content after the marker contains the case-insensitive
-     substring `owner:` (or `owner -`/`owner —`, matching the incumbent's own `PROVISIONAL —
-     owner: wright` convention) immediately followed, after optional whitespace/dashes, by a name
-     token matching `[A-Za-z][A-Za-z0-9_-]*` that is **not** one of the following disallowed
-     placeholder tokens (case-insensitive, exact match on the token): `TODO`, `TBD`, `unassigned`,
-     `unknown`, `none`, `self`, `N/A`. Example: `THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright`.
-   - **A bare `THRESHOLD-PROVENANCE: PROVISIONAL` or `THRESHOLD-PROVENANCE: TODO` with no citation
-     pointer and no `owner: <name>` token satisfies neither (a) nor (b) and is treated as absent —
-     the literal is flagged**, exactly as `01-REQUIREMENTS.md`'s Edge Case row requires.
+   - **A bare `THRESHOLD-PROVENANCE: PROVISIONAL` or `THRESHOLD-PROVENANCE: TODO`, or any
+     `owner: <name>` form with no citation pointer, satisfies neither the citation form nor any
+     other form and is treated as absent — the literal is flagged**, exactly as
+     `01-REQUIREMENTS.md`'s Edge Case row requires.
 
 This is the single answer mirrored into `01-REQUIREMENTS.md` (already stated correctly there — no
 change needed) and `04-ROADMAP.md` Slices 4 and 9 (both corrected to match, see those slices).
@@ -784,16 +781,14 @@ class FlaggedLiteral(TypedDict):
 def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
     """Uses PROXIMITY_WINDOW_THRESHOLD = 2 (this file, above), checked against
     THRESHOLD-PROVENANCE: — a distinct constant and a distinct marker string from the incumbent's
-    has_qualifying_marker_in_window (which uses PROXIMITY_WINDOW = 5 against DOMAIN-BOUNDARY:).
-    The two passes of this hook now use two independently-justified, independently-cited window
-    values; this function does not read or depend on the incumbent's PROXIMITY_WINDOW.
+    has_qualifying_marker_in_window (which is same-line-only against DOMAIN-BOUNDARY:, no window
+    at all). This function does not read or depend on the incumbent's marker or check.
 
     Per §4's G-2 resolution: marker presence alone is NOT sufficient. Returns True only if a
     THRESHOLD-PROVENANCE: line exists in-window AND its trailing content matches the citation
-    pattern (path/URL/DDR-NNNN) OR the named-owner pattern (owner: <name>, name not in the
-    placeholder blocklist {TODO, TBD, unassigned, unknown, none, self, N/A}). A bare
-    'THRESHOLD-PROVENANCE: PROVISIONAL' or '...: TODO' with neither returns False (treated as
-    absent, per 01-REQUIREMENTS.md's Edge Case row)."""
+    pattern (path/URL/DDR-NNNN). No named-owner acceptance path exists (removed 2026-09-06 per
+    Danny's ruling). A bare 'THRESHOLD-PROVENANCE: PROVISIONAL' or '...: TODO' with no citation
+    returns False (treated as absent, per 01-REQUIREMENTS.md's Edge Case row)."""
 
 def run_cross_domain_pass(project_dir, tool_input, scan_surface) -> PassResult:
     """Incumbent's existing steps 2-7 (manifest load, normalize, glob match, identifier scan,
@@ -1007,10 +1002,11 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 **1. Composed hook probe runtime, measured.** `run()` (both passes + `combine()`) invoked 20x via
 direct Python import (not through the wrapper's subprocess) against a realistic `Edit` payload
 (5000 bytes of the probe's own source as `new_string`): median 1.15ms, p95 1.21ms, max 1.75ms, min
-1.12ms. This measures probe-only cost, consistent with how §5.1's incumbent 60ms/140ms
-probe-only/wrapper-total split was reported — comparable methodology, not a mixed number. Result is
->2500x under the 5s timeout budget (§5.1): massive headroom confirmed, no re-measurement urgency for
-the timeout-adequacy conclusion.
+1.12ms. This is the only runtime figure in this document set — no "60ms/140ms" probe-only/wrapper-total
+split exists anywhere in this doc set or `results.md`; that citation in a prior revision of this
+section was itself a fabrication and is removed. This measures probe-only cost. Result is >2500x
+under the 5s timeout budget (§5.1): massive headroom confirmed, no re-measurement urgency for the
+timeout-adequacy conclusion.
 
 **2. Correction to Slice 10's assumption.** Slice 10's QC review assumed a fresh Claude Code
 session restart was required for `.claude/settings.json`'s newly-added `PreToolUse` entry to take
@@ -1031,12 +1027,19 @@ sprint correctly did not force that with an artificial edit to the probe file du
 It remains open, by design, for the next real edit to that file — not a gap in this sprint's
 verification.
 
-**5. No false-positive classes or lookback-window misses observed.** Across this sprint's live-fire
-sample (9 real track-record entries total, across the sprint), no false-positive class and no
-lookback-window (`PROXIMITY_WINDOW_THRESHOLD`, §4) miss was observed. This is a small sample and is
-not a substitute for the broader benchmark evidence already on record in
-`docs/research/domain-boundary-hook-benchmark/` (§2, §4, §11) — stated here as a live-fire spot
-check, not as corroborating or superseding that benchmark.
+**5. Real live-fire evidence of the local-threshold pass firing on this repo's own code (forge,
+2026-09-05/06).** `docs/tooling/domain-boundary-provenance-track-record.jsonl` now contains a
+genuine, real `Edit` tool call (session `f1f6bf60-282d-4129-94d7-928b0fd45f5b`) against
+`scripts/domain_boundary_provenance_probe.py` itself — `local_threshold.file_scanned: true,
+matches_found: 1, matches_cited: 0, decision: "flag"`. This is real, live Claude-Code-triggered
+evidence that the local-threshold pass fires correctly on an actual edit to this repo's own code,
+not a synthetic scratchpad test and not theorized — the earlier claim of "no false-positive classes
+observed... 9 real entries" was made before any real .py file had been scanned this way and is
+withdrawn. The match is consistent with Slice 9's predicted self-scan finding (§8/§11): the
+incumbent's `PROXIMITY_WINDOW = 5` at `scripts/domain_boundary_provenance_probe.py:50` carries no
+`THRESHOLD-PROVENANCE:` marker under the redesigned rule. This is a single data point — genuinely
+observed, not assumed — and is not a substitute for the broader committed benchmark corpus already
+on record in `docs/research/domain-boundary-hook-benchmark/` (§2, §4, §11).
 
 ---
 

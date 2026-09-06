@@ -15,7 +15,7 @@ docs/tooling/domain-boundary-provenance-hook.md §6:
   4. Scan surface is `tool_input.content` (Write) or `tool_input.new_string` (Edit) only —
      never the on-disk file, never an `old_string`->`new_string` resolution.
   5-7. Scan for `externalSourceIdentifiers` matches; each match must have a
-     `DOMAIN-BOUNDARY: <non-empty>` marker line within a 5-line window (§5) in the SAME
+     `DOMAIN-BOUNDARY: <non-empty>` marker on the SAME LINE as the match, in the SAME
      scan surface. Any unmarked match -> deny.
   8. Deny reason lists every unmarked match (file, line, identifier) + remediation.
 
@@ -51,33 +51,32 @@ MODE_CONFIG_RELATIVE_PATH = os.path.join("docs", "tooling", "domain-boundary-mod
 MARKER = "DOMAIN-BOUNDARY:"
 _MARKER_RE = re.compile(re.escape(MARKER) + r"\s*(\S.*)?$")
 
-# §5 — PROVISIONAL, owner: wright. Proximity window (lines) above/below a match, inclusive.
-PROXIMITY_WINDOW = 5
-
 # §4 — the new check's citation marker; a qualifying line has this literal string followed
 # by non-whitespace content on the same line. Distinct marker from `DOMAIN-BOUNDARY:` above.
 THRESHOLD_MARKER = "THRESHOLD-PROVENANCE:"
 _THRESHOLD_MARKER_RE = re.compile(re.escape(THRESHOLD_MARKER) + r"\s*(\S.*)?$")
 
-# A 2-line window captures every real citation observed in this corpus (93.5% at distance
-# 1, 100.0% at distance 2, 0 additional at any distance 3-12); wider buys no additional
-# recall. New, second window constant distinct from the incumbent's PROXIMITY_WINDOW = 5
-# above (out of scope — see Architecture §4 for why the two passes now use two
-# independently-justified windows rather than sharing one).
-# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5
+# What was actually measured (results.md §5-§6): of assignment candidates with "any
+# preceding comment" within 12 lines, 93.5% land at distance 1 and 100.0% at distance 2,
+# 0 additional at distance 3-12. This is a PRECEDING-direction-only measurement, and "any
+# preceding comment" is an unlabeled proxy for a real citation — no hand-labeled sample
+# confirms these are actually citations (results.md §6 admits this: "no hand-labeled
+# sample was drawn"). The preceding-direction half of this claim is genuinely measured and
+# sound (100% coverage by distance 2). The BELOW-direction half of the window this
+# constant drives (`has_threshold_provenance_marker` checks match_line_idx +/- this value,
+# symmetric) has NO measurement behind it at all — accepted as a known limitation, not a
+# blocking defect, since log_only mode absorbs any resulting under/over-flagging. New,
+# second window constant distinct from the incumbent's `DOMAIN-BOUNDARY:` check above (see
+# Architecture §4 for why the two passes use independently-justified windows/rules).
+# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5-§6
 PROXIMITY_WINDOW_THRESHOLD = 2
 
-# §4 — citation-form (a): file-path-shaped token, URL, or DDR-NNNN reference.
+# §4 — citation form: file-path-shaped token, URL, or DDR-NNNN reference. This is the only
+# acceptance form — no named-owner alternative exists (Danny's ruling: no owner-name
+# acceptance path of any kind, for any constant, ever; see Architecture §4).
 _THRESHOLD_CITATION_RE = re.compile(
     r"[\w./-]+\.(?:py|md|json|ts|tsx|sh)\b" r"|https?://\S+" r"|DDR-\d+"
 )
-
-# §4 — named-owner form (b): case-insensitive `owner:`/`owner -`/`owner —`, followed by a
-# name token, excluding the placeholder blocklist below (checked separately, case-insensitive).
-_THRESHOLD_OWNER_RE = re.compile(
-    r"owner\s*(?::|-|—)\s*([A-Za-z][A-Za-z0-9_./-]*)", re.IGNORECASE
-)
-_THRESHOLD_OWNER_PLACEHOLDERS = {"todo", "tbd", "unassigned", "unknown", "none", "self", "n/a"}
 
 
 def read_stdin():
@@ -251,45 +250,38 @@ def find_identifier_matches(scan_surface, identifiers):
 
 
 def has_qualifying_marker_in_window(lines, match_line_idx):
-    """§5/§6 step 6 — search the PROVISIONAL 5-line window (inclusive, above and below)
-    around `match_line_idx`, within `lines` (the scan surface's own lines), for a
-    `DOMAIN-BOUNDARY:` marker line with non-empty trailing content."""
-    start = max(0, match_line_idx - PROXIMITY_WINDOW)
-    end = min(len(lines) - 1, match_line_idx + PROXIMITY_WINDOW)
-    for idx in range(start, end + 1):
-        m = _MARKER_RE.search(lines[idx])
-        if m and m.group(1) and m.group(1).strip():
-            return True
-    return False
+    """§5/§6 step 6 — require a `DOMAIN-BOUNDARY:` marker with non-empty trailing content
+    on the SAME LINE as `match_line_idx` (within `lines`, the scan surface's own lines).
+    No line-distance window: any wider-window mechanism (a prior `PROXIMITY_WINDOW`
+    constant and its lookback logic) was removed as unsound (benchmark audit) — this check
+    is same-line only, the one case that needs no measurement at all."""
+    m = _MARKER_RE.search(lines[match_line_idx])
+    return bool(m and m.group(1) and m.group(1).strip())
 
 
 def _threshold_marker_satisfies(trailing_content):
     """§4 G-2 resolution — trailing content after `THRESHOLD-PROVENANCE:` satisfies the
-    check only if it matches citation form (a) or named-owner form (b), with the owner
-    name checked against the placeholder blocklist. Bare presence (e.g. `PROVISIONAL` or
-    `TODO` alone) does not satisfy."""
-    if _THRESHOLD_CITATION_RE.search(trailing_content):
-        return True
-    owner_match = _THRESHOLD_OWNER_RE.search(trailing_content)
-    if owner_match and owner_match.group(1).lower() not in _THRESHOLD_OWNER_PLACEHOLDERS:
-        return True
-    return False
+    check only if it matches the citation form (file path, URL, or DDR-NNNN reference).
+    Bare presence (e.g. `PROVISIONAL` or `TODO` alone) does not satisfy, and no
+    named-owner alternative exists — owner-name acceptance was removed entirely per
+    Danny's ruling (Architecture §4)."""
+    return bool(_THRESHOLD_CITATION_RE.search(trailing_content))
 
 
 def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
     """Uses `PROXIMITY_WINDOW_THRESHOLD = 2` (this file, above), checked against
     `THRESHOLD-PROVENANCE:` — a distinct constant and a distinct marker string from the
-    incumbent's `has_qualifying_marker_in_window` (which uses `PROXIMITY_WINDOW = 5`
-    against `DOMAIN-BOUNDARY:`). This function does not read or depend on the incumbent's
-    `PROXIMITY_WINDOW`.
+    incumbent's `has_qualifying_marker_in_window` (which is same-line-only against
+    `DOMAIN-BOUNDARY:`, no window at all). This function does not read or depend on the
+    incumbent's marker or check.
 
     Per Architecture §4's G-2 resolution: marker presence alone is NOT sufficient. Returns
     True only if a `THRESHOLD-PROVENANCE:` line exists in-window AND its trailing content
-    matches the citation pattern (path/URL/DDR-NNNN) OR the named-owner pattern
-    (`owner: <name>`, name not in the placeholder blocklist {TODO, TBD, unassigned,
-    unknown, none, self, N/A}). A bare `THRESHOLD-PROVENANCE: PROVISIONAL` or `...: TODO`
-    with neither returns False (treated as absent, per 01-REQUIREMENTS.md's Edge Case
-    row)."""
+    matches the citation pattern (path/URL/DDR-NNNN). A bare `THRESHOLD-PROVENANCE:
+    PROVISIONAL` or `...: TODO` with no citation returns False (treated as absent, per
+    01-REQUIREMENTS.md's Edge Case row). The named-owner acceptance form (b) that
+    previously existed here has been removed entirely, per Danny's ruling that no
+    owner-name acceptance path is valid, for any constant, ever — see Architecture §4."""
     start = max(0, match_line_idx - PROXIMITY_WINDOW_THRESHOLD)
     end = min(len(lines) - 1, match_line_idx + PROXIMITY_WINDOW_THRESHOLD)
     for idx in range(start, end + 1):
@@ -303,8 +295,22 @@ def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bo
 
 TEST_PATH_COMPONENTS = {"test", "tests", "fixtures"}
 
+# Filename patterns matched in addition to the path-component check above, since a
+# component-only check misses `test_foo.py`/`foo_test.py` at repo root (no matching path
+# component) and `conftest.py` anywhere.
+_TEST_FILENAME_RE = re.compile(r"^(test_.*|.*_test|conftest)\.py$")
+
 _COMPARISON_OPS = (ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq)
-_TRUNCATION_METHODS = {"ljust", "rjust", "zfill", "truncate", "read", "head"}
+# Narrowed 2026-09-06 to only the cited/verified members: `ljust` is the only
+# attribute-call truncation method with an actual citation/corpus hit; slice syntax
+# (`x[:n]`) is detected separately via `_walk_comparison_and_slice_contexts`'s
+# `ast.Subscript`/`ast.Slice` handling, not via this set. `rjust`, `zfill`, `truncate`,
+# `read`, `head` had no citation and no corpus evidence they ever fire — removed rather
+# than kept as unverified guesses. This is a deliberate narrowing to only verified-real
+# cases; it means calls to those five methods with a literal argument are no longer
+# flagged by this context (comparison/slice contexts still catch any literal misuse via
+# their own paths where applicable).
+_TRUNCATION_METHODS = {"ljust"}
 
 # §2.1 strategy 3 — per-line regex fallback, context 3 (module/class-level assignment)
 # ONLY. Whole-line match: an optionally type-annotated `NAME = <numeric/bool literal>`,
@@ -322,13 +328,18 @@ class FlaggedLiteral(TypedDict):
 
 
 def _is_test_or_fixture_path(file_path):
-    """§2 exclusion — any `test`/`tests`/`fixtures` path component, checked
-    component-wise on the POSIX-normalized path, not a bare substring match."""
+    """§2 exclusion — any `test`/`tests`/`fixtures` path component (checked component-wise
+    on the POSIX-normalized path, not a bare substring match), OR a filename matching
+    `test_*.py`/`*_test.py`/`conftest.py` — the component-only check misses a test file at
+    repo root (e.g. `test_foo.py`, no matching path component) and `conftest.py`."""
     if not isinstance(file_path, str) or not file_path:
         return False
     normalized = file_path.replace(os.sep, "/")
     components = normalized.split("/")
-    return any(component in TEST_PATH_COMPONENTS for component in components)
+    if any(component in TEST_PATH_COMPONENTS for component in components):
+        return True
+    basename = components[-1]
+    return bool(_TEST_FILENAME_RE.match(basename))
 
 
 def _literal_value_and_repr(node):
@@ -578,9 +589,8 @@ def build_deny_reason(file_path, unmarked_matches):
     )
     return (
         f"Domain-boundary provenance violation in {file_path}: "
-        f"{lines_desc} — no qualifying `DOMAIN-BOUNDARY:` marker within {PROXIMITY_WINDOW} "
-        f"lines. Add a `DOMAIN-BOUNDARY: <rationale>` comment within {PROXIMITY_WINDOW} "
-        f"lines of the flagged read."
+        f"{lines_desc} — no qualifying `DOMAIN-BOUNDARY:` marker on the same line. Add a "
+        f"`DOMAIN-BOUNDARY: <rationale>` comment on the same line as the flagged read."
     )
 
 
@@ -758,9 +768,10 @@ def build_local_threshold_deny_reason(file_path, unmarked_matches):
     )
     return (
         f"Threshold-provenance violation in {file_path}: {lines_desc} — no qualifying "
-        f"`THRESHOLD-PROVENANCE:` marker with a citation or named owner within "
-        f"{PROXIMITY_WINDOW_THRESHOLD} lines. Add a `THRESHOLD-PROVENANCE: <citation or "
-        f"owner: name>` comment within {PROXIMITY_WINDOW_THRESHOLD} lines of the flagged literal."
+        f"`THRESHOLD-PROVENANCE:` marker with a citation within "
+        f"{PROXIMITY_WINDOW_THRESHOLD} lines. Add a `THRESHOLD-PROVENANCE: <file path, URL, "
+        f"or DDR-NNNN citation>` comment within {PROXIMITY_WINDOW_THRESHOLD} lines of the "
+        f"flagged literal."
     )
 
 

@@ -179,28 +179,19 @@ if HAVE_PYTEST:
         stdout_text, entries = _run_case(monkeypatch, tmp_path, case)
         _assert_case(case, stdout_text, entries)
 
-    def test_self_scan_flags_proximity_window_specifically_not_proximity_window_threshold():
+    def test_self_scan_does_not_flag_proximity_window_threshold():
         """Corpus-level (end-to-end through detect_threshold_literals, the same function
-        run_local_threshold_pass() calls internally) confirmation that the aggregate
-        `self_scan_proximity_window_flagged` corpus case's flag/allow-per-line specificity
-        matches Architecture §8/§13's G-9 finding: `PROXIMITY_WINDOW = 5` IS flagged as
-        unmarked, `PROXIMITY_WINDOW_THRESHOLD = 2` is NOT (its own THRESHOLD-PROVENANCE:
-        citation satisfies the check). The parametrized `test_corpus_case` run for this
-        fixture id only confirms the AGGREGATE decision/counts via the track-record entry
-        (which has no per-literal detail); this test confirms WHICH literal drove it,
-        against the real, current probe source (not a duplicated literal snapshot)."""
+        run_local_threshold_pass() calls internally) confirmation that
+        `PROXIMITY_WINDOW_THRESHOLD = 2` is NOT flagged as unmarked (its own
+        THRESHOLD-PROVENANCE: citation satisfies the check), against the real, current probe
+        source (not a duplicated literal snapshot). The incumbent `PROXIMITY_WINDOW = 5`
+        constant this test previously also checked was removed entirely (benchmark-verified
+        unsourced number; the `DOMAIN-BOUNDARY:` check is now same-line-only, no window
+        constant exists to self-scan)."""
         with open(PROBE_PATH, "r") as fh:
             source = fh.read()
         lines = source.split("\n")
         flags = probe.detect_threshold_literals(PROBE_PATH, source)
-        incumbent_flag = next(
-            f
-            for f in flags
-            if f["context"] == "assign_module_or_class"
-            and f["literal_repr"] == "5"
-            and "PROXIMITY_WINDOW" in lines[f["line_index"]]
-            and "PROXIMITY_WINDOW_THRESHOLD" not in lines[f["line_index"]]
-        )
         new_flag = next(
             f
             for f in flags
@@ -208,7 +199,6 @@ if HAVE_PYTEST:
             and f["literal_repr"] == "2"
             and "PROXIMITY_WINDOW_THRESHOLD" in lines[f["line_index"]]
         )
-        assert probe.has_threshold_provenance_marker(lines, incumbent_flag["line_index"]) is False
         assert probe.has_threshold_provenance_marker(lines, new_flag["line_index"]) is True
 
 

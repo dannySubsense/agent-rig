@@ -134,11 +134,16 @@ except Exception:
 PYEOF
 }
 
-# PROVISIONAL — owner: wright. 5s budget, reused as a starting value from
-# first-turn-contract.sh's own measured-and-cited 5s bound. Measured 2026-08-21 against a
-# representative fixture manifest, 10 runs: probe-only median ~60ms (range 50-90ms), full
-# wrapper end-to-end median ~140ms — see docs/tooling/domain-boundary-provenance-hook.md §6's
-# timeout note.
+# NOT YET BENCHMARKED for this specific wrapper+probe combination. 5s budget carried over
+# from first-turn-contract.sh's own measured-and-cited 5s bound (a different wrapper/probe
+# pair) as a starting value only — no committed, re-runnable measurement exists for this
+# hook. An uncommitted 2026-08-21 measurement and a PROVISIONAL-owner tag previously stood
+# in for a real citation here; both are invalid (no owner-name acceptance path is valid for
+# any constant, ever). Concrete plan to close this: run this wrapper (not the probe alone)
+# N>=30 times against the largest .py file in this repo, each run through the full
+# stdin-capture/timeout/validate path exercised above, measure wall-clock per run, and cite
+# p99 x a safety margin (e.g. 3x) as the timeout value, committed to a script under
+# docs/research/domain-boundary-hook-benchmark/ so the measurement is re-runnable.
 PROBE_EXIT=0
 timeout 5 "$REPO_DIR/scripts/domain_boundary_provenance_probe.py" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
 

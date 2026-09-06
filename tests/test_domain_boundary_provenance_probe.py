@@ -189,8 +189,8 @@ def test_ac3_cited_match_is_allowed(monkeypatch, tmp_path):
     _write_manifest(tmp_path)
     target = tmp_path / "docs" / "tooling" / "pipeline.json"
     content = (
-        "# DOMAIN-BOUNDARY: sourced from market_data's daily_universe view, see DDR-0014\n"
-        "EXTERNAL_CAP_V1 = 5\n"
+        "EXTERNAL_CAP_V1 = 5  # DOMAIN-BOUNDARY: sourced from market_data's daily_universe "
+        "view, see DDR-0014\n"
     )
     stdin_data = _write_stdin(file_path=str(target), content=content)
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
@@ -410,15 +410,14 @@ def test_ac7_in_scope_no_match_allows(monkeypatch, tmp_path):
     assert entries[-1]["cross_domain"]["matches_found"] == 0
 
 
-def test_ac7_marker_just_outside_window_denies(monkeypatch, tmp_path):
-    """§5 PROXIMITY_WINDOW = 5 (inclusive). A marker at exactly line 7 relative to a match on
-    line 1 (index 0) is 6 lines away — outside the window — and must deny. Opts into blocking
-    mode (see test_ac4's note) so the window-boundary miss still surfaces as a genuine deny."""
+def test_ac7_marker_one_line_away_denies(monkeypatch, tmp_path):
+    """§5 (post-window-removal): the `DOMAIN-BOUNDARY:` marker must be on the SAME LINE as the
+    matched identifier. A marker one line away no longer qualifies and must deny. Opts into
+    blocking mode (see test_ac4's note) so the miss still surfaces as a genuine deny."""
     _write_manifest(tmp_path)
     _write_mode_config(tmp_path, "blocking")
     target = tmp_path / "docs" / "tooling" / "pipeline.json"
-    filler = "\n".join(f"filler line {i}" for i in range(1, 6))  # 5 filler lines
-    content = "EXTERNAL_CAP_V1 = 5\n" + filler + "\n# DOMAIN-BOUNDARY: too far away\n"
+    content = "EXTERNAL_CAP_V1 = 5\n# DOMAIN-BOUNDARY: one line away\n"
     stdin_data = _write_stdin(file_path=str(target), content=content)
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     decision = _decision(stdout_text)
@@ -426,13 +425,12 @@ def test_ac7_marker_just_outside_window_denies(monkeypatch, tmp_path):
     assert entries[-1]["decision"] == "deny"
 
 
-def test_ac7_marker_at_window_boundary_line_5_allows(monkeypatch, tmp_path):
-    """Positive control for the boundary case above: a marker exactly 5 lines away (inclusive
-    edge of PROXIMITY_WINDOW) must still qualify."""
+def test_ac7_marker_same_line_allows(monkeypatch, tmp_path):
+    """Positive control for the case above: a marker on the SAME LINE as the match must
+    qualify."""
     _write_manifest(tmp_path)
     target = tmp_path / "docs" / "tooling" / "pipeline.json"
-    filler = "\n".join(f"filler line {i}" for i in range(1, 4))  # 4 filler lines
-    content = "EXTERNAL_CAP_V1 = 5\n" + filler + "\n# DOMAIN-BOUNDARY: within window\n"
+    content = "EXTERNAL_CAP_V1 = 5  # DOMAIN-BOUNDARY: same line\n"
     stdin_data = _write_stdin(file_path=str(target), content=content)
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
@@ -492,14 +490,13 @@ def test_ac7_absolute_path_outside_project_dir_allows(monkeypatch, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# AC9 — PROVISIONAL markers preserved as-authored (spec §5/§6 constants)
+# AC9 — marker string preserved as-authored (spec §5/§6 constants)
 # ---------------------------------------------------------------------------
 
-def test_ac9_proximity_window_and_marker_string_match_spec_provisional_values(monkeypatch, tmp_path):
-    """§8 AC9: this sprint's PROVISIONAL constants (§5's 5-line window) must ship exactly as
-    the spec states them — a silent drift here would ship an unmarked, unreviewed change to a
-    value the spec explicitly flags as owner-revisable, not free-floating."""
-    assert probe.PROXIMITY_WINDOW == 5
+def test_ac9_marker_string_matches_spec_value(monkeypatch, tmp_path):
+    """§8 AC9: the `DOMAIN-BOUNDARY:` marker string must ship exactly as the spec states it —
+    a silent drift here would ship an unmarked, unreviewed change. (The prior proximity-window
+    constant was removed — benchmark-verified unsourced number, same-line-only check now.)"""
     assert probe.MARKER == "DOMAIN-BOUNDARY:"
 
 
@@ -569,8 +566,8 @@ def test_cross_domain_pass_match_with_citation(tmp_path):
     _write_manifest(tmp_path)
     target = tmp_path / "docs" / "tooling" / "pipeline.json"
     content = (
-        "# DOMAIN-BOUNDARY: sourced from market_data's daily_universe view, see DDR-0014\n"
-        "EXTERNAL_CAP_V1 = 5\n"
+        "EXTERNAL_CAP_V1 = 5  # DOMAIN-BOUNDARY: sourced from market_data's daily_universe "
+        "view, see DDR-0014\n"
     )
     result = probe.run_cross_domain_pass(str(tmp_path), {"file_path": str(target)}, content)
     assert result["ran"] is True
@@ -764,9 +761,12 @@ def test_threshold_marker_same_line_with_citation_satisfies():
     assert probe.has_threshold_provenance_marker(lines, 0) is True
 
 
-def test_threshold_marker_same_line_with_owner_satisfies():
+def test_threshold_marker_same_line_with_owner_only_does_not_satisfy():
+    """Owner-name acceptance path deleted 2026-09-06 (Danny's ruling: no owner-name
+    acceptance path of any kind, for any constant, ever) — an owner tag with no citation
+    no longer satisfies the check."""
     lines = ["FOO = 5  # THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright"]
-    assert probe.has_threshold_provenance_marker(lines, 0) is True
+    assert probe.has_threshold_provenance_marker(lines, 0) is False
 
 
 def test_threshold_marker_two_lines_above_with_citation_satisfies():
@@ -833,26 +833,28 @@ def test_threshold_marker_placeholder_owner_todo_does_not_satisfy():
 
 
 def test_threshold_marker_placeholder_owner_all_blocklist_tokens_do_not_satisfy():
-    """Independent-review gap: the prior suite only exercised TODO as a placeholder owner
-    value. A regex-based blocklist can silently miss a token if only one or two examples
-    are tested — probe each of the seven documented placeholders individually
-    (Architecture §4 / roadmap Slice 4)."""
+    """Owner acceptance path deleted 2026-09-06 — none of these owner forms satisfy the
+    check regardless of whether the name is a blocklisted placeholder, since owner-name
+    acceptance no longer exists at all (Danny's ruling)."""
     for placeholder in ("TODO", "TBD", "unassigned", "unknown", "none", "self", "N/A"):
         lines = [f"# THRESHOLD-PROVENANCE: PROVISIONAL — owner: {placeholder}", "FOO = 5"]
         assert probe.has_threshold_provenance_marker(lines, 1) is False, placeholder
 
 
 def test_threshold_marker_placeholder_owner_case_insensitive_do_not_satisfy():
-    """The blocklist check is documented as case-insensitive — confirm mixed-case
-    placeholder tokens (not just the exact-case forms already tested) are still caught."""
+    """Owner acceptance path deleted 2026-09-06 — mixed-case owner forms also do not
+    satisfy, same as any other owner form."""
     for placeholder in ("Todo", "tbd", "UNASSIGNED", "Unknown", "NONE", "SELF", "n/a"):
         lines = [f"# THRESHOLD-PROVENANCE: PROVISIONAL — owner: {placeholder}", "FOO = 5"]
         assert probe.has_threshold_provenance_marker(lines, 1) is False, placeholder
 
 
-def test_threshold_marker_real_owner_name_satisfies():
+def test_threshold_marker_real_owner_name_does_not_satisfy():
+    """Owner-name acceptance path deleted 2026-09-06 (Danny's ruling: no owner-name
+    acceptance path of any kind, for any constant, ever) — even a real, non-placeholder
+    owner name no longer satisfies without an actual citation."""
     lines = ["# THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright", "FOO = 5"]
-    assert probe.has_threshold_provenance_marker(lines, 1) is True
+    assert probe.has_threshold_provenance_marker(lines, 1) is False
 
 
 def test_domain_boundary_marker_or_bare_provisional_does_not_satisfy_threshold_check():
@@ -860,30 +862,6 @@ def test_domain_boundary_marker_or_bare_provisional_does_not_satisfy_threshold_c
     assert probe.has_threshold_provenance_marker(lines, 1) is False
     lines2 = ["# PROVISIONAL", "FOO = 5"]
     assert probe.has_threshold_provenance_marker(lines2, 1) is False
-
-
-def test_incumbent_proximity_window_constant_flagged_on_self_scan():
-    """PROXIMITY_WINDOW = 5 (the incumbent's own existing assignment, unmodified and
-    uncommented by this sprint) IS flagged by the local-threshold pass when this probe
-    file is scanned, with `unmarked` populated and `context: "assign_module_or_class"` —
-    self-scan regression confirming restored assignment-detection behavior."""
-    probe_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "scripts",
-        "domain_boundary_provenance_probe.py",
-    )
-    with open(probe_path, "r") as fh:
-        source = fh.read()
-    lines = source.split("\n")
-    flags = probe.detect_threshold_literals(probe_path, source)
-    incumbent_flag = next(
-        f
-        for f in flags
-        if f["context"] == "assign_module_or_class" and f["literal_repr"] == "5"
-        and "PROXIMITY_WINDOW" in lines[f["line_index"]]
-        and "PROXIMITY_WINDOW_THRESHOLD" not in lines[f["line_index"]]
-    )
-    assert probe.has_threshold_provenance_marker(lines, incumbent_flag["line_index"]) is False
 
 
 def test_new_threshold_window_constant_not_flagged_as_unmarked_on_self_scan():
