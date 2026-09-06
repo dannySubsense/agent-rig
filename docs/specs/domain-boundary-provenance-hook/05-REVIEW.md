@@ -6,7 +6,8 @@
 **Scope**: verification pass against working-tree state at commit `e7223e9`, targeting the two
 attempt-4 fixes (F1 exclusion-set deletion, F2 regex fix) plus an unscoped hostile sweep.
 Prior passes' clean objectives (three detection contexts, `PROXIMITY_WINDOW_THRESHOLD = 2` as a
-value, fragment-shaped 9/9 recall, out-of-scope boundary, owner-or-citation marker rule) were
+value, fragment-shaped 9/9 recall, out-of-scope boundary, citation-or-deletion-only marker rule —
+corrected from the original owner-or-citation framing per Danny's 2026-09-06 ruling) were
 re-read and show **no regression**; they are not re-litigated except where the exclusion deletion
 demonstrably changed their basis (M-1).
 **Docs/artifacts read**: INTAKE, INTERVIEW, NORTH-STAR, 01, 02, 04, PROGRESS, `results.md`,
@@ -20,7 +21,7 @@ demonstrably changed their basis (M-1).
 | # | Objective | Verdict | Evidence |
 |---|---|---|---|
 | 1 | `{0,1,-1,2}` fully removed from all spec docs, nothing treats it as active, no replacement constant | **PASS** | grep across `docs/`: every hit in 01/02/04 is an explicit REMOVED/historical framing. 01 L128-133, L208-210; 02 L268, L290-334, L778-780, L943-946; 04 L134-135, L175-179, L258, L511, L624, L672. No filter replaced it — no new constant introduced. |
-| 2 | §0.1 rule-1 restatement accurate (three dispositions, no invented fourth) | **PASS** | 02 L42-53: names exactly (a) citation, (b) named-human-owner PROVISIONAL, (c) deletion; explicitly deletes the "executable benchmarking plan" fourth option and names its only load-bearing use. |
+| 2 | §0.1 rule-1 restatement accurate (two dispositions, no invented third) | **PASS** | 02 L42-53: names exactly (a) citation, (b) deletion; explicitly deletes the "executable benchmarking plan" third option and names its only load-bearing use. Corrected from three dispositions to two per Danny's 2026-09-06 ruling, which removed named-human-owner PROVISIONAL as a valid option — this evidence line previously named a third disposition that no longer exists in the live architecture doc. |
 | 3 | Volume increase handled consistently; no stale "excluded" assertion | **PASS** | 04 Slice 3 test L185-187 is direction-reversed ("Literals `0, 1, -1, 2` ARE flagged"); Slice 9 L511 says "no fixture should assert it"; Slice 12 L623-625 removes the deferred benchmarking plan; Deferred L672-674 marks it REMOVED-not-deferred. No surviving "is excluded" assertion in any spec doc. |
 | 4 | Regex fix real in `scan_thresholds.py`; doc's claim about it matches reality | **PASS (code) / FAIL (evidence-doc consistency — see H-1)** | `scan_thresholds.py:276-279` = `(-?\d[\d_]*(?:\.\d[\d_]*)?\|True\|False)`, float-inclusive as §2.1 describes. Value-parse branch L320 is `float(raw) if "." in raw else int(raw)` — the silent-drop bug named in §2.1 is genuinely fixed, not just the pattern. |
 | 5 | PROGRESS.md Cycle 1/2 framing internally consistent | **PARTIAL — see M-2** | Attempts 1-4 preserved; Cycle 2 counter 0/3 present; but the Post-HALT note still asserts the counter question is unresolved. |

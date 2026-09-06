@@ -27,15 +27,16 @@ or the wider repo roster; that is separate follow-on work.
   wording approval 2026-09-05).
 - A concrete, checkable detection rule for "threshold-shaped literal" is specified and
   implemented — not deferred as "configurable" or "finalized at implementation time."
-- The check verifies citation/PROVISIONAL-tag/removal presence only — it does not judge whether
+- The check verifies citation/removal presence only (no named-owner `PROVISIONAL` tag ever
+  satisfies it) — it does not judge whether
   an existing citation is actually sound (that stays `benchmark`'s, Frank's, and a human's job),
   per DDR-0014's own "What it is not" and the amendment's unchanged inheritance of that limit.
 - Rollout ships `log_only` first; promotion to `blocking` is a separate, later, per-repo decision
   — never bundled into initial install (Interview Q2, DDR-0014 amendment's Rollout section).
 - No hard latency bound required — best-effort, same posture as the precedent hook (Interview Q3).
 - Every predetermined constant this sprint itself introduces (e.g. any internal limit the hook's
-  own code uses) carries a citable precedent or explicit PROVISIONAL tag — no exception to this
-  repo's Decision Discipline for the sprint's own artifacts.
+  own code uses) carries a citable precedent — no exception to this repo's Decision Discipline
+  for the sprint's own artifacts.
 
 ## Traceability (Layer 2 input — Frank verifies independently, does not trust this field)
 Project North Star bullet(s) this sprint serves: `docs/NORTHSTAR.md` Thesis — "Orchestration

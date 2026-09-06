@@ -609,7 +609,7 @@ pointing at `.claude/hooks/domain-boundary-provenance.sh` (unchanged path), with
 the initial committed value — satisfying `01-REQUIREMENTS.md`'s Must: "No repo's hook installation
 ships in `blocking` mode as its initial configuration."
 
-### 5.1 Re-justification of the Inherited 5s Probe Timeout (benchmark audit finding #5)
+### 5.1 Re-justification of the Inherited 5s Probe Timeout, Now Set to 3s (benchmark audit finding #5)
 
 The wrapper's existing `5s` timeout budget (`.claude/hooks/domain-boundary-provenance.sh`, marked
 `PROVISIONAL — owner: wright... reused as a starting value from first-turn-contract.sh's own
@@ -639,22 +639,6 @@ interpreter-startup overhead) -> 2.14s, **rounded up to a 3s timeout**. The inhe
 superseded; it was never measured for this pair and was held open only by an invalid
 PROVISIONAL-owner tag. Scope limit: one host, sequential runs — this bounds the value, it is not a
 cross-host distribution.
-conclusion (timeout is adequate) is unchanged and does not depend on the discredited 8ms/76ms pair.
-No new number is invented in its place: `results.md` itself carries no independent `ast.parse`
-timing measurement of its own (its docstring only reports the two prior-audit figures and states
-them as unreproducible), so **this section's own timing figure needs re-measurement against this
-repo's current corpus** before it can be cited as this document's own reproducible number, rather
-than a borrowed cold-re-run figure from a different gate. This is a Roadmap-tracked open item
-(§13) — re-run `python3 -c "import ast, time; ..."` (or equivalent) against this repo's actual
-largest `.py` file and a synthetic worst-case file, commit the script or the exact command used,
-and cite the result here by path, the same discipline `results.md` already applies to every other
-number in this document. Until that re-run happens, **377ms is the disposition, cited to
-`PROGRESS.md` -> Spec Gate -> Cycle 1 -> attempt 3, not to an unlabeled "measured 2026-09-05" claim** — the conclusion (5s
-timeout is adequate) holds under this number and is not blocked on the re-run, but the re-run
-itself is required before this section can claim its own reproducible measurement rather than
-borrowing another gate's number. The timeout constant's own PROVISIONAL/owner framing in the
-wrapper file is a pre-existing artifact outside this sprint's file-touch scope (see report) and is
-not edited here.
 
 ## 6. Data Schema Changes
 
@@ -984,13 +968,11 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   the discarded pre-benchmark 3-line value. Not carried forward as open.
 - **§5.1's timeout — CLOSED (re-measured 2026-09-06; now 3s, cited to
   `docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md`).** The prior ~8ms/~76ms pair (contradicted by `scan_thresholds.py`'s
-  own docstring, which names 76ms as unreproducible) is deleted. Disposition now cites Frank's
-  377ms cold re-run (`PROGRESS.md` -> Spec Gate -> Cycle 1 -> attempt 3) — still 13x under the 5,000ms budget, so the
-  timeout-adequacy conclusion is unchanged — but this section still needs its own fresh, committed
-  `ast.parse` measurement against this repo's current corpus rather than borrowing another gate's
-  figure; tracked here as the concrete forge follow-up. The timeout constant's pre-existing
-  PROVISIONAL/owner framing in the wrapper file itself is unchanged and out of this sprint's
-  file-touch scope.
+  own docstring, which names 76ms as unreproducible) is deleted. The fresh, committed `ast.parse`
+  wrapper-timeout measurement against this repo's current corpus is done: N=50 runs, p99 = 0.1068s,
+  20x margin -> 3s (ceiling of p99 x 20). Not tracked as an outstanding forge follow-up. The
+  wrapper file's PROVISIONAL/owner framing was removed and replaced with a real citation to this
+  results file.
 - **§10's vocabulary-gate figures — G-4 (`05-REVIEW.md`, HIGH) resolved.** "8/10 words never fire" /
   "11 measured false positives" deleted, not re-derived — absent from `results.md`, produced by no
   code in the current design, and not load-bearing for the decision (rule (d)'s I2 recall loss,

@@ -27,3 +27,4 @@ docs/tooling/progress-proof-per-slice-track-record.jsonl
 # same rationale as the sibling entries above, gitignored so every Stop-hook append does not
 # permanently dirty the tree.
 docs/tooling/no-preamble-no-meta-narration-track-record.jsonl
+.coverage

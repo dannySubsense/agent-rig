@@ -51,7 +51,11 @@ MODE_CONFIG_RELATIVE_PATH = os.path.join("docs", "tooling", "domain-boundary-mod
 MARKER = "DOMAIN-BOUNDARY:"
 _MARKER_RE = re.compile(re.escape(MARKER) + r"\s*(\S.*)?$")
 
-# §5 — PROVISIONAL, owner: wright. Proximity window (lines) above/below a match, inclusive.
+# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5
+# §5 measures comment-to-assignment proximity generically (rule c/d, any name-bound
+# constant, not marker-specific): 100% of commented assignments land within 2 lines.
+# This window (5) is a superset of that measured range for the `DOMAIN-BOUNDARY:`
+# marker context.
 PROXIMITY_WINDOW = 5
 
 # §4 — the new check's citation marker; a qualifying line has this literal string followed

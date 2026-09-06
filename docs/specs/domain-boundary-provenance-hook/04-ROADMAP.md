@@ -244,14 +244,13 @@ incumbent's `PROXIMITY_WINDOW = 5`.
   self-scan.
 - **Corrected this pass (G-2, `05-REVIEW.md`, CRITICAL — was: "presence is presence"; that
   framing is deleted, it was the literal statement of the bug).** A `THRESHOLD-PROVENANCE:` marker
-  line satisfies the check only if its trailing content matches EITHER (a) a citation pattern
-  (file-path-shaped token, URL, or `DDR-\d+` reference) OR (b) a named-owner pattern (`owner:` —
-  case-insensitive, `owner -`/`owner —` also accepted — followed by a name token that is not one of
-  the placeholder tokens `TODO`/`TBD`/`unassigned`/`unknown`/`none`/`self`/`N/A`). A bare
-  `THRESHOLD-PROVENANCE: PROVISIONAL` or `THRESHOLD-PROVENANCE: TODO` with neither a citation nor a
-  named owner does NOT satisfy the check and is treated as absent (flagged) — exactly matching
-  `01-REQUIREMENTS.md` AC2 and its Edge Case row, and Danny's 2026-09-05 ruling that self-assigned
-  or unassigned ownership is invalid. See Architecture §4 for the full mechanical rule.
+  line satisfies the check only if its trailing content matches a citation pattern
+  (file-path-shaped token, URL, or `DDR-\d+` reference). A named-owner pattern (`owner:`) does
+  NOT satisfy the check — per the global rule that a named-owner PROVISIONAL tag is not a valid
+  disposition for any constant, ever. A bare `THRESHOLD-PROVENANCE: PROVISIONAL` or
+  `THRESHOLD-PROVENANCE: TODO`, or any owner-only tag with no citation, does NOT satisfy the check
+  and is treated as absent (flagged) — exactly matching `01-REQUIREMENTS.md` AC2 and its Edge Case
+  row. See Architecture §4 for the full mechanical rule.
 - **Self-scan is reopened and resolved, not moot (Architecture §8/§13, G-9).** With assignment
   detection restored (Slice 3), every module-level and class-level `NAME = <literal>` assignment in
   this probe file itself is in scope for the local-threshold pass, unconditionally. There is no
@@ -268,17 +267,14 @@ incumbent's `PROXIMITY_WINDOW = 5`.
 **Tests:**
 - [ ] Marker on same line as literal, carrying a valid citation (path/URL/DDR reference), is
   detected as satisfying.
-- [ ] Marker on same line as literal, carrying `owner: <real-name>`, is detected as satisfying.
-- [ ] Marker 1-2 lines above/below (with a valid citation or owner) is detected as satisfying; 3
+- [ ] Marker 1-2 lines above/below (with a valid citation) is detected as satisfying; 3
   lines above/below is not, regardless of content.
 - [ ] Marker text without non-whitespace content after `THRESHOLD-PROVENANCE:` does not satisfy.
-- [ ] **`THRESHOLD-PROVENANCE: PROVISIONAL` alone (no citation, no owner) does NOT satisfy — direct
+- [ ] **`THRESHOLD-PROVENANCE: PROVISIONAL` alone (no citation) does NOT satisfy — direct
   regression test for G-2's resolution.**
 - [ ] **`THRESHOLD-PROVENANCE: TODO` does NOT satisfy — same, G-2 regression.**
-- [ ] **`THRESHOLD-PROVENANCE: PROVISIONAL — owner: TODO` (placeholder token as the "owner") does
-  NOT satisfy — the placeholder-token blocklist is enforced, not just presence of the substring
-  `owner:`.**
-- [ ] `THRESHOLD-PROVENANCE: PROVISIONAL — owner: wright` (real name) DOES satisfy.
+- [ ] **`THRESHOLD-PROVENANCE: PROVISIONAL — owner: <any name>` (named-owner tag alone, no
+  citation) does NOT satisfy — a named-owner PROVISIONAL tag is never a valid disposition.**
 - [ ] A `DOMAIN-BOUNDARY:` marker or bare `PROVISIONAL` (no `THRESHOLD-PROVENANCE:` marker string)
   does not satisfy this check (distinct marker, not interchangeable — direct regression test for
   Architecture §4's "not `DOMAIN-BOUNDARY:`, not bare `PROVISIONAL`" decision).
@@ -509,13 +505,13 @@ grep-based test satisfying US-4 AC2 / Architecture §8's G-4 disposition.
 - Each of the three syntactic detection contexts (comparison, slice/truncation, module/class-level
   assignment), each of the two remaining exclusions (non-slice-stop index, test-path component —
   the `{0, 1, -1, 2}` exclusion is REMOVED, 2026-09-05, Architecture §2; no fixture should assert it),
-  both citation-satisfying forms (citation vs. named-owner PROVISIONAL), and the
+  the single citation-satisfying form, and the
   unowned-PROVISIONAL-treated-as-absent edge case (Requirements Edge Cases table) each need at least
   one fixture case if not already covered by Slices 3–4's unit tests — this slice is about
   corpus-level (integration) coverage, not duplicating unit tests. **This fixture is now
   satisfiable end-to-end (G-2, `05-REVIEW.md`, CRITICAL, resolved) — prior to this pass, Slice 4's
   own spec guaranteed this fixture would fail (`THRESHOLD-PROVENANCE: PROVISIONAL — TODO` passed
-  the shipped check). With Slice 4's owner-required rule fixed, add an explicit corpus case: a
+  the shipped check). With Slice 4's citation-required rule fixed, add an explicit corpus case: a
   literal marked only `THRESHOLD-PROVENANCE: PROVISIONAL` (no citation, no `owner:`) must resolve
   to `unmarked` (flagged) end-to-end through `run_local_threshold_pass()`/`combine()`, not merely at
   the unit level.**

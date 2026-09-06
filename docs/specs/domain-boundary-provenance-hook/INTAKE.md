@@ -33,7 +33,10 @@ spec-of-record: `gap-lens-dilution-filter/docs/DDR/DDR-0014-DOMAIN-BOUNDARY-PROV
 used in code as a threshold, cap, limit, cutoff, retry count, or budget — regardless of whether it
 was defined locally or imported/read from elsewhere — the codebase must carry, at or adjacent to
 that value's definition, a citation, an explicit `PROVISIONAL — unvalidated` marker naming a human
-owner, or the value must be removed. Absence of all three is a flagged finding. This drops the
+owner, or the value must be removed. Absence of all three is a flagged finding.
+
+**Note (2026-09-06 addendum): the named-human-owner `PROVISIONAL` option described above was later
+ruled invalid by Danny; see `CLAUDE.md` rule 1 and `NORTH-STAR.md`'s Success Criteria.** This drops the
 domain-crossing trigger entirely — it becomes one flagged case among all threshold-shaped
 literals, not the precondition for the check to fire. This is simpler to detect, not harder: "is
 this literal threshold-shaped, does it have a citation nearby" is answerable from syntax/context

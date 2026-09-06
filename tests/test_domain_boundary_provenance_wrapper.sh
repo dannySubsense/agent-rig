@@ -72,8 +72,8 @@ cp "$WRAPPER" "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
 cp "$FAKE_PROBE_DIR/timeout_probe.py" "$fake_repo/scripts/domain_boundary_provenance_probe.py"
 chmod +x "$fake_repo/scripts/domain_boundary_provenance_probe.py"
 
-# Patch the wrapper's 5s timeout down to 1s so this test doesn't take 5+ seconds.
-sed -i 's/timeout 5 /timeout 1 /' "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
+# Patch the wrapper's 3s timeout down to 1s so this test doesn't take 3+ seconds.
+sed -i 's/timeout 3 /timeout 1 /' "$fake_repo/.claude/hooks/domain-boundary-provenance.sh"
 
 OUT="$(echo '{"session_id":"s1","tool_name":"Edit","tool_input":{"file_path":"x.py"},"cwd":"'"$fake_repo"'"}' \
   | env -u CLAUDE_PROJECT_DIR bash "$fake_repo/.claude/hooks/domain-boundary-provenance.sh")"
