@@ -1,6 +1,6 @@
 {
   "source": "Self-authored corpus for domain-boundary-provenance-hook Slice 3, per docs/tooling/domain-boundary-provenance-hook.md §6's fixture-corpus requirement and §8 AC7's named minimum case list. Paired with tests/fixtures/domain_boundary_manifest_fixture.json (schemaVersion 1, pipelineConfigGlobs: docs/tooling/*.json + pipelines/*/config.json + pipelines/*/spec.json, externalSourceIdentifiers: EXTERNAL_CAP_V1, MARKET_DATA_FLOOR, re:UNIVERSE_[A-Z_]+_THRESHOLD). Each case's file_path is repo-root-relative unless is_absolute is true, in which case the test harness must join it onto the fixture project root to produce a real absolute path before invoking the probe -- the corpus itself cannot express an absolute path, since the project root only exists at test-run time (tmp_path).",
-  "note_ac7_wording": "SUPERSEDED (benchmark-verified F3 fix): the prior PROXIMITY_WINDOW = 5 constant this note described had a false citation (measured a different population than what it governed) and no real citation exists or can be cheaply obtained. Disposition: the DOMAIN-BOUNDARY: marker now must be on the SAME LINE as the matched identifier -- no line-distance window at all. See case id distance_1_boundary_denies (replaces the removed distance_5_boundary_allows case).",
+  "note_ac7_wording": "AC7's prose says the marker-just-outside-window case is 'at line 6' while §5's own normative text defines the window as 'within 5 lines, inclusive' -- meaning a marker at distance 5 is INSIDE the window (allow), and only distance 6 is outside (deny). The implementation (PROXIMITY_WINDOW = 5, inclusive both directions) follows §5 correctly; AC7's line-6 example is consistent with that (distance 6 = deny), but the surrounding paragraph is easy to misread as implying distance 5 already denies. This corpus adds the distance-5 case explicitly (case id distance_5_boundary_allows) as the missing positive control the QC notes on Slice 1/2 flagged as untested. Do not silently edit the locked spec -- this note exists so the wording issue is visible to a follow-up review.",
   "cases": [
     {
       "id": "no_manifest",
@@ -46,12 +46,12 @@
     },
     {
       "id": "in_scope_match_cited",
-      "description": "In-scope match with a qualifying DOMAIN-BOUNDARY marker on the same line -> allow.",
+      "description": "In-scope match with a qualifying DOMAIN-BOUNDARY marker within the window -> allow.",
       "use_manifest": true,
       "tool_name": "Write",
       "file_path": "docs/tooling/pipeline.json",
       "is_absolute": false,
-      "content": "EXTERNAL_CAP_V1 = 5  # DOMAIN-BOUNDARY: sourced from market_data's daily_universe view, see DDR-0014\n",
+      "content": "# DOMAIN-BOUNDARY: sourced from market_data's daily_universe view, see DDR-0014\nEXTERNAL_CAP_V1 = 5\n",
       "expect": {
         "decision": "allow",
         "manifest_status": "matched",
@@ -93,19 +93,19 @@
       }
     },
     {
-      "id": "distance_1_boundary_denies",
-      "description": "PROXIMITY_WINDOW was removed (benchmark-verified unsourced number, docs/tooling/domain-boundary-provenance-hook.md §5 superseded) -- the DOMAIN-BOUNDARY: marker must now be on the SAME LINE as the match. A marker at distance 1 (the smallest possible off-line distance) no longer qualifies and must deny (downgraded to flag under this corpus's log_only mode). Replaces the prior distance-5-boundary-allows case, which tested the now-deleted window's inclusive edge.",
+      "id": "distance_5_boundary_allows",
+      "description": "Marker at exactly distance 5 (lines) from the match -- the inclusive edge of PROXIMITY_WINDOW per §5's normative text ('within 5 lines, inclusive') -- must allow, not deny. This is the true edge case Slice 1/2 QC found untested (existing tests covered distance 4 and distance 6 only).",
       "use_manifest": true,
       "tool_name": "Write",
       "file_path": "docs/tooling/pipeline.json",
       "is_absolute": false,
-      "content": "EXTERNAL_CAP_V1 = 5\n# DOMAIN-BOUNDARY: one line away, no longer qualifies\n",
+      "content": "EXTERNAL_CAP_V1 = 5\nfiller line 1\nfiller line 2\nfiller line 3\nfiller line 4\n# DOMAIN-BOUNDARY: exactly at the inclusive edge\n",
       "expect": {
-        "decision": "flag",
+        "decision": "allow",
         "manifest_status": "matched",
         "file_in_scope": true,
         "matches_found": 1,
-        "matches_cited": 0
+        "matches_cited": 1
       }
     },
     {

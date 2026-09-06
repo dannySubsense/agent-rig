@@ -15,7 +15,7 @@ docs/tooling/domain-boundary-provenance-hook.md §6:
   4. Scan surface is `tool_input.content` (Write) or `tool_input.new_string` (Edit) only —
      never the on-disk file, never an `old_string`->`new_string` resolution.
   5-7. Scan for `externalSourceIdentifiers` matches; each match must have a
-     `DOMAIN-BOUNDARY: <non-empty>` marker on the SAME LINE as the match, in the SAME
+     `DOMAIN-BOUNDARY: <non-empty>` marker line within a 5-line window (§5) in the SAME
      scan surface. Any unmarked match -> deny.
   8. Deny reason lists every unmarked match (file, line, identifier) + remediation.
 
@@ -50,6 +50,9 @@ MODE_CONFIG_RELATIVE_PATH = os.path.join("docs", "tooling", "domain-boundary-mod
 # non-whitespace content on the same line.
 MARKER = "DOMAIN-BOUNDARY:"
 _MARKER_RE = re.compile(re.escape(MARKER) + r"\s*(\S.*)?$")
+
+# §5 — PROVISIONAL, owner: wright. Proximity window (lines) above/below a match, inclusive.
+PROXIMITY_WINDOW = 5
 
 # §4 — the new check's citation marker; a qualifying line has this literal string followed
 # by non-whitespace content on the same line. Distinct marker from `DOMAIN-BOUNDARY:` above.
@@ -250,13 +253,16 @@ def find_identifier_matches(scan_surface, identifiers):
 
 
 def has_qualifying_marker_in_window(lines, match_line_idx):
-    """§5/§6 step 6 — require a `DOMAIN-BOUNDARY:` marker with non-empty trailing content
-    on the SAME LINE as `match_line_idx` (within `lines`, the scan surface's own lines).
-    No line-distance window: any wider-window mechanism (a prior `PROXIMITY_WINDOW`
-    constant and its lookback logic) was removed as unsound (benchmark audit) — this check
-    is same-line only, the one case that needs no measurement at all."""
-    m = _MARKER_RE.search(lines[match_line_idx])
-    return bool(m and m.group(1) and m.group(1).strip())
+    """§5/§6 step 6 — search the PROVISIONAL 5-line window (inclusive, above and below)
+    around `match_line_idx`, within `lines` (the scan surface's own lines), for a
+    `DOMAIN-BOUNDARY:` marker line with non-empty trailing content."""
+    start = max(0, match_line_idx - PROXIMITY_WINDOW)
+    end = min(len(lines) - 1, match_line_idx + PROXIMITY_WINDOW)
+    for idx in range(start, end + 1):
+        m = _MARKER_RE.search(lines[idx])
+        if m and m.group(1) and m.group(1).strip():
+            return True
+    return False
 
 
 def _threshold_marker_satisfies(trailing_content):
@@ -271,9 +277,9 @@ def _threshold_marker_satisfies(trailing_content):
 def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
     """Uses `PROXIMITY_WINDOW_THRESHOLD = 2` (this file, above), checked against
     `THRESHOLD-PROVENANCE:` — a distinct constant and a distinct marker string from the
-    incumbent's `has_qualifying_marker_in_window` (which is same-line-only against
-    `DOMAIN-BOUNDARY:`, no window at all). This function does not read or depend on the
-    incumbent's marker or check.
+    incumbent's `has_qualifying_marker_in_window` (which uses `PROXIMITY_WINDOW = 5`
+    against `DOMAIN-BOUNDARY:`). This function does not read or depend on the incumbent's
+    `PROXIMITY_WINDOW`.
 
     Per Architecture §4's G-2 resolution: marker presence alone is NOT sufficient. Returns
     True only if a `THRESHOLD-PROVENANCE:` line exists in-window AND its trailing content
@@ -589,8 +595,9 @@ def build_deny_reason(file_path, unmarked_matches):
     )
     return (
         f"Domain-boundary provenance violation in {file_path}: "
-        f"{lines_desc} — no qualifying `DOMAIN-BOUNDARY:` marker on the same line. Add a "
-        f"`DOMAIN-BOUNDARY: <rationale>` comment on the same line as the flagged read."
+        f"{lines_desc} — no qualifying `DOMAIN-BOUNDARY:` marker within {PROXIMITY_WINDOW} "
+        f"lines. Add a `DOMAIN-BOUNDARY: <rationale>` comment within {PROXIMITY_WINDOW} "
+        f"lines of the flagged read."
     )
 
 
