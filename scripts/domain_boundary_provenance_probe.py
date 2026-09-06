@@ -326,17 +326,6 @@ TEST_PATH_COMPONENTS = {"test", "tests", "fixtures"}
 _TEST_FILENAME_RE = re.compile(r"^(test_.*|.*_test|conftest)\.py$")
 
 _COMPARISON_OPS = (ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq)
-# Narrowed 2026-09-06: `rjust`, `zfill`, `truncate`, `read`, `head` had no citation and
-# no corpus evidence they ever fire — removed rather than kept as unverified guesses.
-# `ljust` is kept as a design choice, NOT because it has a corpus hit — it doesn't
-# (candidates.jsonl has zero `ljust` matches; its only reference anywhere in this doc
-# set is one illustrative example in Architecture §2, and `ljust` pads rather than
-# truncates, so even that example is imprecise). Slice syntax (`x[:n]`) is detected
-# separately via `_walk_comparison_and_slice_contexts`'s `ast.Subscript`/`ast.Slice`
-# handling, not via this set. This is a narrowing to only the members either measured
-# or explicitly named in the architecture doc; `ljust`'s presence is not itself
-# evidence-backed and should not be cited as if it were.
-_TRUNCATION_METHODS = {"ljust"}
 
 # §2.1 strategy 3 — per-line regex fallback, context 3 (module/class-level assignment)
 # ONLY. Whole-line match: an optionally type-annotated `NAME = <numeric/bool literal>`,
@@ -406,12 +395,6 @@ def _walk_comparison_and_slice_contexts(tree):
                 value, value_repr, ok = _literal_value_and_repr(part)
                 if ok and not isinstance(value, bool):
                     flagged.append((part.lineno - 1, "slice_truncation", value_repr))
-        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            if node.func.attr in _TRUNCATION_METHODS:
-                for arg in node.args:
-                    value, value_repr, ok = _literal_value_and_repr(arg)
-                    if ok and not isinstance(value, bool):
-                        flagged.append((arg.lineno - 1, "slice_truncation", value_repr))
     return flagged
 
 

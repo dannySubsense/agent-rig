@@ -108,8 +108,8 @@ name-agnostic.** A numeric or boolean literal is "threshold-shaped" if it appear
 
 1. **Comparison operand** — a numeric literal appearing as either operand of a comparison
    (`<`, `<=`, `>`, `>=`, `==`, `!=`) — e.g. `if retries > 3:`.
-2. **Slice/truncation argument** — a numeric literal used as a slice bound (`x[:50000]`) or as an
-   argument to a truncation-shaped call (`str[:N]`, `.ljust(N)`, `[:N]` generally).
+2. **Slice/truncation argument** — a numeric literal used as a slice bound (`x[:50000]`, `[:N]`
+   generally).
 3. **Module-level or class-level named assignment** (`NAME = <literal>`, numeric or boolean
    literal, at module body or class body scope) — **no vocabulary gate, no case restriction**. Any
    assignment target name qualifies; this is a pure-shape rule (module/class body binding), not a
