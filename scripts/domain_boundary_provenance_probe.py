@@ -51,11 +51,21 @@ MODE_CONFIG_RELATIVE_PATH = os.path.join("docs", "tooling", "domain-boundary-mod
 MARKER = "DOMAIN-BOUNDARY:"
 _MARKER_RE = re.compile(re.escape(MARKER) + r"\s*(\S.*)?$")
 
-# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5
-# §5 measures comment-to-assignment proximity generically (rule c/d, any name-bound
-# constant, not marker-specific): 100% of commented assignments land within 2 lines.
-# This window (5) is a superset of that measured range for the `DOMAIN-BOUNDARY:`
-# marker context.
+# THRESHOLD-PROVENANCE: tests/test_domain_boundary_provenance_probe.py
+# (test_deny_message_window_matches_proximity_window_constant,
+# test_remediation_at_deny_message_offsets_is_recognized_as_cited,
+# test_remediation_one_line_beyond_window_is_still_denied)
+#
+# This is not a corpus-measured population statistic — a prior version of this comment
+# cited docs/research/domain-boundary-hook-benchmark/results.md §5, but that §5 measured
+# comment-to-assignment proximity for a different, unrelated population (any name-bound
+# constant, generically) and does not support this constant's value; that citation has
+# been removed. The number 5 itself is a design choice — how much buffer to give an agent
+# placing a `DOMAIN-BOUNDARY:` remediation comment after a deny — not a value derived from
+# any external measurement. What the cited tests actually verify is self-consistency: the
+# deny message (build_deny_reason) and the enforcement (has_qualifying_marker_in_window)
+# never disagree about what window size applies, across every remediation position an
+# agent would plausibly produce by following the deny message literally.
 PROXIMITY_WINDOW = 5
 
 # §4 — the new check's citation marker; a qualifying line has this literal string followed

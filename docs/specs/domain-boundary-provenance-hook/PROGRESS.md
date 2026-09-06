@@ -1,6 +1,20 @@
 # Progress: unsourced-threshold-provenance-hook (domain-boundary-provenance-hook)
 
-## Status: IN_PROGRESS (all 12 slices complete, awaiting Frank binding forge-gate)
+## Status: PARKED (2026-09-06) — not shipped, not scrapped, held for redesign
+
+Danny's call, 2026-09-06: the mechanical citation-presence check this sprint built can only ever
+verify a marker string exists — it cannot, and per US-4 was deliberately never designed to, verify
+that a citation is real, that its reasoning is sound, or that the disposition (citation vs. deletion)
+actually addresses the original problem the flagged constant existed to solve. Real testing this
+session (a `DOMAIN-BOUNDARY:` marker distance benchmark against production code) showed only ~30-45%
+of real matches have any nearby comment at all, and the marker string itself is project-invented
+jargon no un-onboarded author would organically write. The deny-message/enforcement loop is
+internally self-consistent (proven by test) for its narrow, real audience — new edits made by a
+Claude Code agent, once a repo is in `blocking` mode — but the sprint's own framing overclaimed this
+as general unsourced-constant detection. Parked pending a redesign of what "citation" means (see
+conversation record for the mission-vs-mechanism discussion) rather than shipped as-is or discarded
+outright — the local-threshold detection logic and both real benchmarks (timeout, citation-proximity)
+built this sprint are sound and reusable in a redesign.
 
 ## Slices
 - [x] Slice 1: Extract `run_cross_domain_pass()` — COMPLETE (2026-09-05, commit `3a5de4e`). QC found one FAIL (missing PassResult TypedDict), fixed and re-verified PASS. 162/162 tests passing.

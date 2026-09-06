@@ -186,11 +186,20 @@ different semantic claims would blur exactly the distinction DDR-0014 exists to 
 - The marker must appear within **5 lines** (inclusive, counted in the file content the hook is
   inspecting — i.e. `tool_input.content` for Write, or the post-edit `new_string` for Edit) above
   or below the line containing the matched `externalSourceIdentifiers` entry.
-  **THRESHOLD-PROVENANCE: `docs/research/domain-boundary-hook-benchmark/results.md` §5.**
-  §5 measures comment-to-assignment proximity generically (rule c/d, any name-bound
-  constant, not marker-specific): 100% of commented assignments land within 2 lines. The
-  5-line window is a superset of that measured range for the `DOMAIN-BOUNDARY:` marker
-  context.
+  **THRESHOLD-PROVENANCE: `tests/test_domain_boundary_provenance_probe.py`
+  (`test_deny_message_window_matches_proximity_window_constant`,
+  `test_remediation_at_deny_message_offsets_is_recognized_as_cited`,
+  `test_remediation_one_line_beyond_window_is_still_denied`).**
+  This is not a corpus-measured population statistic — a prior version of this section cited
+  `docs/research/domain-boundary-hook-benchmark/results.md` §5, but that §5 measured
+  comment-to-assignment proximity for a different, unrelated population (any name-bound
+  constant, generically) and does not actually support this constant's value; that citation
+  has been corrected 2026-09-06. The number 5 is a design choice for how much buffer to give
+  an agent placing a remediation comment after a deny, not a value derived from any external
+  measurement. What the cited tests verify is self-consistency: the deny message and the
+  enforcement logic (`has_qualifying_marker_in_window`) never disagree about the window size,
+  across every remediation position an agent would plausibly produce by following the deny
+  message literally.
 - Citation location is the same file as the match (not a separate docs file). Rationale: the whole
   failure mode DDR-0014 names is a value crossing a boundary *silently* — requiring the citation to
   live at the point of use maximizes the chance a future reader (human or agent) sees the rationale
@@ -492,9 +501,10 @@ passes — this hook checks presence only, not correctness (§9).
 
 ## 12. Open Items Carried to Forge
 
-- **§5's 5-line proximity window** — now cited to
-  `docs/research/domain-boundary-hook-benchmark/results.md` §5 (see §5 above); no further
-  action needed.
+- **§5's 5-line proximity window** — CLOSED 2026-09-06. Corrected disposition: not a
+  corpus citation (the prior `results.md` §5 citation measured an unrelated population and
+  has been removed), but a self-consistency property verified by
+  `tests/test_domain_boundary_provenance_probe.py` (see §5 above); no further action needed.
 - **§6's timeout** — CLOSED. Measured against a real manifest and a real worst-case payload;
   now 3s, cited to `docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md`
   (see §6 above). The prior PROVISIONAL-owner tag is withdrawn, not carried forward.
@@ -512,12 +522,16 @@ spec-gate and human approval before any status change from DRAFT.*
 **§2–§4, §7, §9–§10 are unchanged from the LOCKED 2026-08-22 version — no edit was made to that
 text. §5, §6, §8, and §12 were edited by this sprint, but only to correct citations, not to change
 the incumbent's detection logic:** the invalid `PROVISIONAL — owner: wright` tags on §5's 5-line
-proximity window and §6's 5s timeout were replaced with real citations
-(`docs/research/domain-boundary-hook-benchmark/results.md` §5 and
-`results-wrapper-timeout.md` respectively, the latter also revising the timeout value itself from
-5s to a measured 3s), §8's AC9 was reworded to match, and §12's "Open Items" entries were marked
-closed. The cross-domain detection functions themselves — proximity search, timeout wiring, deny
-behavior — are byte-identical to the LOCKED version; only the surrounding citation prose changed.
+proximity window and §6's 5s timeout were replaced with citations (§6's `results-wrapper-timeout.md`
+citation, revising the timeout value itself from 5s to a measured 3s, stands). §5's window was
+initially re-cited to `docs/research/domain-boundary-hook-benchmark/results.md` §5, but that citation
+was itself corrected 2026-09-06: §5 of that doc measured an unrelated population (generic
+comment-to-assignment proximity, not this marker's deny/enforcement contract) and did not actually
+support this constant's value. §5's current disposition (see above) is self-consistency, verified by
+`tests/test_domain_boundary_provenance_probe.py`, not a corpus citation. §8's AC9 was reworded to
+match, and §12's "Open Items" entries were marked closed. The cross-domain detection functions
+themselves — proximity search, timeout wiring, deny behavior — are byte-identical to the LOCKED
+version; only the surrounding citation prose changed.
 This addendum records what a later sprint (`domain-boundary-provenance-hook`
 extension, `docs/specs/domain-boundary-provenance-hook/`) built on top of it. For the full design,
 read `02-ARCHITECTURE.md` §3, §5, §6, and §11 in that sprint's folder — this addendum summarizes and

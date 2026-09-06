@@ -1427,6 +1427,91 @@ def test_no_soundness_implying_language_in_wrapper_hook_source():
 
 
 # ---------------------------------------------------------------------------
+# PROXIMITY_WINDOW self-consistency — deny message vs. enforcement logic agree
+# ---------------------------------------------------------------------------
+#
+# PROXIMITY_WINDOW=5 is not a corpus-measured population statistic — it's a designed
+# parameter of the hook's own deny-message/enforcement contract with the agent it
+# interacts with. Its correctness criterion is self-consistency: does the window size the
+# deny message promises match the window size the checker actually enforces, across every
+# remediation position an agent would plausibly produce by following the deny message
+# literally. See scripts/domain_boundary_provenance_probe.py's PROXIMITY_WINDOW comment.
+
+def _uncited_stdin(target):
+    return _write_stdin(file_path=str(target), content="EXTERNAL_CAP_V1 = 5\n")
+
+
+def _stated_window_from_deny_reason(reason):
+    """Parses the two "N lines" occurrences the deny message states (window-size mention
+    and remediation-instruction mention) and confirms they agree with each other before
+    returning the value."""
+    found = [int(n) for n in re.findall(r"within (\d+)\s*\n?\s*lines", reason)]
+    assert len(found) == 2, f"expected exactly 2 window-size mentions in deny reason, got {found}"
+    assert found[0] == found[1], f"deny reason states inconsistent window sizes: {found}"
+    return found[0]
+
+
+def test_deny_message_window_matches_proximity_window_constant(monkeypatch, tmp_path):
+    """Gets the actual deny reason text via the real code path (an uncited match, blocking
+    mode) and confirms the window size it states matches PROXIMITY_WINDOW's actual value —
+    the self-consistency contract this constant's correctness rests on."""
+    _write_manifest(tmp_path)
+    _write_mode_config(tmp_path, "blocking")
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+    stdin_data = _uncited_stdin(target)
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    stated_window = _stated_window_from_deny_reason(decision["reason"])
+    assert stated_window == probe.PROXIMITY_WINDOW
+
+
+def test_remediation_at_deny_message_offsets_is_recognized_as_cited(monkeypatch, tmp_path):
+    """Every remediation an agent would plausibly produce by following the deny message
+    literally — a marker placed 1, 3, or 5 lines above/below the flagged match — must be
+    recognized as cited on retry. Constructs the match on a fixed line and places the
+    marker at each offset in turn (negative = above, positive = below)."""
+    for offset in (-5, -3, -1, 1, 3, 5):
+        _write_manifest(tmp_path)
+        _write_mode_config(tmp_path, "blocking")
+        target = tmp_path / "docs" / "tooling" / "pipeline.json"
+
+        match_idx = 10  # comfortably away from both file edges for any offset in [-5, 5]
+        marker_idx = match_idx + offset
+        lines = ["filler" for _ in range(21)]
+        lines[match_idx] = "EXTERNAL_CAP_V1 = 5"
+        lines[marker_idx] = "# DOMAIN-BOUNDARY: cited per offset test"
+        content = "\n".join(lines) + "\n"
+
+        stdin_data = _write_stdin(file_path=str(target), content=content)
+        stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+        assert stdout_text == "", f"offset {offset} unexpectedly denied: {stdout_text}"
+        assert entries[-1]["decision"] == "allow"
+
+
+def test_remediation_one_line_beyond_window_is_still_denied(monkeypatch, tmp_path):
+    """6 lines away (1 line beyond the stated/enforced 5-line window) must still deny —
+    confirms the boundary is real, not a no-op, using the same construction as the
+    offset-parametrized allow cases above."""
+    _write_manifest(tmp_path)
+    _write_mode_config(tmp_path, "blocking")
+    target = tmp_path / "docs" / "tooling" / "pipeline.json"
+
+    match_idx = 10
+    marker_idx = match_idx + (probe.PROXIMITY_WINDOW + 1)
+    lines = ["filler" for _ in range(21)]
+    lines[match_idx] = "EXTERNAL_CAP_V1 = 5"
+    lines[marker_idx] = "# DOMAIN-BOUNDARY: one line too far"
+    content = "\n".join(lines) + "\n"
+
+    stdin_data = _write_stdin(file_path=str(target), content=content)
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert entries[-1]["decision"] == "deny"
+
+
+# ---------------------------------------------------------------------------
 # Plain assert-based runner (used if pytest is not installed)
 # ---------------------------------------------------------------------------
 
