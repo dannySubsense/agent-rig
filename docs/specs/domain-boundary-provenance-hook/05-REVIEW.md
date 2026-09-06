@@ -14,6 +14,13 @@ demonstrably changed their basis (M-1).
 `results-fragment-shaped.md`, plus direct reads of `scan_thresholds.py`, `scan_fragments.py`,
 `candidates.jsonl`, `scripts/domain_boundary_provenance_probe.py`.
 
+**STALE/SUPERSEDED (2026-09-06):** this review's references to `PROXIMITY_WINDOW_THRESHOLD = 2`
+as the adopted, current design — including the "retain the window" recommendation at M-1 below —
+are superseded by `02-ARCHITECTURE.md` §4, following a real Frank forge-gate FAIL that found the
+symmetric window checked the wrong thing. The constant was deleted; a same-line-or-contiguous-
+comment-block-above rule (no fixed window) was adopted instead. Text below is left unedited as a
+historical review record.
+
 ---
 
 ## 1. Targeted Objectives — Verdicts
@@ -74,6 +81,12 @@ whose entire subject is citation discipline. **Fix**: repoint both references to
 `PROGRESS.md` → Spec Gate → Cycle 1 → attempt 3.
 
 ### M-1 (MEDIUM) — `PROXIMITY_WINDOW_THRESHOLD = 2`'s cited population was measured *with* the now-deleted exclusion applied
+
+**STALE/SUPERSEDED (2026-09-06):** `PROXIMITY_WINDOW_THRESHOLD = 2` and this finding's "the window
+is retained" recommendation are superseded by `02-ARCHITECTURE.md` §4 (constant deleted,
+contiguous-comment-block-above rule adopted instead, following a real Frank forge-gate FAIL that
+found the symmetric window checked the wrong thing). Left unedited below as a historical review
+record.
 
 `results.md` §5 computes the comment-distance distribution over "assignment candidates (net of
 exclusions): **185**" — and "net of exclusions" in that script includes `EXCLUDED_VALUES =

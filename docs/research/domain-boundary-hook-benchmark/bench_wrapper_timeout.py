@@ -11,9 +11,18 @@ Worst-case input: a Write tool_input whose `content` is the largest .py file in 
 is the scaling axis and the largest .py is the realistic ceiling for an agent-authored Write.
 
 Regenerate: python3 docs/research/domain-boundary-hook-benchmark/bench_wrapper_timeout.py
-Writes: results-wrapper-timeout.md (machine-generated; do not hand-edit).
+Writes: results-wrapper-timeout-<run-timestamp>.md alongside the committed
+results-wrapper-timeout.md, WITHOUT touching the committed file, so a later re-run's
+recommendation can never silently overwrite the measurement the shipped timeout was cited
+against. Pass --overwrite-committed to replace results-wrapper-timeout.md itself; that is a
+deliberate, separate act, not the default of running the script.
+
+The committed 3s timeout is a ceiling based on the original committed measurement run. A
+later re-run producing a lower recommended value does NOT automatically lower the shipped
+timeout -- changing the wrapper's timeout requires a deliberate, separate decision to
+re-cite (updating the wrapper comment and results file together, on purpose).
 """
-import json, os, subprocess, sys, time, statistics, platform
+import argparse, json, os, subprocess, sys, time, statistics, platform
 from datetime import datetime, timezone
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -38,6 +47,13 @@ def largest_py():
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--overwrite-committed", action="store_true",
+                         help="Replace the committed results-wrapper-timeout.md in place "
+                              "instead of writing a new timestamped file. This is a "
+                              "deliberate re-citation act, not the default.")
+    args = parser.parse_args()
+
     size, path = largest_py()
     content = open(path, encoding="utf-8").read()
     payload = json.dumps({
@@ -136,13 +152,29 @@ legitimate edits.
 
 **Recommended timeout: {max(1, int(-(-rec // 1)))}s** (ceiling of p99 x {margin:g}).
 
+**On re-runs**: the shipped wrapper timeout (3s) is a ceiling based on the ORIGINAL committed
+measurement run, not on whichever run happened most recently. If this run's recommended value
+above is lower than 3s, that does NOT automatically lower the shipped timeout -- reducing it
+requires a deliberate, separate decision to re-cite (updating both the wrapper comment in
+`.claude/hooks/domain-boundary-provenance.sh` and this results file together, on purpose, not
+as a side effect of re-running the script).
+
 ## 5. Track-record hygiene
 
 The benchmark's own runs append `probe_error`/allow lines to
 `docs/tooling/domain-boundary-provenance-track-record.jsonl`. The script deletes every line
 carrying `session_id == "{SESSION_ID}"` after the run. Line count before: {pre_lines}; after: {post}.
 """
-    dest = os.path.join(os.path.dirname(__file__), "results-wrapper-timeout.md")
+    here = os.path.dirname(__file__)
+    committed = os.path.join(here, "results-wrapper-timeout.md")
+    if args.overwrite_committed:
+        dest = committed
+    else:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        dest = os.path.join(here, f"results-wrapper-timeout-{stamp}.md")
+        print(f"NOTE: committed results-wrapper-timeout.md left untouched. "
+              f"Writing this run's output to {dest} instead. "
+              f"Pass --overwrite-committed to replace the committed file deliberately.")
     open(dest, "w").write(out)
     print(out)
 

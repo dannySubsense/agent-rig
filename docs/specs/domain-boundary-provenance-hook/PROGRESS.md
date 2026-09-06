@@ -89,7 +89,7 @@ Counter: 1/3 (Cycle 2)
 
 ## Forge Gate
 
-Counter: 2/3
+Counter: 3/3
 
 **⚠️ CAVEAT — no independently-checkable artifacts back attempts 1 and 2.** Independent QC
 (2026-09-06) confirmed: no `.gate-snapshots/forge/` directory exists anywhere in this repo. The
@@ -111,6 +111,12 @@ such directory was ever created; it is corrected below to reflect that.
 
 **Fixes applied since attempt 2, before attempt 3:** incumbent `PROXIMITY_WINDOW`/`has_qualifying_marker_in_window` and its tests/corpus cases restored byte-identical to commit `09e2569` (commit `a25157f`); North Star/Requirements owner-tag language corrected to citation-or-removal only, per Danny's direct ruling 2026-09-06 (commit `ee422d6`); `_TRUNCATION_METHODS` comment corrected to stop claiming a false `ljust` citation. This section (F4) and the slice/Done-When rows below (F6) updated to match current live file state as part of this same fix pass.
 
-Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
-Deep-diagnosis evidence:
-Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
+| 3 | 2026-09-06 | FAIL | Cold Frank, SHA `5dd5caa`. F1 (blocking): wrapper `timeout 5` (.claude/hooks/domain-boundary-provenance.sh:137-148) unsourced — self-declares "NOT YET BENCHMARKED". F2 (blocking, required Danny): incumbent PROXIMITY_WINDOW=5 (scripts/domain_boundary_provenance_probe.py:54) still carries invalid `owner: wright` PROVISIONAL tag in shipped code; disposition on record was only a DDR-INDEX "idea" filing, not a Danny decision. F3 (blocking): doc set (04-ROADMAP.md, NORTH-STAR.md) still specified a named-owner acceptance form the shipped code and tests reject. F4 (non-blocking): PROGRESS.md's own honesty-caveat paragraph contained a false snapshot claim; a line-number citation error; a self-contradiction between two items. F5 (observation, no action): benchmark corpus totals drift naturally on regeneration since corpus repos are live checkouts; net-flagged/recall numbers unaffected. Layer 1: FAIL (F1-F3). Layer 2: PASS, non-PROVISIONAL. Cross-attempt classification: STATIC — the rule-1 findings (unsourced/invalid-owner constants) had not moved across three attempts, though process findings (fake verification, scope violations, stale claims) did shrink each round. Verdict: FAIL (attempt 3/3 — budget exhausted at the time, escalated to Danny; no override existed under the old rule). | none created for this attempt. |
+
+Convergence judgment (attempt 3): STATIC
+Deep-diagnosis evidence: rule-1 findings (unsourced/invalid-owner constants, F1-F3) recurred unchanged in shape across attempts; process-hygiene findings (fake verification, scope violations, stale claims) shrank each round.
+Orchestrator independent re-derivation: AGREES.
+
+**2026-09-06, Danny: the 3-attempt cycle/counter mechanism itself is removed, effective now.** Frank is invoked as needed until PASS — no further Cycle/attempt counting or budget tracking applies. This Counter and the Cycle 1 attempt history above are retained as historical record only.
+
+**Progress since attempt 3 (commits `c1cc427`, `0d1cce1`):** wrapper `timeout 5` sourced via real benchmark (F1 addressed); incumbent `PROXIMITY_WINDOW` owner tag replaced with a real citation (F2 addressed); doc/code divergence on the named-owner acceptance form swept across the full doc set (F3 addressed).

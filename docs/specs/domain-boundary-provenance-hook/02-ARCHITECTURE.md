@@ -267,11 +267,11 @@ buys nothing since volume is already absorbed by `log_only`. Net: keep all three
 rule (c) exactly as measured, do not invent a fourth combination.
 
 **Net flagged volume for rule (c) (this repo's benchmark corpus, remaining two exclusions
-applied — non-slice index and test/fixture path — `{0,1,-1,2}` exclusion removed, 2026-09-05): 856**
-(of 2173 total candidates before exclusion; re-derived directly from `candidates.jsonl`'s
-per-candidate `in_range_call`/`in_test_path` flags, since `results.md` §3's own "Net flagged"
-column still reports the pre-removal 481 figure — that column measures the four-rule benchmark's
-original exclusion set, not this document's now-adopted design, and is not re-run here). This is
+applied — non-slice index and test/fixture path — `{0,1,-1,2}` exclusion removed, 2026-09-05): 858**
+(of 2205 total candidates before exclusion; read directly from `results.md` §3's "Net flagged"
+column, which as of the 2026-09-06 re-run applies no literal-value filter — the benchmark script's
+`EXCLUDED_VALUES` set was deleted and the full corpus regenerated, so the committed evidence now
+measures the detector this document actually ships). This is
 volume, not false-positive count — no precision sample has ever been drawn on this population (see
 disposition below).
 
@@ -460,47 +460,73 @@ it to a third case):**
   which trivially satisfies the check by there being no literal left to flag). No PROVISIONAL
   disposition, named-owner or otherwise, satisfies the check.
 
-**Proximity window: 2 lines — REVISED this pass, replacing the previously-shipped reuse of the
-incumbent's 5-line `PROXIMITY_WINDOW`.**
+**Citation window: no line-count constant — REVISED this pass (Frank binding forge-gate FAIL,
+2026-09-06), replacing the previously-shipped `PROXIMITY_WINDOW_THRESHOLD = 2` fixed symmetric
+±2-line window.**
 
-The prior revision's §4 reused the incumbent's `PROXIMITY_WINDOW = 5` on the premise that a
-benchmark had measured "13 of 40 (32.5%) have their comment starting 4–5 lines above the
-assignment line." That number is discarded this pass — cold Frank's attempt-3 finding, and the
-newly committed benchmark, both establish it as **wrong, not merely superseded**: the committed,
-re-runnable measurement (`results.md` §5, "Citation-proximity window — measured distribution,"
-computed over rule (c)'s 185 net-of-exclusion assignment candidates, 62 of which have a preceding
-comment within a 12-line search cap) finds:
+**What Frank found, against the shipped probe (`scripts/domain_boundary_provenance_probe.py:295-303`,
+`has_threshold_provenance_marker`): the ±2-line window is symmetric (checks 2 lines above AND 2
+lines below the flagged literal) and fixed-length, and both properties produce wrong verdicts on
+real input.** Three concrete failures, confirmed against the shipped code, not hypothetical:
 
-| Distance (lines above assignment) | Count |
-|---|---|
-| 1 | 58 |
-| 2 | 4 |
+1. An uncited constant sitting within 2 lines of an *unrelated* constant's citation is incorrectly
+   blessed — the window has no concept of "whose citation is this," only "is a marker line nearby."
+2. A marker line followed by two comment lines, then the constant, all one contiguous comment
+   block — genuinely well-documented — is invisible, because the citation is 3 lines above the
+   constant, outside the fixed ±2 window.
+3. Self-scan of the shipped probe: `PROXIMITY_WINDOW = 5`'s own citation (marker at line 54, the
+   constant at line 59) is 5 lines away and is not recognized, despite sitting directly and
+   unambiguously above it in one unbroken comment block.
 
-| Window W | Coverage of commented assignments |
-|---|---|
-| 1 | 93.5% |
-| **2** | **100.0%** |
-| 3–12 | 100.0% (no additional comments beyond distance 2 anywhere in the corpus) |
+**Root cause: the ±2-line window measures a different quantity than what was ever actually
+benchmarked.** What `results.md` §5 measured was produced by `scan_thresholds.py`'s
+`_preceding_comment` function
+(`docs/research/domain-boundary-hook-benchmark/scan_thresholds.py:210-225`) — read directly as part
+of this correction, not assumed. That function's real behavior: walk upward from the line above the
+assignment; blank lines are scanned through; the walk terminates the instant it reaches a line that
+is neither blank nor a comment. The quantity it reports is "is there a comment, as part of a
+preceding contiguous run of comment/blank lines, immediately above this assignment" — **not** "is
+there a comment within a fixed N-line box." A fixed symmetric ±2-line window is a different rule
+from the one `results.md` §5 cites, and implementing it as if it were the same rule is the bug: it
+happens to match the distance-1/distance-2 cases actually present in the benchmark's own corpus
+(which only ever had single comment lines immediately above), but it diverges on any comment block
+longer than 2 lines, and it invents a "below" direction the measured function never had — 
+`_preceding_comment` only ever scans upward.
 
-**Decision: `PROXIMITY_WINDOW_THRESHOLD = 2`.** A 2-line window captures 100% of the real
-comment-to-constant distances observed in this exact corpus (`results.md` §5) — there is no
-recall gained by going wider (distances 3–12 contain zero additional real comments), so 2 lines is
-both sufficient and the tightest window the data supports. This is a **new, second window
-constant**, distinct from the incumbent's `PROXIMITY_WINDOW = 5`, cited exactly to
-`docs/research/domain-boundary-hook-benchmark/results.md` §5 — not reused from the incumbent,
-because the incumbent's 5-line value was never itself measured against this corpus (it predates
-this benchmark and was carried over from `first-turn-contract.sh`'s unrelated reuse window, per
-DDR-006's own history); this document does not disturb that pre-existing value for the
-cross-domain pass (out of scope, §1), but it does not import it into a new pass on the strength of
-an unmeasured assumption of shared applicability either. `THRESHOLD-PROVENANCE:` and
-`DOMAIN-BOUNDARY:` therefore now use two distinct proximity windows, each independently justified
-for its own pass: 5 lines (incumbent, unchanged, out of scope for re-justification here) and 2
-lines (new, cited to `results.md` §5).
+**Corrected rule, no window-size constant of any kind:**
 
-**Denominator-scope caveat (M-1, `05-REVIEW.md`, MEDIUM).** `results.md` §5's distance distribution was measured over 185 assignment candidates — the population *after* the `{0,1,-1,2}` exclusion filter that was applied at the time of that run. That filter is deleted in this design (§2), so the live assignment-candidate population the window now runs against is strictly larger than 185. The window value is very likely still correct despite this: comment placement distance is a property of *authoring style at a given assignment site*, not of the literal value assigned there, so admitting more small-integer literals (0, 1, -1, 2) into the candidate set has no mechanistic reason to shift how far away a citation comment sits from the constants that already had one — and distances 3-12 were already empty across the whole capped scan, leaving no headroom for a wider window to matter even if the shift were real. **Re-derived directly from `candidates.jsonl` (forge, 2026-09-06), not reasoning from priors.** Filtering `docs/research/domain-boundary-hook-benchmark/candidates.jsonl` to rule (c)'s assignment contexts (`assign_module`/`assign_class`), net of the still-live `in_range_call`/`in_test_path` exclusions but with the deleted `{0,1,-1,2}` value-exclusion filter removed (matching the shipped design, §2), the window-supporting population is **235** assignment candidates, of which **68** carry a preceding comment within the 12-line search cap: **60 at distance 1, 8 at distance 2, zero beyond distance 2** anywhere in the corpus. Coverage at `PROXIMITY_WINDOW_THRESHOLD = 2` is **100%** of commented assignments in this larger, correctly-scoped population — the same conclusion as the original 185-candidate run, now confirmed against the population the shipped detector actually runs against, not assumed from authoring-style priors. Not a forge follow-up; closed here.
+`has_threshold_provenance_marker` recognizes a citation for a flagged literal at line L if and only
+if a qualifying `THRESHOLD-PROVENANCE:` marker (citation-form rule, item 4 below, unchanged) is
+found in either of:
 
-**v1 citation rule for the new check — RESOLVED this revision (G-2, `05-REVIEW.md`, CRITICAL).**
-Prior wording checked marker-presence-plus-non-whitespace-content only, which `#
+1. **The same line as the flagged literal** — a trailing same-line comment on line L itself.
+2. **The contiguous comment block immediately above line L** — starting at line L-1 and scanning
+   upward: a blank line is scanned through (does not break the block); a comment line (`#...`) is
+   part of the block and is checked for the marker; the first line that is neither blank nor a
+   comment terminates the scan. There is no maximum block length and no fixed distance cutoff — the
+   block is exactly as long as the contiguous run of comment/blank lines above the literal, matching
+   `_preceding_comment`'s own termination condition exactly, not approximately.
+
+There is no "below" direction — `_preceding_comment`, the only committed measurement this rule is
+allowed to cite, never scans downward, so a marker appearing only below the flagged literal does not
+satisfy the check. This also resolves failure (1) above by construction: a citation attached to a
+*different* constant, separated from the literal being checked by a blank/code-line boundary (i.e.
+outside the contiguous block that terminates at that boundary), is never treated as belonging to the
+literal under test.
+
+**`PROXIMITY_WINDOW_THRESHOLD` is deleted, not re-valued.** A contiguous-block-above rule has no
+length parameter to source or cite — the previous constant existed only because the (wrong) design
+needed a magic number; the corrected design needs none. This closes the citation obligation for that
+constant by removing the mechanism that required it, per this repo's binding rule 1 disposition (b)
+(delete the number, don't re-justify it) applied here to the window mechanism itself, not just a
+value inside it. `results.md` §5's distance-1/distance-2 histogram remains valid evidence that the
+*common case* in this corpus is a single comment line 1-2 lines above — it is cited now only as
+descriptive context for why the contiguous-block rule is a reasonable design, not as a bound the
+implementation enforces.
+
+**v1 citation rule for the new check — RESOLVED this revision (G-2, `05-REVIEW.md`, CRITICAL);
+item 2 below revised again this pass to remove the fixed-window mechanism per the correction above.**
+Prior wording (before G-2) checked marker-presence-plus-non-whitespace-content only, which `#
 THRESHOLD-PROVENANCE: TODO` would satisfy — a direct contradiction of `01-REQUIREMENTS.md` AC2 and
 its Edge Case row ("A PROVISIONAL tag exists, named-owner or not | Treated as absent" —
 `01-REQUIREMENTS.md:159`), and of Danny's 2026-09-06 ruling that any PROVISIONAL tag, named-owner
@@ -511,28 +537,56 @@ A `THRESHOLD-PROVENANCE:` line satisfies the check if and only if **all** of the
 
 1. The line contains the literal marker `THRESHOLD-PROVENANCE:` (case-sensitive, exact string),
    followed by non-whitespace content on the same line — necessary but **not sufficient**.
-2. The marker appears within **2 lines (inclusive) above or below** the line containing the
-   flagged literal — `PROXIMITY_WINDOW_THRESHOLD = 2`, cited to
-   `docs/research/domain-boundary-hook-benchmark/results.md` §5, per the table above.
-3. Same location rule as the incumbent: citation lives in the same file as the flagged literal,
-   not a separate doc.
-4. **The content after the marker satisfies the citation form, checked mechanically. Updated
-   2026-09-06: the named-owner acceptance form previously documented here (form (b),
-   `owner: <name>`) has been DELETED — Danny has ruled out any owner-name acceptance path,
-   for any constant, ever. Citation is the only acceptance form now:**
-   - **Citation** — the content after the marker contains a checkable pointer, matched by any
-     of: a file-path-shaped token (regex `[\w./-]+\.(py|md|json|ts|tsx|sh)\b`), a URL
-     (`https?://`), or a DDR reference (`DDR-\d+`). Example: `THRESHOLD-PROVENANCE:
+2. **The marker's line is either the same line as the flagged literal, or is part of the contiguous
+   comment block immediately above it** — per the corrected rule above (same-line-or-contiguous-
+   block-above, no fixed window size, no `PROXIMITY_WINDOW_THRESHOLD` constant), cited exactly to
+   `scan_thresholds.py`'s `_preceding_comment`
+   (`docs/research/domain-boundary-hook-benchmark/scan_thresholds.py:210-225`) as the measured
+   definition this rule now matches exactly, not approximately.
+3. Same location rule as the incumbent: citation lives in the same file as the flagged literal, not
+   a separate doc.
+4. **The content after the marker satisfies the citation form, checked mechanically.** The
+   named-owner acceptance form (`owner: <name>`) is DELETED — Danny has ruled out any owner-name
+   acceptance path, for any constant, ever. Citation is the only acceptance form:
+   - **Citation** — the content after the marker contains a checkable pointer, matched by any of: a
+     file-path-shaped token (regex `[\w./-]+\.(py|md|json|ts|tsx|sh)\b`), a URL (`https?://`), or a
+     DDR reference (`DDR-\d+`). Example: `THRESHOLD-PROVENANCE:
      docs/research/domain-boundary-hook-benchmark/results.md §5`.
    - **A bare `THRESHOLD-PROVENANCE: PROVISIONAL` or `THRESHOLD-PROVENANCE: TODO`, or any
      `owner: <name>` form with no citation pointer, satisfies neither the citation form nor any
      other form and is treated as absent — the literal is flagged**, exactly as
      `01-REQUIREMENTS.md`'s Edge Case row requires.
 
+**Adversarial test cases (Frank binding forge-gate, 2026-09-06) — spec-level acceptance criteria,
+mirrored into `04-ROADMAP.md` Slice 4:**
+
+- **(a) Neighbor-citation payload — must FLAG.** Two module-level constants, `A = 10` on line N
+  with no comment above it, and `B = 20` two lines below with `# THRESHOLD-PROVENANCE:
+  results.md §5` on the line immediately above `B`. `A` must be flagged as unmarked: `B`'s citation
+  is not in the contiguous block immediately above `A`'s line (it is below `A`, and is separated
+  from `A` by `A`'s own assignment line, which terminates any upward scan starting from `B`'s
+  citation toward `A`). The old ±2-line window incorrectly blessed `A` here; the corrected rule does
+  not, because it only ever looks at the contiguous run of comment/blank lines directly above the
+  literal being checked, never sideways to a neighbor's citation.
+- **(b) One-block, three-line citation payload — must be CITED (not flagged).** A marker line
+  (`# THRESHOLD-PROVENANCE: results.md §5`), followed immediately (no blank line) by two more plain
+  comment lines, followed immediately by the constant assignment — all four lines a single
+  unbroken comment-then-code run. Must be recognized as cited even though the marker is 3 lines
+  above the constant, because the scan walks the entire contiguous comment block above the literal
+  with no length limit, not a fixed N-line box. The old ±2-line window flagged this as uncited; the
+  corrected rule does not.
+- **(c) Self-scan payload — must be CITED (not flagged).** `scripts/domain_boundary_provenance_probe.py`'s
+  own `PROXIMITY_WINDOW = 5` constant, whose citation comment sits in the contiguous comment block
+  directly above it (marker at line 54, constant at line 59, per Frank's report — five lines,
+  unbroken block, no intervening code). Must be recognized as cited under the corrected rule. The
+  old ±2-line window flagged the probe's own citation as uncited on self-scan; the corrected rule
+  does not.
+
 This is the single answer mirrored into `01-REQUIREMENTS.md` (already stated correctly there — no
 change needed) and `04-ROADMAP.md` Slices 4 and 9 (both corrected to match, see those slices).
-Roadmap Slice 4's prior "presence is presence" framing is deleted, not merely softened — it was the
-literal statement of the bug this fix removes.
+Roadmap Slice 4's prior "presence is presence" framing, and its subsequent ±2-line fixed-window
+framing, are both deleted, not merely softened — each was the literal statement of a bug this
+correction removes.
 
 ## 5. Rollout: `log_only` Mode (new capability, both checks)
 
@@ -729,14 +783,13 @@ the new value.
 # (load_manifest, normalize_file_path, match_globs, get_scan_surface, etc.), which are
 # UNMODIFIED.
 
-PROXIMITY_WINDOW_THRESHOLD = 2
-# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5 — measured
-# comment-to-assignment distance over rule (c)'s 185 net-of-exclusion candidates: 93.5% at
-# distance 1, 100.0% at distance 2, 0 additional at any distance 3-12. A 2-line window captures
-# every real citation observed in this corpus; wider buys no additional recall. This is a new,
-# second window constant distinct from the incumbent's PROXIMITY_WINDOW = 5 (probe L51, unchanged,
-# out of scope — see §4 for why the two passes now use two independently-justified windows rather
-# than sharing one).
+# No new module-level window constant is introduced (§4 correction, Frank binding forge-gate
+# FAIL, 2026-09-06): has_threshold_provenance_marker checks the flagged literal's own trailing
+# same-line comment, plus the contiguous comment block immediately above it (blank lines within
+# the block scanned through, block terminates at the first non-comment/non-blank line) — a rule
+# with no length parameter, matching scan_thresholds.py's _preceding_comment
+# (docs/research/domain-boundary-hook-benchmark/scan_thresholds.py:210-225) exactly. The prior
+# PROXIMITY_WINDOW_THRESHOLD = 2 fixed symmetric window is deleted, not re-valued (§4).
 
 def load_mode_config(project_dir: str) -> str:
     """Reads docs/tooling/domain-boundary-mode.json. Returns "log_only" on any absence,
@@ -775,15 +828,24 @@ class FlaggedLiteral(TypedDict):
 # three contexts above, including 0/1/-1/2, are flagged unfiltered; volume is absorbed by log_only.
 
 def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
-    """Uses PROXIMITY_WINDOW_THRESHOLD = 2 (this file, above), checked against
-    THRESHOLD-PROVENANCE: — a distinct constant and a distinct marker string from the incumbent's
-    has_qualifying_marker_in_window (which is same-line-only against DOMAIN-BOUNDARY:, no window
-    at all). This function does not read or depend on the incumbent's marker or check.
+    """Checks for a qualifying THRESHOLD-PROVENANCE: marker on the flagged literal's own line, or
+    in the contiguous comment block immediately above it — a distinct marker string and a distinct
+    scan rule from the incumbent's has_qualifying_marker_in_window (which is same-line-only against
+    DOMAIN-BOUNDARY:, no block scan at all). This function does not read or depend on the
+    incumbent's marker or check.
+
+    Scan rule (§4, corrected this pass — no fixed-size window, no PROXIMITY_WINDOW_THRESHOLD
+    constant): (1) check match_line_idx's own line for a trailing same-line marker; (2) if absent,
+    scan upward from match_line_idx - 1: a blank line continues the scan, a comment line is checked
+    for the marker, the first line that is neither blank nor a comment stops the scan. This matches
+    scan_thresholds.py's _preceding_comment
+    (docs/research/domain-boundary-hook-benchmark/scan_thresholds.py:210-225) exactly, not
+    approximately — same-line-or-contiguous-block-above, upward only, no downward direction.
 
     Per §4's G-2 resolution: marker presence alone is NOT sufficient. Returns True only if a
-    THRESHOLD-PROVENANCE: line exists in-window AND its trailing content matches the citation
-    pattern (path/URL/DDR-NNNN). No named-owner acceptance path exists (removed 2026-09-06 per
-    Danny's ruling). A bare 'THRESHOLD-PROVENANCE: PROVISIONAL' or '...: TODO' with no citation
+    THRESHOLD-PROVENANCE: line is found by the scan above AND its trailing content matches the
+    citation pattern (path/URL/DDR-NNNN). No named-owner acceptance path exists (removed 2026-09-06
+    per Danny's ruling). A bare 'THRESHOLD-PROVENANCE: PROVISIONAL' or '...: TODO' with no citation
     returns False (treated as absent, per 01-REQUIREMENTS.md's Edge Case row)."""
 
 def run_cross_domain_pass(project_dir, tool_input, scan_surface) -> PassResult:
@@ -818,7 +880,7 @@ now a real, non-trivial question — see below).
 | **G-6** (`base_ref` undefined) | The discarded design's Stop-hook trigger needed a git base ref to find "session-changed files." | **Moot.** This design keeps `PreToolUse` on `Edit`/`Write` (the incumbent's trigger) — there is no "changed files since session start" concept at all; the scan surface is the single tool call's own `content`/`new_string`, exactly as the incumbent already does. No base-ref resolution is needed anywhere in this document. |
 | **G-7** (`run()` takes `mode` as param AND reads config) | Same ambiguity risk exists in principle. | **Addressed directly**, not just moot: §7 specifies `run()` calls `load_mode_config()` itself, once, at the top, then passes the resulting `mode` string into `combine()` as a plain argument — config is read exactly once, by `run()`, never re-read or re-passed ambiguously. |
 | **G-8** (`ProbeResult.decision` can't express `probe_error`) | The discarded design's `ProbeResult` type omitted `probe_error`. | **Addressed.** §6's `TrackRecordEntry.decision` explicitly lists `"allow" \| "flag" \| "deny" \| "probe_error"` as one flat union, matching the incumbent's own existing pattern (its `TrackRecordEntry.decision` already includes `probe_error`) — no separate `ProbeResult` type with a narrower union is introduced by this design; `PassResult`/`CombinedResult` (§7) are per-pass/pre-decision structures, not the final logged decision. |
-| **G-9 / G-4 (self-scan)** | Whether the new probe's own PROVISIONAL constants get scanned by its own detection rule once live. | **REOPENED and answered for real this pass — no longer moot.** The prior revision's "resolved, no tag needed" disposition depended entirely on the now-corrected §2 having removed all assignment detection; that premise is gone. Under the rule adopted this revision (§2, context 3), **every module-level and class-level `NAME = <literal>` assignment in this probe file itself is now in scope for the local-threshold pass**, unconditionally — including `PROXIMITY_WINDOW = 5` (incumbent, unchanged) and the new `PROXIMITY_WINDOW_THRESHOLD = 2` (§7, this pass). No literal-value exclusion exists in this design (§2, removed 2026-09-05), so neither constant is exclusion-protected regardless of its value. **Concrete answer, not deferred**: `PROXIMITY_WINDOW_THRESHOLD = 2` ships in §7 with an inline `THRESHOLD-PROVENANCE:` comment on the line immediately above it, citing `results.md` §5 by exact path — satisfying option (a) (a real citation) under the new 2-line window (§4), so this probe's own edit does not produce an unmarked self-flag when the hook next scans its own source. The incumbent's `PROXIMITY_WINDOW = 5` is **out of this sprint's file-touch scope** (§1: the incumbent's file is extended, its existing lines are not edited) — it does not currently carry a `THRESHOLD-PROVENANCE:` comment, and under the redesigned rule it **will** be flagged (as `unmarked`, `context: "assign_module_or_class"`) the first time this hook scans `scripts/domain_boundary_provenance_probe.py` itself. This is named as a real, live self-scan finding, not glossed over: it is `log_only` at initial wiring (§5), so it produces a track-record `"flag"` entry, not a block — but it is a true positive against the probe's own pre-existing unlabeled-by-this-marker constant, and is reported to Danny (accompanying report) as a same-sprint or immediate-follow-up file-touch decision, since leaving a LOCKED incumbent file's own constant unmarked while shipping a check whose entire purpose is catching exactly that pattern is a visible inconsistency the first live scan will surface mechanically. Roadmap Slice 9 must add an explicit fixture case asserting this **is** flagged (not "is not flagged," reversing the prior revision's fixture direction) so the corrected self-scan behavior is a tested claim. |
+| **G-9 / G-4 (self-scan)** | Whether the new probe's own PROVISIONAL constants get scanned by its own detection rule once live. | **REOPENED and answered for real this pass — no longer moot.** The prior revision's "resolved, no tag needed" disposition depended entirely on the now-corrected §2 having removed all assignment detection; that premise is gone. Under the rule adopted this revision (§2, context 3), **every module-level and class-level `NAME = <literal>` assignment in this probe file itself is now in scope for the local-threshold pass**, unconditionally — including `PROXIMITY_WINDOW = 5` (incumbent, unchanged). No literal-value exclusion exists in this design (§2, removed 2026-09-05), so this constant is not exclusion-protected regardless of its value. **Concrete answer, not deferred**: `PROXIMITY_WINDOW = 5` carries a `THRESHOLD-PROVENANCE:` citation comment in the contiguous comment block immediately above it — satisfying option (a) (a real citation) under the corrected same-line-or-contiguous-block-above rule (§4, no fixed window size), so this probe's own edit does not produce an unmarked self-flag when the hook next scans its own source. The incumbent's `PROXIMITY_WINDOW = 5` is **out of this sprint's file-touch scope** (§1: the incumbent's file is extended, its existing lines are not edited). It **does** already carry a `THRESHOLD-PROVENANCE:` citation comment, in the contiguous comment block immediately above it in the shipped probe — this was previously misreported in this document as absent, based on the now-corrected assumption that only a fixed ±2-line window applied; under the corrected same-line-or-contiguous-block-above rule (§4), that existing citation **is** recognized, so this constant is not an unmarked self-scan finding. Roadmap Slice 9 must add an explicit fixture case confirming `PROXIMITY_WINDOW = 5` **is** recognized as cited (not flagged) under the corrected rule. |
 | **G-4** (US-4 AC2 no verification path) | "No log message implies soundness" has no test. | **Still applies, unchanged from before** — this is a requirements-level testability gap independent of which design implements it. Not this document's to resolve; flagged to Roadmap the same way the review already did (a grep-based test asserting the deny/flag `reason` string template contains no soundness-implying language, e.g. no "verified correct"/"sound"/"validated" claims beyond presence-check wording). |
 
 ## 9. Dependencies
@@ -839,7 +901,7 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 | Fail-safe config default (absent mode file → `log_only`, never `blocking`) | `load_mode_config` (§5) | Mirrors the incumbent's "absent manifest → allow" fail-safe posture — an unconfigured or partially-installed hook must always default toward the less disruptive behavior, never the more disruptive one. |
 | AST-based syntactic detection, with a context-3-only regex fallback for unparsable fragments | `detect_threshold_literals` (§2) | Reliably distinguishes "literal is a comparison operand" from "literal merely appears near a comparison token," and now "assignment target is at module/class body scope" from "name token appears anywhere" — same rationale the discarded design already established, extended to the new assignment context. Contexts 1-2 stay AST-only, no fallback. |
 | Shape-only detection, no name-vocabulary or case gate | `detect_threshold_literals` (§2) | **Vocabulary-gate false-negative/false-positive figures removed this revision (G-4, `05-REVIEW.md`, HIGH)** — the prior "8/10 words never fire, 11 measured false positives" pair was inherited from the discarded name-gate/vocabulary design and does not appear anywhere in `results.md`; the current script implements no vocabulary gate and cannot have produced them. Deleted, not re-derived, because the decision does not need them: restricting assignment targets to UPPER_CASE (rule (d)) alone already drops recall on the real I2 incident (a lowercase dataclass field) from 2/2 to 1/2 (`results.md` §4, cited and verified) — that single, real, cited measurement is sufficient to reject both case-gating and, by the same shape-vs-vocabulary reasoning, name-vocabulary gating. No fabricated number is needed to support a decision the recall table already carries on its own. |
-| Two independently-justified proximity windows, one per pass | `PROXIMITY_WINDOW` (incumbent, 5, unchanged) / `PROXIMITY_WINDOW_THRESHOLD` (new, 2, §4/§7) | The incumbent's window was never measured against this corpus and predates this benchmark; importing it into the new pass on an unmeasured assumption of shared applicability would repeat the same "promoted default" failure mode this repo's CLAUDE.md names explicitly. Measuring and citing a window specific to the new pass's own candidate population (`results.md` §5) is the correct scope for the citation, even though it costs a second constant to maintain. |
+| No new window constant for the local-threshold pass's citation check | `PROXIMITY_WINDOW` (incumbent, 5, unchanged, its own pass) / same-line-or-contiguous-block-above rule (new pass, §4, no constant) | The incumbent's fixed 5-line window was never measured against this corpus and predates this benchmark, so it is left untouched and out of scope for the new pass. The new pass does not import it, and does not introduce its own fixed-size replacement either (the prior `PROXIMITY_WINDOW_THRESHOLD = 2` was found wrong by Frank's binding forge-gate, 2026-09-06, §4) — it instead implements the contiguous-block rule that `scan_thresholds.py`'s `_preceding_comment` actually measures, which has no length parameter to cite or maintain. |
 
 **Anti-patterns (do not use), unchanged from incumbent plus three additions:**
 - General static import/reference analysis for either check — rejected (incumbent §4, unaffected).
@@ -856,8 +918,9 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
 - **New**: restricting the assignment context to UPPER_CASE/UPPER_SNAKE_CASE targets — rejected,
   §2 (rule (d); drops recall on I2 from 2/2 to 1/2, `results.md` §4).
 - **New**: reusing the incumbent's `PROXIMITY_WINDOW = 5` for the new check without independent
-  measurement — rejected, §4 (the value was never validated against this pass's own candidate
-  population; the corrected, cited value is 2, per `results.md` §5).
+  measurement — rejected, §4 (that fixed value was never validated against this pass's own
+  candidate population; the corrected design uses a same-line-or-contiguous-block-above rule with
+  no fixed-size constant at all, cited to `scan_thresholds.py`'s `_preceding_comment`).
 
 ## 11. Integration Points
 
@@ -877,11 +940,10 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   pattern that this revision removes from every doc it touches. That LOCKED doc and the live probe
   script (`scripts/domain_boundary_provenance_probe.py`, `.claude/hooks/domain-boundary-provenance.sh`)
   are out of this sprint's file-touch scope and are not edited here — see the accompanying report
-  for the exact instances and a recommended separate correction pass. **This now also includes the
-  incumbent's own `PROXIMITY_WINDOW = 5` constant (§8's reopened self-scan finding)**, which will
-  be a genuine unmarked match under the redesigned rule the first time the composed hook scans its
-  own source file — flagged here explicitly as a same-file-touch-scope question for Danny to route,
-  not silently absorbed into "out of scope."
+  for the exact instances and a recommended separate correction pass. **The incumbent's own
+  `PROXIMITY_WINDOW = 5` constant (§8's reopened self-scan finding) already carries a
+  `THRESHOLD-PROVENANCE:` citation and is correctly recognized under the corrected rule (§4)** —
+  no unmarked self-scan finding remains for this constant.
 - **`docs/tooling/domain-boundary-manifest.json`** (F2 correction, Frank spec-gate attempt 1):
   **this file does not exist and has never been tracked in this repo** — confirmed by direct
   check. No repo-root manifest exists in agent-rig; this is deliberate, not an oversight — the
@@ -904,7 +966,7 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   Committed on branch `bench/domain-boundary-detection-rule`, commit `929865d`. Re-running
   `scan_thresholds.py` against a changed corpus (new roster repos added/removed, or this repo's own
   `.py` file set changing materially) would change the exact volume and window numbers cited above;
-  the *rule selection* (adopt (c), 2-line window) is not expected to flip on small corpus deltas
+  the *rule selection* (adopt (c); the citation check has no window constant to flip) is not expected to change on small corpus deltas
   given the 100%-at-distance-2 and 2/2-recall margins observed, but this is not itself a claim that
   has been stress-tested against a different corpus.
 
@@ -924,12 +986,14 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
    contexts, name-agnostic, are described consistently throughout `01-REQUIREMENTS.md`). No further
    edit needed.
 8. **`04-ROADMAP.md`** — **Applied** (confirmed this pass, correcting stale status; same G-7
-   finding). Slice 3's three-context description, Slice 4's independent `PROXIMITY_WINDOW_THRESHOLD`
-   constant, Slice 9's self-scan-**IS**-flagged fixture direction, and the removed `range()`
-   exclusion are all present and consistent in `04-ROADMAP.md` as read this pass. Only this pass's
-   *new* Roadmap fixes (G-2's citation-required marker rule in Slices 4/9, and the vocabulary-figure
-   deletion in Slice 3) are additional corrections applied directly in `04-ROADMAP.md` alongside
-   this document, per the task's own corresponding-fix instruction — see that file.
+   finding). Slice 3's three-context description, Slice 9's self-scan-**IS**-flagged fixture
+   direction, and the removed `range()` exclusion are all present and consistent in
+   `04-ROADMAP.md` as read this pass. Only this pass's *new* Roadmap fixes (G-2's citation-required
+   marker rule in Slices 4/9, the vocabulary-figure deletion in Slice 3, and this pass's
+   same-line-or-contiguous-block-above correction to Slice 4, replacing the deleted
+   `PROXIMITY_WINDOW_THRESHOLD` fixed-window framing) are additional corrections applied directly in
+   `04-ROADMAP.md` alongside this document, per the task's own corresponding-fix instruction — see
+   that file.
 
 ## 13. Open Items Carried to Forge
 
@@ -962,10 +1026,13 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   §4 and `04-ROADMAP.md` Slices 4 and 9 are corrected to match. Not carried forward as open.
 - **§2's `range()` exclusion** — REMOVED this pass, cited to `results.md` §3 (fires zero times,
   structurally inert under any of rules (a)-(d)). Not carried forward as open.
-- **§4's proximity window** — RESOLVED this pass with a corrected, cited value: `2` lines
-  (`PROXIMITY_WINDOW_THRESHOLD = 2`), cited to `results.md` §5's measured 93.5%-at-1/100%-at-2
-  distribution. This supersedes both this document's own prior 5-line (reused-incumbent) value and
-  the discarded pre-benchmark 3-line value. Not carried forward as open.
+- **§4's citation-window mechanism** — RESOLVED this pass, superseding this document's own prior
+  `PROXIMITY_WINDOW_THRESHOLD = 2` fixed symmetric window (found wrong by Frank's binding
+  forge-gate, 2026-09-06: incorrectly blesses a neighbor's citation, misses a well-documented
+  3-line block, and fails on the probe's own self-scan). Replaced with a same-line-or-contiguous-
+  comment-block-above rule with no length parameter, cited to `scan_thresholds.py`'s
+  `_preceding_comment` as the measured definition it now matches exactly. Not carried forward as
+  open.
 - **§5.1's timeout — CLOSED (re-measured 2026-09-06; now 3s, cited to
   `docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md`).** The prior ~8ms/~76ms pair (contradicted by `scan_thresholds.py`'s
   own docstring, which names 76ms as unreproducible) is deleted. The fresh, committed `ast.parse`
@@ -978,12 +1045,12 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   code in the current design, and not load-bearing for the decision (rule (d)'s I2 recall loss,
   already cited, is sufficient). Not carried forward as open.
 - **§8's self-scan disposition** — REOPENED and RESOLVED this pass with a real answer, not a
-  "moot" one: the new `PROXIMITY_WINDOW_THRESHOLD = 2` constant ships pre-cited (§7); the
-  incumbent's `PROXIMITY_WINDOW = 5` does not carry a `THRESHOLD-PROVENANCE:` comment and **will**
-  be flagged (unmarked) the first time the composed hook scans its own source file under the
-  redesigned rule. Reported to Danny (§11) as a routing decision, not silently absorbed. Roadmap
-  Slice 9 must add a fixture asserting `PROXIMITY_WINDOW = 5` **is** flagged (reversing the prior
-  revision's "not flagged" fixture direction) — see report.
+  "moot" one: `PROXIMITY_WINDOW = 5` carries a `THRESHOLD-PROVENANCE:` citation comment in the
+  contiguous comment block immediately above it, satisfying the corrected same-line-or-contiguous-
+  block-above rule (§4, no fixed window) — so the probe's own edit does not produce an unmarked
+  self-flag under the corrected rule. Reported to Danny (§11) as a routing decision, not silently
+  absorbed. Roadmap Slice 9 must add a fixture asserting `PROXIMITY_WINDOW = 5` **is** recognized
+  as cited under the corrected rule.
 - **§11's roster/LOCKED-doc addendum updates** — Roadmap-level housekeeping, not architecture.
 - **LOCKED doc / live probe self-assigned-owner pattern** — out of this sprint's file-touch scope;
   reported to Danny for separate routing (see accompanying report and §11's integration-point

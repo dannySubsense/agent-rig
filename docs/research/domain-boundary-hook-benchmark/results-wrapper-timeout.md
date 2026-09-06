@@ -65,6 +65,14 @@ legitimate edits.
 
 **Recommended timeout: 3s** (ceiling of p99 x 20).
 
+**On re-runs**: the shipped wrapper timeout (3s) is a ceiling based on the ORIGINAL committed
+measurement run, not on whichever run happened most recently. If a later re-run's recommended
+value is lower than 3s, that does NOT automatically lower the shipped timeout -- reducing it
+requires a deliberate, separate decision to re-cite (updating both the wrapper comment in
+`.claude/hooks/domain-boundary-provenance.sh` and this results file together, on purpose, not
+as a side effect of re-running the script). Re-running the script no longer overwrites this
+file in place; see `bench_wrapper_timeout.py`'s `--overwrite-committed` flag.
+
 ## 5. Track-record hygiene
 
 The benchmark's own runs append `probe_error`/allow lines to

@@ -44,14 +44,17 @@ Missing corpus roots (reported, not guessed): none
 ## 3. Volume and exclusions, per rule (same corpus)
 
 Exclusion columns are counted over each rule's own candidate set and overlap; 
-`net flagged` = survives all three exclusions simultaneously.
+`net flagged` = survives both exclusions simultaneously. **There is no literal-value
+exclusion:** the `{0, 1, -1, 2}` set was deleted 2026-09-06 (Danny's decision, `02-ARCHITECTURE.md`
+§2 disposition) and this run applies no value filter, so these counts are the population the
+shipped detector actually sees.
 
-| Rule | Total candidates | in `{0,1,-1,2}` | share | `range()` bound | test/fixture path | Net flagged |
-|---|---|---|---|---|---|---|
-| a | 1768 | 1237 | 70.0% | 0 | 1273 | 192 |
-| b | 1922 | 1265 | 65.8% | 0 | 1301 | 296 |
-| c | 2173 | 1315 | 60.5% | 0 | 1317 | 481 |
-| d | 2103 | 1281 | 60.9% | 0 | 1315 | 447 |
+| Rule | Total candidates | `range()` bound | test/fixture path | Net flagged |
+|---|---|---|---|---|
+| a | 1799 | 0 | 1303 | 496 |
+| b | 1953 | 0 | 1331 | 622 |
+| c | 2205 | 0 | 1347 | 858 |
+| d | 2135 | 0 | 1345 | 790 |
 
 **The `range()`-bound exclusion fired 0 times across the whole corpus.** This is
 not a tuning result -- it is structural: a `range()` positional argument is a call argument,
@@ -65,8 +68,8 @@ Candidates by syntactic context (rule-independent raw counts):
 | Context | Count |
 |---|---|
 | `assign_class` | 75 |
-| `assign_module` | 176 |
-| `comparison` | 1768 |
+| `assign_module` | 177 |
+| `comparison` | 1799 |
 | `slice_trunc` | 154 |
 
 ## 4. Recall on the real historical incidents (the disqualifying test)
@@ -92,26 +95,26 @@ A rule that cannot flag these is disqualified regardless of its false-positive r
 ## 5. Citation-proximity window — measured distribution
 
 Measured over the assignment-context candidates specifically (rule c, and rule d as a
-subset), net of exclusions. Distance 1 = comment on the line immediately above the
+subset), net of the two live exclusions and WITHOUT any literal-value filter. Distance 1 = comment on the line immediately above the
 assignment; blank lines are scanned through; a non-comment code line terminates the
 scan (so distances are real comment-to-constant gaps, not any nearby comment).
 Search capped at 12 lines.
 
 ### Rule (c) — all name-bound assignments
 
-- Assignment candidates (net of exclusions): **185**
-- With a preceding comment within 12 lines: **62** (33.5%)
+- Assignment candidates (net of the two live exclusions, unfiltered by value): **236**
+- With a preceding comment within 12 lines: **69** (29.2%)
 
 | Distance (lines) | Count |
 |---|---|
-| 1 | 58 |
-| 2 | 4 |
+| 1 | 61 |
+| 2 | 8 |
 
 Cumulative share of commented assignments captured by a window of size W:
 
 | W | Coverage of commented assignments |
 |---|---|
-| 1 | 93.5% |
+| 1 | 88.4% |
 | 2 | 100.0% |
 | 3 | 100.0% |
 | 4 | 100.0% |
@@ -126,19 +129,19 @@ Cumulative share of commented assignments captured by a window of size W:
 
 ### Rule (d) — UPPER_CASE targets only
 
-- Assignment candidates (net of exclusions): **151**
-- With a preceding comment within 12 lines: **54** (35.8%)
+- Assignment candidates (net of the two live exclusions, unfiltered by value): **168**
+- With a preceding comment within 12 lines: **57** (33.9%)
 
 | Distance (lines) | Count |
 |---|---|
-| 1 | 50 |
+| 1 | 53 |
 | 2 | 4 |
 
 Cumulative share of commented assignments captured by a window of size W:
 
 | W | Coverage of commented assignments |
 |---|---|
-| 1 | 92.6% |
+| 1 | 93.0% |
 | 2 | 100.0% |
 | 3 | 100.0% |
 | 4 | 100.0% |
@@ -157,6 +160,6 @@ Rule selection is an architecture decision, not a benchmark verdict. This script
 recall on the two known true positives and the false-positive volume profile of each rule.
 It deliberately does not pick a winner: the precision of the flagged volume is unlabeled
 (no hand-labeled sample was drawn), so 'net flagged' is volume, not false positives.
-The `{0,1,-1,2}` exclusion set remains unvalidated — this run measures its SHARE, which is
-its leverage, not its correctness. Both remain open for a human decision.
+No literal-value exclusion is measured because none exists in the shipped design (removed
+2026-09-06). Precision of the flagged population remains open for a human decision.
 

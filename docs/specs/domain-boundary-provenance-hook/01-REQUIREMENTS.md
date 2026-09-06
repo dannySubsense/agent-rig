@@ -158,7 +158,7 @@ same-file/local-threshold detection pass is new work.
 | Repo has hook newly wired live with pre-existing unlabeled magic numbers throughout | All matching literals flagged in `log_only` mode; no blocking until repo owner explicitly promotes to `blocking` after triage |
 | A PROVISIONAL tag exists, named-owner or not | Treated as absent — flagged, since the amended check accepts only a real citation or removal; no PROVISIONAL tag of any form (owned or unowned) suppresses the flag |
 | Threshold-shaped literal is removed entirely (e.g. inlined logic without a magic number) | Not flagged — removal is one of the three satisfying conditions |
-| Hook's own code introduces an internal constant (e.g. a scan timeout value) | Applies to constants THIS SPRINT introduces (e.g. `PROXIMITY_WINDOW_THRESHOLD = 2`, cited to `02-ARCHITECTURE.md` §2/§4 — though the citation covers only the preceding-direction half of the window, per the constant's own comment at `scripts/domain_boundary_provenance_probe.py` ~L62-73, and Frank's spec-gate found `results.md`'s cited measurements not independently reproducible from a committed script/corpus, per `PROGRESS.md`) — that constant itself must carry a real citation, or be deleted/redesigned to remove the need for it, no named-owner PROVISIONAL tag, and no exception for the sprint's own artifacts, per this repo's Decision Discipline. Pre-existing incumbent constants (e.g. `PROXIMITY_WINDOW = 5` in `scripts/domain_boundary_provenance_probe.py`, currently carrying an invalid `owner: wright` PROVISIONAL tag) belong to the already-shipped, locked incumbent sprint this sprint's `NORTH-STAR.md` leaves untouched (mechanism only — no constants-exemption is granted) — out of scope for this sprint's own compliance claim and Done-When criteria, tracked as a DDR-INDEX backlog entry (`docs/specs/agent-rig-ddrs/00-DDR-INDEX.md`, "Incumbent domain-boundary-provenance hook's `PROXIMITY_WINDOW = 5` constant carries an invalid self-named-owner PROVISIONAL tag") |
+| Hook's own code introduces an internal constant (e.g. a scan timeout value) | Applies to constants THIS SPRINT introduces — the sprint's citation-recognition rule (same-line-or-contiguous-block-above, `02-ARCHITECTURE.md` §4) has no fixed-size window and needs no constant of its own, so this case no longer produces a sprint-introduced literal to cite. The incumbent's pre-existing `PROXIMITY_WINDOW = 5` (`scripts/domain_boundary_provenance_probe.py`) is out of this sprint's file-touch scope and, per Architecture §8's reopened self-scan finding, already carries a real `THRESHOLD-PROVENANCE:` citation comment in the contiguous comment block immediately above it — not an owner-tag disposition — so it is correctly recognized as cited, not flagged, under the corrected rule; no DDR-INDEX backlog entry is needed for it |
 
 ## Out of Scope
 
@@ -206,9 +206,10 @@ same-file/local-threshold detection pass is new work.
   precedent, or is deleted/redesigned to remove the need for it — no named-owner PROVISIONAL tag
   is a valid disposition, ever, and no exception for the hook's own artifacts, per this repo's
   Decision Discipline. The detection rule's own three syntactic
-  contexts and the citation-proximity window (`PROXIMITY_WINDOW_THRESHOLD = 2`) are cited to
-  `02-ARCHITECTURE.md` §2/§4, not restated here — see that section for the authoritative citation
-  trail (`results.md` §§2-5). There is no literal-value exclusion in this design (`{0, 1, -1, 2}`
+  contexts and the citation-recognition rule (same-line-or-contiguous-block-above, no fixed
+  window, no `PROXIMITY_WINDOW_THRESHOLD` constant) are cited to `02-ARCHITECTURE.md` §2/§4, not
+  restated here — see that section for the authoritative citation trail (`results.md` §§2-5).
+  There is no literal-value exclusion in this design (`{0, 1, -1, 2}`
   removed, 2026-09-05, Architecture §2) — no constant needs citing for a filter that no longer
   exists.
 - Must not: implement or imply a soundness/correctness judgment on existing citations within this
@@ -222,11 +223,11 @@ same-file/local-threshold detection pass is new work.
   PROVISIONAL tag is not a valid disposition for any constant, ever; it is a pass on an unsourced
   number, not a source). This supersedes the earlier assumption that the existing PROVISIONAL-tag
   convention's owner form would be reusable here.
-- Assumes: the new local-threshold pass's citation-proximity window is
-  `PROXIMITY_WINDOW_THRESHOLD = 2` lines (inclusive, above or below the flagged literal) — a new,
-  distinct constant from the incumbent's unrelated `PROXIMITY_WINDOW = 5`, cited to
-  `docs/research/domain-boundary-hook-benchmark/results.md` §5's measured comment-to-assignment
-  distance distribution (93.5% coverage at distance 1, 100.0% at distance 2, zero additional
-  comments at any distance 3–12). This document does not restate that measurement — see
-  Architecture §4.
+- Assumes: the new local-threshold pass recognizes a citation if the qualifying
+  `THRESHOLD-PROVENANCE:` marker is on the flagged literal's own trailing comment, OR anywhere in
+  the contiguous comment block immediately above it (scanning upward; blank lines continue the
+  block; the first non-comment/non-blank line terminates it) — no fixed line-count window, no
+  downward scan, and no `PROXIMITY_WINDOW_THRESHOLD` constant (deleted, not re-valued, per
+  `02-ARCHITECTURE.md` §4). This document does not restate that rule — see Architecture §4 for the
+  authoritative wording.
 </content>

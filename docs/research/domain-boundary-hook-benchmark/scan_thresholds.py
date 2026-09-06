@@ -94,8 +94,10 @@ SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".mypy_cach
 
 # Existing exclusion: "Files under any test/tests/fixtures path component" (§2).
 TEST_PATH_COMPONENTS = {"test", "tests", "fixtures", "fixture", "testdata", "conftest"}
-# Existing exclusion: the literal values {0, 1, -1, 2} -- NOT YET BENCHMARKED per §2.
-EXCLUDED_VALUES = {0, 1, -1, 2}
+# NOTE: there is NO literal-value exclusion in this benchmark. A `{0, 1, -1, 2}` exclusion set
+# existed here until 2026-09-06 and was deleted per Danny's decision (02-ARCHITECTURE.md §2
+# disposition, 2026-09-05): the shipped detector flags all threshold-shaped literals unfiltered
+# under `log_only`. This script must measure the detector that ships, so it applies no such filter.
 
 INCIDENT_1 = PROJECTS / "gap-lens-dilution-filter" / "research" / "gates" / "measure_oq5_residue.py"
 INCIDENT_2_REPO = PROJECTS / "gap-lens-dilution-filter"
@@ -120,7 +122,6 @@ class Candidate:
     is_upper: bool = False
     in_range_call: bool = False
     in_test_path: bool = False
-    in_excluded_values: bool = False
     comment_distance: int | None = None   # lines from nearest preceding comment block
     comment_text: str | None = None
 
@@ -134,8 +135,9 @@ class Candidate:
         return {"c", "d"} if self.is_upper else {"c"}
 
     def net_flagged(self) -> bool:
-        """Survives ALL existing exclusions from §2."""
-        return not (self.in_range_call or self.in_test_path or self.in_excluded_values)
+        """Survives ALL exclusions in the shipped design from §2 (non-slice index / range()
+        bound, and test/fixture path). No literal-value filter exists."""
+        return not (self.in_range_call or self.in_test_path)
 
 
 def is_upper_name(name: str) -> bool:
@@ -200,7 +202,6 @@ class Scanner(ast.NodeVisitor):
             is_upper=is_upper_name(target_name) if target_name else False,
             in_range_call=self._is_range(node),
             in_test_path=self.in_test_path,
-            in_excluded_values=(not isinstance(val, bool)) and val in EXCLUDED_VALUES,
         )
         if context.startswith("assign"):
             d, t = self._preceding_comment(node.lineno)
@@ -325,7 +326,6 @@ def regex_fallback_candidates(repo: str, relpath: str, source: str) -> list[Cand
             context="assign_module", target_name=name,
             is_upper=is_upper_name(name), in_range_call=False,
             in_test_path=in_test,
-            in_excluded_values=(not isinstance(val, bool)) and val in EXCLUDED_VALUES,
         ))
     return out
 
@@ -459,13 +459,10 @@ def main() -> int:
         sel = [c for c in all_cands if rule in c.rules()]
         stats[rule] = {
             "total_candidates": len(sel),
-            "excl_value_set": sum(1 for c in sel if c.in_excluded_values),
             "excl_range": sum(1 for c in sel if c.in_range_call),
             "excl_test_path": sum(1 for c in sel if c.in_test_path),
             "net_flagged": sum(1 for c in sel if c.net_flagged()),
             "by_context": dict(Counter(c.context for c in sel)),
-            "excl_value_share_pct": round(
-                100.0 * sum(1 for c in sel if c.in_excluded_values) / len(sel), 1) if sel else 0.0,
         }
 
     recalls = recall_check()
@@ -537,13 +534,16 @@ def main() -> int:
     A("## 3. Volume and exclusions, per rule (same corpus)")
     A("")
     A("Exclusion columns are counted over each rule's own candidate set and overlap; ")
-    A("`net flagged` = survives all three exclusions simultaneously.")
+    A("`net flagged` = survives both exclusions simultaneously. **There is no literal-value")
+    A("exclusion:** the `{0, 1, -1, 2}` set was deleted 2026-09-06 (Danny's decision, `02-ARCHITECTURE.md`")
+    A("§2 disposition) and this run applies no value filter, so these counts are the population the")
+    A("shipped detector actually sees.")
     A("")
-    A("| Rule | Total candidates | in `{0,1,-1,2}` | share | `range()` bound | test/fixture path | Net flagged |")
-    A("|---|---|---|---|---|---|---|")
+    A("| Rule | Total candidates | `range()` bound | test/fixture path | Net flagged |")
+    A("|---|---|---|---|---|")
     for r in RULES:
         s = stats[r]
-        A(f"| {r} | {s['total_candidates']} | {s['excl_value_set']} | {s['excl_value_share_pct']}% | "
+        A(f"| {r} | {s['total_candidates']} | "
           f"{s['excl_range']} | {s['excl_test_path']} | {s['net_flagged']} |")
     A("")
     total_range = sum(1 for c in all_cands if c.in_range_call)
@@ -584,7 +584,7 @@ def main() -> int:
     A("## 5. Citation-proximity window — measured distribution")
     A("")
     A("Measured over the assignment-context candidates specifically (rule c, and rule d as a")
-    A("subset), net of exclusions. Distance 1 = comment on the line immediately above the")
+    A("subset), net of the two live exclusions and WITHOUT any literal-value filter. Distance 1 = comment on the line immediately above the")
     A("assignment; blank lines are scanned through; a non-comment code line terminates the")
     A("scan (so distances are real comment-to-constant gaps, not any nearby comment).")
     A("Search capped at 12 lines.")
@@ -593,7 +593,8 @@ def main() -> int:
                      ("Rule (d) — UPPER_CASE targets only", prox_d)):
         A(f"### {label}")
         A("")
-        A(f"- Assignment candidates (net of exclusions): **{p['assignment_candidates']}**")
+        A(f"- Assignment candidates (net of the two live exclusions, unfiltered by value): "
+          f"**{p['assignment_candidates']}**")
         A(f"- With a preceding comment within 12 lines: **{p['with_preceding_comment']}** "
           f"({p['with_preceding_comment_pct']}%)")
         A("")
@@ -615,15 +616,14 @@ def main() -> int:
     A("recall on the two known true positives and the false-positive volume profile of each rule.")
     A("It deliberately does not pick a winner: the precision of the flagged volume is unlabeled")
     A("(no hand-labeled sample was drawn), so 'net flagged' is volume, not false positives.")
-    A("The `{0,1,-1,2}` exclusion set remains unvalidated — this run measures its SHARE, which is")
-    A("its leverage, not its correctness. Both remain open for a human decision.")
+    A("No literal-value exclusion is measured because none exists in the shipped design (removed")
+    A("2026-09-06). Precision of the flagged population remains open for a human decision.")
     A("")
     (HERE / "results.md").write_text("\n".join(L) + "\n")
 
     print(f"files scanned: {total_files}; candidates: {len(all_cands)}")
     for r in RULES:
-        print(f"  rule {r}: total={stats[r]['total_candidates']:6d} net={stats[r]['net_flagged']:6d} "
-              f"excl_value_share={stats[r]['excl_value_share_pct']}%")
+        print(f"  rule {r}: total={stats[r]['total_candidates']:6d} net={stats[r]['net_flagged']:6d}")
     for r in recalls:
         print(f"  recall {r['id']}: {r['status']} flagged_by={r['flagged_by'] or 'NONE'}")
     print(f"wrote {HERE/'results.md'} and {HERE/'candidates.jsonl'}")

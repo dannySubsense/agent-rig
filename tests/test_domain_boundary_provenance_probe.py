@@ -781,28 +781,31 @@ def test_threshold_marker_two_lines_above_with_citation_satisfies():
     assert probe.has_threshold_provenance_marker(lines, 2) is True
 
 
-def test_threshold_marker_three_lines_away_does_not_satisfy():
+def test_threshold_marker_three_lines_away_with_only_blank_lines_between_satisfies():
+    """Corrected rule (Architecture §4, 2026-09-06): blank lines are scanned through and do
+    not break the contiguous block, and there is no fixed distance cutoff — a marker three
+    lines above, separated only by blank lines, is still recognized. The old
+    `PROXIMITY_WINDOW_THRESHOLD = 2` fixed window incorrectly missed this case."""
     lines = [
         "# THRESHOLD-PROVENANCE: DDR-0014",
         "",
         "",
         "FOO = 5",
     ]
-    assert probe.has_threshold_provenance_marker(lines, 3) is False
+    assert probe.has_threshold_provenance_marker(lines, 3) is True
 
 
-def test_threshold_marker_two_lines_below_with_citation_satisfies():
-    """Window-boundary gap: the existing exact-2/exact-3 tests only exercise the marker
-    positioned ABOVE the literal. The window is computed symmetrically (`match_line_idx -
-    PROXIMITY_WINDOW_THRESHOLD` .. `match_line_idx + PROXIMITY_WINDOW_THRESHOLD`) — confirm
-    the below direction independently rather than assuming symmetry from the above-only
-    tests."""
+def test_threshold_marker_two_lines_below_with_citation_does_not_satisfy():
+    """Corrected rule (Architecture §4, 2026-09-06): there is no "below" direction —
+    `_preceding_comment`, the only committed measurement this rule cites, never scans
+    downward. A marker appearing only below the flagged literal does not satisfy the
+    check, unlike the old (wrong) symmetric ±2-line window."""
     lines = [
         "FOO = 5",
         "",
         "# THRESHOLD-PROVENANCE: DDR-0014",
     ]
-    assert probe.has_threshold_provenance_marker(lines, 0) is True
+    assert probe.has_threshold_provenance_marker(lines, 0) is False
 
 
 def test_threshold_marker_three_lines_below_does_not_satisfy():
@@ -867,11 +870,14 @@ def test_domain_boundary_marker_or_bare_provisional_does_not_satisfy_threshold_c
     assert probe.has_threshold_provenance_marker(lines2, 1) is False
 
 
-def test_incumbent_proximity_window_constant_flagged_on_self_scan():
+def test_incumbent_proximity_window_constant_cited_on_self_scan():
     """PROXIMITY_WINDOW = 5 (the incumbent's own existing assignment, unmodified and
-    uncommented by this sprint) IS flagged by the local-threshold pass when this probe
-    file is scanned, with `unmarked` populated and `context: "assign_module_or_class"` —
-    self-scan regression confirming restored assignment-detection behavior."""
+    uncommented by this sprint) is NOT flagged (i.e. IS recognized as cited) by the
+    local-threshold pass when this probe file is scanned. Its `THRESHOLD-PROVENANCE:`
+    citation comment sits in the contiguous comment block directly above it (Architecture
+    §4/§8 self-scan resolution, 2026-09-06) — this is now correctly recognized under the
+    same-line-or-contiguous-block-above rule, unlike the deleted fixed ±2-line window,
+    which missed it (marker 5 lines above the constant, outside a ±2 box)."""
     probe_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "scripts",
@@ -888,29 +894,40 @@ def test_incumbent_proximity_window_constant_flagged_on_self_scan():
         and "PROXIMITY_WINDOW" in lines[f["line_index"]]
         and "PROXIMITY_WINDOW_THRESHOLD" not in lines[f["line_index"]]
     )
-    assert probe.has_threshold_provenance_marker(lines, incumbent_flag["line_index"]) is False
+    assert probe.has_threshold_provenance_marker(lines, incumbent_flag["line_index"]) is True
 
 
-def test_new_threshold_window_constant_not_flagged_as_unmarked_on_self_scan():
-    """PROXIMITY_WINDOW_THRESHOLD = 2 (this slice's own new constant) is NOT flagged as
-    unmarked — its accompanying THRESHOLD-PROVENANCE: citation comment satisfies the check
-    within the 2-line window."""
-    probe_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "scripts",
-        "domain_boundary_provenance_probe.py",
-    )
-    with open(probe_path, "r") as fh:
-        source = fh.read()
-    lines = source.split("\n")
-    flags = probe.detect_threshold_literals(probe_path, source)
-    new_flag = next(
-        f
-        for f in flags
-        if f["context"] == "assign_module_or_class" and f["literal_repr"] == "2"
-        and "PROXIMITY_WINDOW_THRESHOLD" in lines[f["line_index"]]
-    )
-    assert probe.has_threshold_provenance_marker(lines, new_flag["line_index"]) is True
+def test_threshold_marker_neighbor_citation_does_not_bless_uncited_constant():
+    """(a) Neighbor-citation adversarial payload (Frank binding forge-gate, 2026-09-06) —
+    must FLAG. `A = 10` has no comment above it; `B = 20` two lines below carries a
+    `THRESHOLD-PROVENANCE:` citation on the line immediately above it. `A` must NOT be
+    recognized as cited: `B`'s citation is not in the contiguous block immediately above
+    `A`'s own line — it sits below `A`, separated by `A`'s own assignment line, which
+    terminates any upward scan. The old ±2-line window incorrectly blessed `A` here."""
+    lines = [
+        "A = 10",
+        "",
+        "# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5",
+        "B = 20",
+    ]
+    assert probe.has_threshold_provenance_marker(lines, 0) is False
+    assert probe.has_threshold_provenance_marker(lines, 3) is True
+
+
+def test_threshold_marker_one_block_three_line_citation_satisfies():
+    """(b) One-block, three-line citation adversarial payload (Frank binding forge-gate,
+    2026-09-06) — must be CITED. A marker line, followed immediately (no blank line) by two
+    more plain comment lines, followed immediately by the constant assignment — one
+    unbroken comment-then-code run. Recognized as cited even though the marker is 3 lines
+    above the constant, because the scan walks the entire contiguous comment block with no
+    length limit. The old ±2-line window flagged this as uncited."""
+    lines = [
+        "# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5",
+        "# additional context line one",
+        "# additional context line two",
+        "FOO = 5",
+    ]
+    assert probe.has_threshold_provenance_marker(lines, 3) is True
 
 
 # ---------------------------------------------------------------------------

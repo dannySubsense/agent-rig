@@ -146,6 +146,11 @@ PYEOF
 # open by an invalid PROVISIONAL-owner tag.
 # Scope limit, honestly: one host, one repo, sequential runs. This bounds the value; it is not
 # a cross-host distribution. Re-run the script above if the probe gains disk or network I/O.
+# On re-runs: this 3s is a ceiling based on the ORIGINAL committed measurement run above, not
+# on whichever run happened most recently. Re-running the script writes a new timestamped file
+# and leaves the committed results-wrapper-timeout.md untouched; if a re-run recommends a lower
+# value, that does NOT by itself lower this 3s — changing it requires a deliberate, separate
+# decision to re-cite (updating this comment and the committed results file together).
 PROBE_EXIT=0
 timeout 3 "$REPO_DIR/scripts/domain_boundary_provenance_probe.py" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
 

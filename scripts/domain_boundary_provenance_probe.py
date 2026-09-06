@@ -63,21 +63,6 @@ PROXIMITY_WINDOW = 5
 THRESHOLD_MARKER = "THRESHOLD-PROVENANCE:"
 _THRESHOLD_MARKER_RE = re.compile(re.escape(THRESHOLD_MARKER) + r"\s*(\S.*)?$")
 
-# What was actually measured (results.md §5-§6): of assignment candidates with "any
-# preceding comment" within 12 lines, 93.5% land at distance 1 and 100.0% at distance 2,
-# 0 additional at distance 3-12. This is a PRECEDING-direction-only measurement, and "any
-# preceding comment" is an unlabeled proxy for a real citation — no hand-labeled sample
-# confirms these are actually citations (results.md §6 admits this: "no hand-labeled
-# sample was drawn"). The preceding-direction half of this claim is genuinely measured and
-# sound (100% coverage by distance 2). The BELOW-direction half of the window this
-# constant drives (`has_threshold_provenance_marker` checks match_line_idx +/- this value,
-# symmetric) has NO measurement behind it at all — accepted as a known limitation, not a
-# blocking defect, since log_only mode absorbs any resulting under/over-flagging. New,
-# second window constant distinct from the incumbent's `DOMAIN-BOUNDARY:` check above (see
-# Architecture §4 for why the two passes use independently-justified windows/rules).
-# THRESHOLD-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results.md §5-§6
-PROXIMITY_WINDOW_THRESHOLD = 2
-
 # §4 — citation form: file-path-shaped token, URL, or DDR-NNNN reference. This is the only
 # acceptance form — no named-owner alternative exists (Danny's ruling: no owner-name
 # acceptance path of any kind, for any constant, ever; see Architecture §4).
@@ -278,28 +263,58 @@ def _threshold_marker_satisfies(trailing_content):
     return bool(_THRESHOLD_CITATION_RE.search(trailing_content))
 
 
+def _threshold_marker_on_line(line: str) -> bool:
+    """True if `line` carries a qualifying `THRESHOLD-PROVENANCE:` marker (citation-form
+    content, per `_threshold_marker_satisfies`)."""
+    m = _THRESHOLD_MARKER_RE.search(line)
+    if not m or not m.group(1) or not m.group(1).strip():
+        return False
+    return _threshold_marker_satisfies(m.group(1))
+
+
 def has_threshold_provenance_marker(lines: list[str], match_line_idx: int) -> bool:
-    """Uses `PROXIMITY_WINDOW_THRESHOLD = 2` (this file, above), checked against
-    `THRESHOLD-PROVENANCE:` — a distinct constant and a distinct marker string from the
-    incumbent's `has_qualifying_marker_in_window` (which uses `PROXIMITY_WINDOW = 5`
-    against `DOMAIN-BOUNDARY:`). This function does not read or depend on the incumbent's
+    """Same-line-or-contiguous-block-above rule (Architecture §4, corrected 2026-09-06 —
+    replaces the deleted `PROXIMITY_WINDOW_THRESHOLD` fixed symmetric ±2-line window).
+    Distinct marker string and a distinct scan rule from the incumbent's
+    `has_qualifying_marker_in_window` (same-line-only against `DOMAIN-BOUNDARY:`, no block
+    scan at all). This function does not read or depend on the incumbent's
     `PROXIMITY_WINDOW`.
 
-    Per Architecture §4's G-2 resolution: marker presence alone is NOT sufficient. Returns
-    True only if a `THRESHOLD-PROVENANCE:` line exists in-window AND its trailing content
-    matches the citation pattern (path/URL/DDR-NNNN). A bare `THRESHOLD-PROVENANCE:
-    PROVISIONAL` or `...: TODO` with no citation returns False (treated as absent, per
-    01-REQUIREMENTS.md's Edge Case row). The named-owner acceptance form (b) that
-    previously existed here has been removed entirely, per Danny's ruling that no
-    owner-name acceptance path is valid, for any constant, ever — see Architecture §4."""
-    start = max(0, match_line_idx - PROXIMITY_WINDOW_THRESHOLD)
-    end = min(len(lines) - 1, match_line_idx + PROXIMITY_WINDOW_THRESHOLD)
-    for idx in range(start, end + 1):
-        m = _THRESHOLD_MARKER_RE.search(lines[idx])
-        if not m or not m.group(1) or not m.group(1).strip():
+    Recognizes a citation for the flagged literal at `match_line_idx` if and only if a
+    qualifying `THRESHOLD-PROVENANCE:` marker is found in either of:
+      1. The same line as the flagged literal (a trailing same-line comment).
+      2. The contiguous comment block immediately above the literal's line: scanning
+         upward from `match_line_idx - 1`, a blank line is scanned through (continues the
+         block), a comment line (`#...`) is part of the block and is checked for the
+         marker, and the first line that is neither blank nor a comment terminates the
+         scan. No maximum block length and no fixed distance cutoff — this matches
+         `scan_thresholds.py`'s `_preceding_comment`
+         (docs/research/domain-boundary-hook-benchmark/scan_thresholds.py:210-225) exactly,
+         not approximately. There is no "below" direction — a marker appearing only below
+         the flagged literal does not satisfy the check.
+
+    Per Architecture §4's G-2 resolution: marker presence alone is NOT sufficient — a
+    found `THRESHOLD-PROVENANCE:` line must also carry citation-form content (checked by
+    `_threshold_marker_on_line`). A bare `THRESHOLD-PROVENANCE: PROVISIONAL` or `...: TODO`
+    with no citation is treated as absent, per 01-REQUIREMENTS.md's Edge Case row. No
+    named-owner acceptance path exists, per Danny's ruling that no owner-name acceptance
+    path is valid, for any constant, ever — see Architecture §4."""
+    if match_line_idx < 0 or match_line_idx >= len(lines):
+        return False
+    if _threshold_marker_on_line(lines[match_line_idx]):
+        return True
+    idx = match_line_idx - 1
+    while idx >= 0:
+        stripped = lines[idx].strip()
+        if stripped == "":
+            idx -= 1
             continue
-        if _threshold_marker_satisfies(m.group(1)):
-            return True
+        if stripped.startswith("#"):
+            if _threshold_marker_on_line(lines[idx]):
+                return True
+            idx -= 1
+            continue
+        break
     return False
 
 
@@ -780,10 +795,10 @@ def build_local_threshold_deny_reason(file_path, unmarked_matches):
     )
     return (
         f"Threshold-provenance violation in {file_path}: {lines_desc} — no qualifying "
-        f"`THRESHOLD-PROVENANCE:` marker with a citation within "
-        f"{PROXIMITY_WINDOW_THRESHOLD} lines. Add a `THRESHOLD-PROVENANCE: <file path, URL, "
-        f"or DDR-NNNN citation>` comment within {PROXIMITY_WINDOW_THRESHOLD} lines of the "
-        f"flagged literal."
+        f"`THRESHOLD-PROVENANCE:` marker with a citation on the flagged literal's own line "
+        f"or in the contiguous comment block immediately above it. Add a "
+        f"`THRESHOLD-PROVENANCE: <file path, URL, or DDR-NNNN citation>` comment on that "
+        f"line or directly above the flagged literal."
     )
 
 
