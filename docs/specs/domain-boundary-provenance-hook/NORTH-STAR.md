@@ -6,8 +6,8 @@
 Extend the existing, Frank-forge-gate-PASSED `domain-boundary-provenance` PreToolUse hook
 (`.claude/hooks/domain-boundary-provenance.sh` + `scripts/domain_boundary_provenance_probe.py`)
 with a new same-file/local detection pass that mechanically flags any numeric or boolean literal
-used as a threshold, cap, limit, cutoff, retry count, or budget that lacks a citation, a
-named-owner PROVISIONAL tag, or removal at its point of definition — regardless of whether the
+used as a threshold, cap, limit, cutoff, retry count, or budget that lacks a citation or removal
+at its point of definition — regardless of whether the
 value crossed a domain boundary between pipelines. The incumbent's manifest-gated cross-domain
 check stays untouched; this is an extension, not a replacement. Traces to Intake's amended
 Problem Statement (`INTAKE.md`, 2026-09-05 amendment): PROMOTED DEFAULT does not require a

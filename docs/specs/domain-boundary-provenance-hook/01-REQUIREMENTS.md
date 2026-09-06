@@ -213,11 +213,12 @@ same-file/local-threshold detection pass is new work.
 - Must not: expand this sprint's scope to include retrofit work into other repos.
 - Must not: create a new/second hook registration or process for the local-threshold check — it
   composes into the incumbent's single `PreToolUse` invocation (`02-ARCHITECTURE.md` §3).
-- Assumes: the existing PROVISIONAL-tag convention (this repo's Decision Discipline) is reusable
-  as part of the citation format — `02-ARCHITECTURE.md` §4 resolves this by introducing a new
-  `THRESHOLD-PROVENANCE:` marker (distinct from the incumbent's `DOMAIN-BOUNDARY:` and from bare
-  `PROVISIONAL`) that recognizes a named-owner PROVISIONAL tag as one of its satisfying forms; this
-  is an architecture-level finding, not a requirements gap.
+- Assumes: `02-ARCHITECTURE.md` §4 introduces a new `THRESHOLD-PROVENANCE:` marker (distinct from
+  the incumbent's `DOMAIN-BOUNDARY:` and from bare `PROVISIONAL`) that requires a real citation
+  only — no named-owner acceptance form exists (Danny's ruling, 2026-09-06: a named-owner
+  PROVISIONAL tag is not a valid disposition for any constant, ever; it is a pass on an unsourced
+  number, not a source). This supersedes the earlier assumption that the existing PROVISIONAL-tag
+  convention's owner form would be reusable here.
 - Assumes: the new local-threshold pass's citation-proximity window is
   `PROXIMITY_WINDOW_THRESHOLD = 2` lines (inclusive, above or below the flagged literal) — a new,
   distinct constant from the incumbent's unrelated `PROXIMITY_WINDOW = 5`, cited to
