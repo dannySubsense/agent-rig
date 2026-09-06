@@ -675,11 +675,6 @@ the `{0, 1, -1, 2}` literal-value exclusion was removed, 2026-09-05 (Danny's dec
 - Any rewrite, retirement, or redesign of the incumbent's manifest-gated cross-domain check itself
   (schema, trigger, scan surface, `DOMAIN-BOUNDARY:` marker, decision logic) — untouched by this
   sprint per Architecture §1/§11.
-- Adding a `THRESHOLD-PROVENANCE:` citation comment to the incumbent's own `PROXIMITY_WINDOW = 5`
-  constant (Slice 9's self-scan finding) — that constant sits in `.claude/hooks/domain-boundary-
-  provenance.sh`'s already-LOCKED/Frank-forge-gate-PASSED sibling file territory and is out of this
-  sprint's file-touch scope per Architecture §1/§11; it is reported to Danny for a separate routing
-  decision, not silently fixed as part of this roadmap.
 
 ---
 

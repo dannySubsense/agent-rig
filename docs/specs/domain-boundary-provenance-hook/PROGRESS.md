@@ -79,9 +79,13 @@ Orchestrator independent re-derivation: AGREES — confirmed via direct file dif
 
 **Open, unresolved as of this migration:** (1) F1 — **RESOLVED 2026-09-05**: `{0,1,-1,2}` exclusion set deleted entirely from `02-ARCHITECTURE.md`/`01-REQUIREMENTS.md`/`04-ROADMAP.md` (Danny's decision — ship unfiltered under `log_only`); §0.1's invented fourth rule-1 disposition also deleted. (2) F2 — **RESOLVED 2026-09-05**: `scan_thresholds.py`'s regex fallback pattern fixed to match floats (and its value-parsing branch fixed to not silently drop a matched float); whole-corpus re-run confirmed `results.md`/`candidates.jsonl` unchanged (regex fallback never fires on a whole file in this corpus), and a direct function-level test confirms the fixed pattern now matches a float fragment the old pattern missed. (3) The counter/authorization question F4 raises — **RESOLVED 2026-09-05**: see "Cycle authorization note" above — Danny explicitly authorized closing Cycle 1 and starting Cycle 2 for the redesigned detection rule, this session.
 
-### Cycle 2 (post-redesign, starting now)
+### Cycle 2 (post-redesign)
 
-Counter: 0/3 (Cycle 2)
+Counter: 1/3 (Cycle 2)
+
+| Attempt | Date | Verdict | Findings Summary | Snapshot |
+|---|---|---|---|---|
+| 1 | 2026-09-05 | PASS | Layer 1 PASS, Layer 2 PASS (non-PROVISIONAL). Frank, SHA `5362942`. 3 carried conditions, all confirmed landed against live file content (2026-09-05/06): (1) DDR-006/DDR-INDEX gate-attempt-count wording conflating spec-gate 3/3 with forge-gate attempt count — landed, confirmed by commit history fixing this same session as the PASS; (2) `04-ROADMAP.md`'s "HALT Check" section's stale "not silently patched" paragraph contradicting Architecture §12's "Applied" status — landed, current "HALT Check" section reads clean with no such paragraph; (3) `02-ARCHITECTURE.md` §11's LOCKED-doc bullet missing the mode-gated-deny clause — landed, current §11 explicitly states the `log_only`-vs-`blocking` deny semantics for the LOCKED doc's §6 step 6/AC4 text. | none taken |
 
 ## Forge Gate
 
