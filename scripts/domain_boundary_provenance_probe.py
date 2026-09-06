@@ -242,7 +242,7 @@ def find_identifier_matches(scan_surface, identifiers):
 
 
 def has_qualifying_marker_in_window(lines, match_line_idx):
-    """§5/§6 step 6 — search the PROVISIONAL 5-line window (inclusive, above and below)
+    """§5/§6 step 6 — search the 5-line window (inclusive, above and below)
     around `match_line_idx`, within `lines` (the scan surface's own lines), for a
     `DOMAIN-BOUNDARY:` marker line with non-empty trailing content."""
     start = max(0, match_line_idx - PROXIMITY_WINDOW)

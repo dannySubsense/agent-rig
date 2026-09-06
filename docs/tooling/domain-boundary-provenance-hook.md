@@ -509,8 +509,16 @@ spec-gate and human approval before any status change from DRAFT.*
 
 ## Addendum (2026-09-05): Composed with a Local-Threshold Pass, Mode-Gated
 
-**Everything above this line (§2–§10) is unchanged from the LOCKED 2026-08-22 version — no edit was
-made to that text.** This addendum records what a later sprint (`domain-boundary-provenance-hook`
+**§2–§4, §7, §9–§10 are unchanged from the LOCKED 2026-08-22 version — no edit was made to that
+text. §5, §6, §8, and §12 were edited by this sprint, but only to correct citations, not to change
+the incumbent's detection logic:** the invalid `PROVISIONAL — owner: wright` tags on §5's 5-line
+proximity window and §6's 5s timeout were replaced with real citations
+(`docs/research/domain-boundary-hook-benchmark/results.md` §5 and
+`results-wrapper-timeout.md` respectively, the latter also revising the timeout value itself from
+5s to a measured 3s), §8's AC9 was reworded to match, and §12's "Open Items" entries were marked
+closed. The cross-domain detection functions themselves — proximity search, timeout wiring, deny
+behavior — are byte-identical to the LOCKED version; only the surrounding citation prose changed.
+This addendum records what a later sprint (`domain-boundary-provenance-hook`
 extension, `docs/specs/domain-boundary-provenance-hook/`) built on top of it. For the full design,
 read `02-ARCHITECTURE.md` §3, §5, §6, and §11 in that sprint's folder — this addendum summarizes and
 points outward rather than restating that document.
@@ -519,8 +527,9 @@ points outward rather than restating that document.
 provenance.sh`, `scripts/domain_boundary_provenance_probe.py`) are no longer single-purpose. A
 second, independent detection pass now runs inside the same invocation: a same-file scan for
 threshold-shaped numeric/boolean literals (comparison operands, slice/truncation bounds, and
-module- or class-level named assignments) that lack a `THRESHOLD-PROVENANCE:` citation comment
-within a 2-line window. This pass carries no manifest and is not gated by one — it runs against any
+module- or class-level named assignments) that lack a `THRESHOLD-PROVENANCE:` citation comment on
+the same line or in the contiguous comment block immediately above it. This pass carries no
+manifest and is not gated by one — it runs against any
 in-scope `.py` file's proposed content, unconditionally. The two passes' results are combined into a
 single decision per invocation (`02-ARCHITECTURE.md` §3).
 
