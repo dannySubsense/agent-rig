@@ -115,3 +115,5 @@ recalled after the fact when challenged. Repetition of the rule doesn't fix this
   check has a citation format actually discoverable by an un-onboarded author.
 - Whether CLAUDE.md needs restructuring so doctrines stay short with pointers to separate incident
   docs, matching its own original Research Data Integrity precedent.
+
+Several of these findings became tracked decision-record items in `docs/specs/agent-rig-ddrs/00-DDR-INDEX.md`'s "Governance Doc Audit" backlog entry — see that entry for the audit/hook-disposition follow-up action items.
