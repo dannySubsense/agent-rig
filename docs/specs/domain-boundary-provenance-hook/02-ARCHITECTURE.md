@@ -40,14 +40,16 @@ false-positive/false-negative evidence, and one section (§7's original marker-c
 contained a genuine self-refuting bug (a 5-line comment block prescribed to satisfy a 3-line
 detection window). That revision applied every finding available at the time. Per this repo's
 binding rule (`~/.claude/CLAUDE.md` rule 1), no constant in this document rests on a self-assigned
-or unassigned `owner:` tag — each one carries exactly one of the three dispositions that rule
-actually names: (a) a citable, reproducible source; (b) an explicit `PROVISIONAL — unvalidated`
-marker with a named human owner; or (c) deletion. **Correction, 2026-09-05 (cold Frank spec-gate
-attempt 4, F1): an earlier revision of this section stated a fourth disposition — "a fully-stated
-executable benchmarking plan with an explicit 'not yet validated' disposition" — as if it were a
-fourth valid option alongside the three above.** It is not; rule 1 names exactly three dispositions
-and an unexecuted plan is not one of them ("a design doc saying a value 'must be calibrated before
-deployment' is not a source if the calibration never ran"). That invented fourth option is deleted
+or unassigned `owner:` tag — each one carries exactly one of the two dispositions that rule
+actually names: (a) a citable, reproducible source; or (b) deletion. A named-human-owner
+`PROVISIONAL` marker is never a valid disposition (Danny, 2026-09-06, superseding the prior
+named-human-owner option this rule used to carry). **Correction, 2026-09-05
+(cold Frank spec-gate attempt 4, F1): an earlier revision of this section stated a further
+disposition — "a fully-stated executable benchmarking plan with an explicit 'not yet validated'
+disposition" — as if it were a valid option alongside the two above.** It is not; rule 1 names
+exactly two dispositions and an unexecuted plan is not one of them ("a design doc saying a value
+'must be calibrated before deployment' is not a source if the calibration never ran"). That
+invented option is deleted
 from this document, not merely reworded. Its only load-bearing use was to justify carrying the
 `{0, 1, -1, 2}` literal-value exclusion set forward unvalidated (§2) — see §2 for the disposition
 that replaces it: deletion, per Danny's 2026-09-05 decision.
@@ -312,9 +314,8 @@ on an option the binding rule does not offer:
 exactly this argument elsewhere in this same section for keeping contexts 1–2 broad ("`log_only`
 mode... makes the extra volume a logging cost, not a blocking cost") — applied here too, to the
 exclusion itself rather than to a context. Per `~/.claude/CLAUDE.md` rule 1, an unsourced constant
-gets a citation, a named-human-owner `PROVISIONAL` marker, or deletion — there is no fourth option,
-and no named human has stepped forward to own a `PROVISIONAL — unvalidated` tag on this value.
-Deletion removes the need for either.
+gets a citation or deletion — there is no other option, and a named-human-owner `PROVISIONAL`
+marker is never a valid disposition. Deletion removes the need for a citation.
 
 **Effective this revision: all threshold-shaped literals are flagged unfiltered, including the
 small idiomatic values `0`, `1`, `-1`, and `2`.** There is no literal-value exclusion anywhere in
@@ -330,8 +331,9 @@ per-finding judgment call is exactly what `log_only` exists to defer to a human,
 architecture document needs to pre-decide by carrying an unowned constant.
 
 This is not a Roadmap-tracked open item — there is nothing left to benchmark or own. If a future
-pass wants to reintroduce a literal-value exclusion, it needs its own citation or named-owner
-`PROVISIONAL` tag at that time, per the same rule this correction applies now.
+pass wants to reintroduce a literal-value exclusion, it needs its own real citation at that time —
+no named-owner `PROVISIONAL` tag is a valid substitute, per the same rule this correction applies
+now.
 
 **AST-based, Python-only; regex fallback only for context 3** — contexts 1-2 have no regex
 fallback by design (see the robustness table above), same posture as the prior pass: syntactic
@@ -439,11 +441,12 @@ slice for the corrected instruction — it no longer forbids saying what changed
 **Rationale, following the incumbent's own §5 reasoning pattern (not re-litigating it, applying
 it to a third case):**
 - **Not `PROVISIONAL` alone** — same objection the incumbent's §5 already establishes: a bare
-  `PROVISIONAL — [disposition]` tag asserts "not yet validated," which is one of the amendment's
-  three satisfying conditions (option b) but not the only one. A citation to a reproducible source
-  (option a) is a different, stronger claim than PROVISIONAL and needs a marker that doesn't
-  presuppose "unvalidated." Reusing bare `PROVISIONAL` as the universal marker would make option
-  (a)'s citations indistinguishable from option (b)'s admissions in a mechanical text-presence
+  `PROVISIONAL — [disposition]` tag asserts "not yet validated," which is never a satisfying
+  condition under this rule (a named-human-owner `PROVISIONAL` marker is never a valid
+  disposition, per `~/.claude/CLAUDE.md` rule 1). A citation to a reproducible source (option a)
+  is a different, stronger claim than PROVISIONAL and needs a marker that doesn't presuppose
+  "unvalidated." Reusing bare `PROVISIONAL` as the universal marker would make option (a)'s
+  citations indistinguishable from a bare unvalidated admission in a mechanical text-presence
   scan, which is exactly the ambiguity DDR-0014's own citation-format open question (Interview,
   01-REQUIREMENTS Constraints) flagged as not yet confirmed sufficient.
 - **Not `DOMAIN-BOUNDARY:`** — per the incumbent's own §5, that marker's semantic is specifically
@@ -452,10 +455,10 @@ it to a third case):**
   under that marker would make `DOMAIN-BOUNDARY:` comments appear on code that domain-boundary
   review has no reason to look at, diluting the marker's own signal value for its original
   purpose (cross-repo/cross-module retrofit triage, per DDR-0014's retrofit section).
-- **`THRESHOLD-PROVENANCE:` accepts any of the three amendment-satisfying forms on one marker
-  line**: a citation (option a), an explicit PROVISIONAL disposition naming what would validate it
-  (option b), or is simply absent because the literal was removed (option c, which trivially
-  satisfies the check by there being no literal left to flag).
+- **`THRESHOLD-PROVENANCE:` accepts either of the two amendment-satisfying forms on one marker
+  line**: a citation (option a), or is simply absent because the literal was removed (option b,
+  which trivially satisfies the check by there being no literal left to flag). No PROVISIONAL
+  disposition, named-owner or otherwise, satisfies the check.
 
 **Proximity window: 2 lines — REVISED this pass, replacing the previously-shipped reuse of the
 incumbent's 5-line `PROXIMITY_WINDOW`.**
@@ -499,10 +502,10 @@ lines (new, cited to `results.md` §5).
 **v1 citation rule for the new check — RESOLVED this revision (G-2, `05-REVIEW.md`, CRITICAL).**
 Prior wording checked marker-presence-plus-non-whitespace-content only, which `#
 THRESHOLD-PROVENANCE: TODO` would satisfy — a direct contradiction of `01-REQUIREMENTS.md` AC2 and
-its Edge Case row ("a PROVISIONAL tag that does not name a human owner → treated as absent,
-flagged"), and of Danny's 2026-09-05 ruling that self-assigned or unassigned ownership is invalid.
-**Requirements is correct; this section was wrong. Fixed here, not the other way around** — bare
-presence never satisfies the check.
+its Edge Case row ("A PROVISIONAL tag exists, named-owner or not | Treated as absent" —
+`01-REQUIREMENTS.md:159`), and of Danny's 2026-09-06 ruling that any PROVISIONAL tag, named-owner
+or not, is invalid. **Requirements is correct; this section was wrong. Fixed here, not the other
+way around** — bare presence never satisfies the check.
 
 A `THRESHOLD-PROVENANCE:` line satisfies the check if and only if **all** of the following hold:
 
@@ -624,9 +627,18 @@ the prior, superseded audit that were **not reproducible**, and records Frank's 
 **377ms**. Carrying 76ms forward as "measured, reproducible" in this section directly contradicted
 the one committed artifact that names it. That pair is deleted, not softened.
 
-**Corrected disposition: use Frank's re-run figure (377ms, logged in `PROGRESS.md` -> Spec Gate -> Cycle 1 -> attempt 3) as
-the only currently-committed, reproducible timing data point for this class of `ast.parse` cost.**
-This is still more than **13x below the 5,000ms budget** (377ms is 7.5% of the budget) — the
+**CLOSED, 2026-09-06 — the timeout is now measured for this exact wrapper+probe pair.**
+`docs/research/domain-boundary-hook-benchmark/bench_wrapper_timeout.py` runs the full wrapper
+(stdin capture -> mode resolve -> probe under `timeout` -> output validation) N=50 times against a
+`Write` payload carrying the largest `.py` in this repo (`tests/test_domain_boundary_provenance_probe.py`,
+67,847 bytes) as `tool_input.content` — the probe's actual scan surface, so `ast.parse` runs on the
+worst realistic input. Results committed to
+`docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md`: **p99 = 0.1068s**,
+stdev 0.0034s. Margin **20x** (host variance, not input variance — the cost is dominated by fixed
+interpreter-startup overhead) -> 2.14s, **rounded up to a 3s timeout**. The inherited 5s is
+superseded; it was never measured for this pair and was held open only by an invalid
+PROVISIONAL-owner tag. Scope limit: one host, sequential runs — this bounds the value, it is not a
+cross-host distribution.
 conclusion (timeout is adequate) is unchanged and does not depend on the discredited 8ms/76ms pair.
 No new number is invented in its place: `results.md` itself carries no independent `ast.parse`
 timing measurement of its own (its docstring only reports the two prior-audit figures and states
@@ -931,7 +943,7 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
    finding). Slice 3's three-context description, Slice 4's independent `PROXIMITY_WINDOW_THRESHOLD`
    constant, Slice 9's self-scan-**IS**-flagged fixture direction, and the removed `range()`
    exclusion are all present and consistent in `04-ROADMAP.md` as read this pass. Only this pass's
-   *new* Roadmap fixes (G-2's owner-required marker rule in Slices 4/9, and the vocabulary-figure
+   *new* Roadmap fixes (G-2's citation-required marker rule in Slices 4/9, and the vocabulary-figure
    deletion in Slice 3) are additional corrections applied directly in `04-ROADMAP.md` alongside
    this document, per the task's own corresponding-fix instruction — see that file.
 
@@ -960,8 +972,8 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   regex-fallback gap (float literals not matched) that was fixed in §2.1 above but not itself
   re-benchmarked — see that fix's note on why it is believed safe without a rerun.
 - **G-2 (`05-REVIEW.md`, CRITICAL) — owner-required contradiction — RESOLVED this pass.** §4's v1
-  citation rule now requires either a checkable citation (path/URL/DDR reference) or a named human
-  owner (`owner: <name>`, name not a placeholder token) — bare marker presence no longer satisfies
+  citation rule now requires a checkable citation (path/URL/DDR reference) only — a named human
+  owner (`owner: <name>`) is never a valid disposition, and bare marker presence does not satisfy
   the check. `01-REQUIREMENTS.md` already stated this correctly and needed no change; Architecture
   §4 and `04-ROADMAP.md` Slices 4 and 9 are corrected to match. Not carried forward as open.
 - **§2's `range()` exclusion** — REMOVED this pass, cited to `results.md` §3 (fires zero times,
@@ -970,8 +982,8 @@ No new third-party dependency. Consistent with the incumbent's own zero-third-pa
   (`PROXIMITY_WINDOW_THRESHOLD = 2`), cited to `results.md` §5's measured 93.5%-at-1/100%-at-2
   distribution. This supersedes both this document's own prior 5-line (reused-incumbent) value and
   the discarded pre-benchmark 3-line value. Not carried forward as open.
-- **§5.1's 5s timeout — G-3 (`05-REVIEW.md`, HIGH) resolved for the discredited-number problem,
-  re-measurement still open.** The prior ~8ms/~76ms pair (contradicted by `scan_thresholds.py`'s
+- **§5.1's timeout — CLOSED (re-measured 2026-09-06; now 3s, cited to
+  `docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md`).** The prior ~8ms/~76ms pair (contradicted by `scan_thresholds.py`'s
   own docstring, which names 76ms as unreproducible) is deleted. Disposition now cites Frank's
   377ms cold re-run (`PROGRESS.md` -> Spec Gate -> Cycle 1 -> attempt 3) — still 13x under the 5,000ms budget, so the
   timeout-adequacy conclusion is unchanged — but this section still needs its own fresh, committed
@@ -1005,8 +1017,8 @@ direct Python import (not through the wrapper's subprocess) against a realistic 
 1.12ms. This is the only runtime figure in this document set — no "60ms/140ms" probe-only/wrapper-total
 split exists anywhere in this doc set or `results.md`; that citation in a prior revision of this
 section was itself a fabrication and is removed. This measures probe-only cost. Result is >2500x
-under the 5s timeout budget (§5.1): massive headroom confirmed, no re-measurement urgency for the
-timeout-adequacy conclusion.
+under the (then-5s, now measured-and-reduced-to-3s) timeout budget (§5.1): massive headroom
+confirmed, consistent with §5.1's committed p99 of 0.1068s for the full wrapper.
 
 **2. Correction to Slice 10's assumption.** Slice 10's QC review assumed a fresh Claude Code
 session restart was required for `.claude/settings.json`'s newly-added `PreToolUse` entry to take

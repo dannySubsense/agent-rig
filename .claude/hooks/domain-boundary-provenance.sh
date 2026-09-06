@@ -134,18 +134,20 @@ except Exception:
 PYEOF
 }
 
-# NOT YET BENCHMARKED for this specific wrapper+probe combination. 5s budget carried over
-# from first-turn-contract.sh's own measured-and-cited 5s bound (a different wrapper/probe
-# pair) as a starting value only — no committed, re-runnable measurement exists for this
-# hook. An uncommitted 2026-08-21 measurement and a PROVISIONAL-owner tag previously stood
-# in for a real citation here; both are invalid (no owner-name acceptance path is valid for
-# any constant, ever). Concrete plan to close this: run this wrapper (not the probe alone)
-# N>=30 times against the largest .py file in this repo, each run through the full
-# stdin-capture/timeout/validate path exercised above, measure wall-clock per run, and cite
-# p99 x a safety margin (e.g. 3x) as the timeout value, committed to a script under
-# docs/research/domain-boundary-hook-benchmark/ so the measurement is re-runnable.
+# TIMEOUT-PROVENANCE: docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md
+# Measured, not inherited. N=50 full-wrapper runs (this exact stdin-capture/timeout/validate
+# path) driven by a Write payload carrying the largest .py in this repo
+# (tests/test_domain_boundary_provenance_probe.py, 67,847 bytes) as tool_input.content, which
+# is the probe's actual scan surface (§6 step 4 / probe get_scan_surface). Measured p99 =
+# 0.1068s; margin 20x -> 2.14s, rounded up to 3s. Margin covers HOST variance (interpreter
+# startup / cold cache on a contended VM), not input variance, since the cost is dominated by
+# fixed overhead and run-to-run stdev was 0.0034s. Supersedes the prior 5s, which was carried
+# over unmeasured from first-turn-contract.sh's different wrapper/probe pair and then held
+# open by an invalid PROVISIONAL-owner tag.
+# Scope limit, honestly: one host, one repo, sequential runs. This bounds the value; it is not
+# a cross-host distribution. Re-run the script above if the probe gains disk or network I/O.
 PROBE_EXIT=0
-timeout 5 "$REPO_DIR/scripts/domain_boundary_provenance_probe.py" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
+timeout 3 "$REPO_DIR/scripts/domain_boundary_provenance_probe.py" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
 
 OUT="$(cat "$STDOUT_FILE")"
 
@@ -154,7 +156,7 @@ OUT="$(cat "$STDOUT_FILE")"
 # decision value other than "block", "block" with no reason, non-zero probe exit, timeout — is
 # probe failure -> fail open (emit nothing, exit 0). Spec §6/§9.
 if [ "$PROBE_EXIT" -eq 124 ] || [ "$PROBE_EXIT" -eq 137 ]; then
-  write_probe_error "timeout: probe killed after 5s"
+  write_probe_error "timeout: probe killed after 3s"
   exit 0
 fi
 

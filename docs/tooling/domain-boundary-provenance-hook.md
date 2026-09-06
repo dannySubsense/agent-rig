@@ -185,12 +185,12 @@ different semantic claims would blur exactly the distinction DDR-0014 exists to 
   daily_universe view; see DDR-0014 for why this repo now owns its own ceiling constant instead.`
 - The marker must appear within **5 lines** (inclusive, counted in the file content the hook is
   inspecting — i.e. `tool_input.content` for Write, or the post-edit `new_string` for Edit) above
-  or below the line containing the matched `externalSourceIdentifiers` entry. **PROVISIONAL —
-  owner: wright.** The 5-line proximity window has no external precedent; it is a first-pass value
-  chosen for this sprint's build, not a measured or cited number, and is expected to be recalibrated
-  against real false-positive/negative rates once a real manifest (e.g. `gap-lens-dilution-filter`'s,
-  at retrofit time) is in use. If proximity search proves too strict or too loose in practice, wright
-  owns revising this constant — it is not treated as settled by this document.
+  or below the line containing the matched `externalSourceIdentifiers` entry.
+  **THRESHOLD-PROVENANCE: `docs/research/domain-boundary-hook-benchmark/results.md` §5.**
+  §5 measures comment-to-assignment proximity generically (rule c/d, any name-bound
+  constant, not marker-specific): 100% of commented assignments land within 2 lines. The
+  5-line window is a superset of that measured range for the `DOMAIN-BOUNDARY:` marker
+  context.
 - Citation location is the same file as the match (not a separate docs file). Rationale: the whole
   failure mode DDR-0014 names is a value crossing a boundary *silently* — requiring the citation to
   live at the point of use maximizes the chance a future reader (human or agent) sees the rationale
@@ -289,9 +289,13 @@ different semantic claims would blur exactly the distinction DDR-0014 exists to 
 **Wrapper** (`domain-boundary-provenance.sh`): structurally identical to `first-turn-contract.sh`
 (§ references above) — capture stdin to a temp file, invoke the probe under a bounded timeout,
 validate stdout shape, `write_probe_error`-equivalent fallback on non-zero exit/timeout/malformed
-output, fail open (allow) on every failure path. **Timeout: 5s. PROVISIONAL — owner: wright**,
-reused as a starting value from `first-turn-contract.sh`'s own measured-and-cited 5s bound, but
-**not itself measured for this probe** (this probe does file I/O the sibling probe does not —
+output, fail open (allow) on every failure path. **Timeout: 3s**, measured for this
+wrapper+probe pair and cited to
+`docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md` (N=50 full-wrapper
+runs against the largest `.py` in this repo as a `Write` payload; p99 = 0.1068s, margin 20x ->
+2.14s, rounded up to 3s). Supersedes the prior unmeasured 5s, which was carried over from
+`first-turn-contract.sh`'s own measured-and-cited 5s bound but was
+**never itself measured for this probe** (this probe does file I/O the sibling probe does not —
 reading and schema-validating the target repo's manifest file (§4/§6 step 2) — even though, per
 §6 step 4, it never reads the on-disk Edit target itself; the sibling's 167ms/85ms measurements do
 not transfer). Forge must measure this probe's actual runtime against representative manifest
@@ -390,9 +394,11 @@ interface TrackRecordEntry {
    — only this pair exercises normalization itself rather than assuming it already happened.
 8. This sprint's deliverable does not modify any file outside `agent-rig` — verified by `git status`
    / diff scope at forge completion (Intake OQ-4 resolution, §2).
-9. No PROVISIONAL constant in this document (§5's 5-line window, §6's 5s timeout) ships without the
-   `PROVISIONAL — owner: wright` marker already present above; forge does not need to add markers
-   this document omitted, only to keep them as it revises the values if measurement warrants.
+9. No unsourced constant ships in this document. §6's timeout is now measured and cited to
+   `docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md` (3s, from a
+   measured p99 of 0.1068s x a 20x host-variance margin); the prior `PROVISIONAL — owner: wright`
+   tag on the inherited 5s value is withdrawn — a named-owner PROVISIONAL tag is not a valid
+   disposition for any constant, only a real citation or deletion is.
 
 ## 9. Integration Boundary — What This Tool Does NOT Get Authority Over
 
@@ -486,9 +492,12 @@ passes — this hook checks presence only, not correctness (§9).
 
 ## 12. Open Items Carried to Forge
 
-- **§5's 5-line proximity window and §6's 5s timeout** — both explicitly PROVISIONAL, owner wright,
-  to be revisited against real measurement once exercised against a real manifest or measured
-  runtime.
+- **§5's 5-line proximity window** — now cited to
+  `docs/research/domain-boundary-hook-benchmark/results.md` §5 (see §5 above); no further
+  action needed.
+- **§6's timeout** — CLOSED. Measured against a real manifest and a real worst-case payload;
+  now 3s, cited to `docs/research/domain-boundary-hook-benchmark/results-wrapper-timeout.md`
+  (see §6 above). The prior PROVISIONAL-owner tag is withdrawn, not carried forward.
 - **§10's `jsonschema` dependency question** — resolve at forge start, before component 3 is built.
 
 ---
