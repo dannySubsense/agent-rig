@@ -54,7 +54,13 @@ _SIGNPOST_PILLAR_HEADING_RE = re.compile(
 # up to a colon that closes the label, then either end of line or trailing content.
 _GENERIC_HEADING_RE = re.compile(r"^([^:\n]+):\s*\**\s*($|\S)")
 
-# §5.3 — the forbidden third-section label.
+# §5.3 — the forbidden third-section label. KNOWN LIMITATION, not fixed here (2026-09-07):
+# this is word-hunting for one specific phrasing and misses real variants (e.g. "Unverified
+# this session:"). An attempted structural redesign (any non-Signpost/Pillar heading is
+# forbidden) was tried the same day and reverted — it broke on real transcript data,
+# mistaking ordinary prose sentences that end in a colon for headings. Left as the
+# original, narrower check rather than shipping a broken generalization under time
+# pressure; needs real design work, not a five-minute fix.
 _C2_LABEL_RE = re.compile(r"^not\s+(yet\s+)?verified(\s+this\s+session)?\s*$", re.IGNORECASE)
 
 
@@ -105,7 +111,7 @@ def find_signpost_pillar_positions(text):
 def find_c2_heading_line(text):
     """§5.3 — the first heading line (generic shape) whose label matches the forbidden
     "not (yet) verified (this session)" pattern. Returns the raw (unstripped) line text,
-    or None."""
+    or None. See `_C2_LABEL_RE`'s comment for this check's known limitation."""
     for raw_line in text.split("\n"):
         stripped = strip_leading_markup(raw_line)
         m = _GENERIC_HEADING_RE.match(stripped)
@@ -315,7 +321,12 @@ def _extract_claim_subjects(pillar_section_text):
             seen.add(key)
             subjects.append(key)
 
-    # Backtick spans: gh-command references, bare identifiers.
+    # Backtick spans: gh-command references, bare identifiers, and (2026-09-07, issue #27
+    # root-cause fix) any other non-path, non-PR backtick content — a bare shell command
+    # like `git status -uno` is just as checkable as a file path and should not be silently
+    # dropped, leaving the Pillar with zero extractable subjects. Content already shaped as
+    # a file path or a PR reference is left to those dedicated branches (below/above) rather
+    # than double-classified.
     for m in _BACKTICK_RE.finditer(pillar_section_text):
         content = m.group(1)
         if _GH_REFERENCE_RE.search(content):
@@ -330,6 +341,8 @@ def _extract_claim_subjects(pillar_section_text):
                 _add("command", content)
         elif _IDENTIFIER_RE.match(content):
             _add("identifier", content)
+        elif not _FILE_PATH_RE.search(content) and _pr_number_from_text(content) is None:
+            _add("command", content)
 
     # File paths (backticked or plain) — both regex branches (slash-containing, and
     # dotted-extension) are accepted as-is, no extension filtering (§3.1, 2026-09-07).
@@ -490,52 +503,19 @@ def _collect_qualifying_tool_calls(preceding):
     ]
 
 
-# Issue #27 (2026-09-07) — a Pillar section can satisfy C3's structural requirements (a
+# Issue #27 (2026-09-07) — a Pillar section could satisfy C3's structural requirements (a
 # heading exists, qualifying tool calls exist) while its own text admits the claims under
 # it were never actually verified (e.g. "Pillar: none yet — nothing independently checked
-# this session"). §3.1's subject-extraction fallback ("no extractable subjects → presence-
-# only pass") cannot catch this, because plain-English admission prose has no backtick/
-# file-path/PR-number/quoted-query shape to extract. This is deliberately narrow, checked
-# ONLY against Pillar text — the current turn's own authored output, the one surface this
-# hook already has standing to gate (same as C1/C2 and the rest of C3). It is NOT sourced
-# from Signpost text: Signpost is injected/observed content the current agent did not
-# author, and gating on it (tried and reverted this same sprint, see
-# docs/specs/first-turn-contract-c3-signpost-sourcing/) repeats the REACTOR-AS-GATEKEEPER
-# mistake one layer up — see docs/specs/agent-rig-ddrs/00-DDR-INDEX.md item 15.
-_PILLAR_ADMITS_UNVERIFIED_RE = re.compile(
-    r"\b(none\s+yet|not\s+yet\s+(?:independently\s+)?(?:verified|checked|run)"
-    r"|nothing\s+(?:independently\s+)?(?:verified|checked)"
-    r"|haven'?t\s+(?:re-?)?(?:run|checked|verified))\b",
-    re.IGNORECASE,
-)
-
-
-def _pillar_admits_unverified(pillar_section_text):
-    """True if the Pillar heading's own immediate completion admits its claims were not
-    (yet) verified this session.
-
-    Scope is deliberately narrow: only the heading line's text after its colon, plus any
-    immediately-following lines up to the first blank line or bullet/list marker (i.e. the
-    same paragraph the heading opens) — NOT the whole section to end-of-message. Corrected
-    2026-09-07 after Cold Frank found the original whole-section scope produced 7 false
-    positives on 22 real Pillar sections pulled from this repo's own transcripts: a long,
-    substantive Pillar naming real verification work, with an unrelated "not yet verified"
-    mention or a separate, honestly-labeled "Unverified this session: ..." disclosure list
-    appearing later in the same section, was wrongly caught. Every real evasion this check
-    exists to catch (verified against the same 22 real sections) has the admission as the
-    Pillar heading's own direct completion, not buried later — narrowing to that scope
-    measured zero false positives and caught all 4 real evasions in the corpus."""
-    if not pillar_section_text:
-        return False
-    lines = pillar_section_text.split("\n")
-    heading_match = re.match(r"^[^:]*:\s*(.*)$", strip_leading_markup(lines[0]))
-    paragraph = heading_match.group(1) if heading_match else ""
-    for line in lines[1:]:
-        stripped = line.strip()
-        if not stripped or stripped.startswith(("-", "*", "1.", "**")):
-            break
-        paragraph += " " + stripped
-    return bool(_PILLAR_ADMITS_UNVERIFIED_RE.search(paragraph))
+# this session"), because the old §3.4 presence-only fallback let any Pillar with zero
+# extractable subjects pass automatically. Two word-matching attempts at patching this
+# (whole-section regex, then heading-paragraph-scoped regex) both shipped with fabricated
+# or unreproducible test claims and were both independently found bypassable by
+# reformatting (Cold Frank, commit 6883cc7) — chasing specific admission phrasing is not
+# viable against an LLM author, who has no fixed vocabulary for "I didn't check this."
+# Root-caused instead (2026-09-07, Danny): the real defect is the presence-only fallback
+# itself — see §3.4 below, now flipped to fail-closed. A Pillar naming nothing checkable
+# fails regardless of what words it uses, closing the issue #27 gap and every future
+# rephrasing of it in one place, with no text-pattern matching involved.
 
 
 def check_c3_violation(records, current_turn_index, pillar_idx, pillar_section_text):
@@ -543,14 +523,10 @@ def check_c3_violation(records, current_turn_index, pillar_idx, pillar_section_t
     None`). Returns `(violation: bool, unmatched_subjects: list)`. `unmatched_subjects` is
     the list of `(subject_type, value)` claim subjects that had no matching qualifying
     tool call — populated only for the "qualifying calls exist but some subject(s)
-    unmatched" case (§4), empty otherwise (including the pure-absence and presence-only-
-    fallback cases). A self-admission match (issue #27) is signaled via the special
-    subject type `"admission"` so `build_reason` can word it distinctly."""
+    unmatched" case (§4), empty otherwise (including the pure-absence and zero-subjects
+    cases)."""
     if pillar_idx is None:
         return False, []
-
-    if _pillar_admits_unverified(pillar_section_text):
-        return True, [("admission", _PILLAR_ADMITS_UNVERIFIED_RE.search(pillar_section_text).group(0))]
 
     if current_turn_index is None:
         preceding = records
@@ -563,8 +539,13 @@ def check_c3_violation(records, current_turn_index, pillar_idx, pillar_section_t
 
     subjects = _extract_claim_subjects(pillar_section_text)
     if not subjects:
-        # §3.4 — presence-only fallback: qualifying calls exist, so C3 passes.
-        return False, []
+        # §3.4 — flipped 2026-09-07 (issue #27 root cause, superseding the old
+        # presence-only pass): a Pillar naming zero checkable subjects (no file path, PR
+        # number, identifier, or quoted query) fails, regardless of qualifying tool calls
+        # existing elsewhere in the transcript for unrelated reasons. A Pillar that names
+        # nothing specific has nothing for this check to verify against — it is not
+        # entitled to a pass just because activity happened nearby.
+        return True, [("no_subject", "")]
 
     targets = [_extract_tool_target(name, tool_input) for name, tool_input in qualifying]
 
@@ -597,17 +578,15 @@ def build_reason(
         )
     if "C3" in violations:
         quoted = pillar_line if pillar_line else "(Pillar heading)"
-        admission = next(
-            (value for subject_type, value in (c3_unmatched_subjects or [])
-             if subject_type == "admission"),
-            None,
+        no_subject = any(
+            subject_type == "no_subject" for subject_type, _value in (c3_unmatched_subjects or [])
         )
-        if admission:
+        if no_subject:
             parts.append(
                 f"C3 violation: a Pillar heading was asserted (quoted: \"{quoted}\") "
-                f"whose own text admits its claims were not verified (matched: "
-                f"\"{admission}\"). An admitted-unverified Pillar is not a Pillar — run "
-                f"the actual verification, then report it."
+                f"naming no checkable subject (no file path, PR/issue number, identifier, "
+                f"or quoted query). A Pillar with nothing specific to verify against is not "
+                f"a Pillar — name what you checked, or run real verification first."
             )
         elif c3_unmatched_subjects:
             named = ", ".join(f"`{value}`" for _subject_type, value in c3_unmatched_subjects)

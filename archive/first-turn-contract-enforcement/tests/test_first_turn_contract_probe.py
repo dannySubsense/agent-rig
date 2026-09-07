@@ -308,7 +308,7 @@ def test_ac2_true_positive_c2_blocks_naming_c2_and_quotes_heading(monkeypatch, t
 
 _COMPLIANT_SIGNPOST_THEN_PILLAR = (
     "**Signpost:** from the queue, not re-checked.\n\n"
-    "**Pillar:** verified this session by method.\n"
+    "**Pillar:** verified this session via `git status -uno`, tree clean.\n"
 )
 
 
@@ -358,7 +358,7 @@ def test_ac3_qualifying_non_todowrite_tool_call_avoids_c3(monkeypatch, tmp_path)
     Pillar turn with a qualifying tool call" fixture named in §11 AC4."""
     transcript = _write_transcript(tmp_path, [
         _queue_marker_record(),
-        _tool_use_record("Read", "toolu_2"),
+        _tool_use_record_with_input("Bash", "toolu_2", {"command": "git status -uno"}),
         _tool_result_record("toolu_2"),
     ])
     stdin_data = {
@@ -866,16 +866,19 @@ def test_c3_matching_ac8_path_basename_fallback_reachable_on_non_aligning_dirs()
 
 
 # ---------------------------------------------------------------------------
-# Issue #27 — Pillar self-admission of non-verification (2026-09-07)
+# Issue #27 — Pillar naming no checkable subject (2026-09-07, root-caused: the presence-only
+# fallback, not word-matched admission phrases, per Danny's YAGNI call against word-hunting
+# an LLM author's unbounded phrasing space)
 # ---------------------------------------------------------------------------
 
-def test_c3_pillar_admission_of_nonverification_blocks_even_with_qualifying_call(
+def test_c3_pillar_naming_nothing_checkable_blocks_even_with_qualifying_call(
     monkeypatch, tmp_path
 ):
-    """Issue #27: a Pillar section that admits its own claims were not verified must block,
-    even when a qualifying tool call exists earlier in the turn (previously satisfied C3's
-    presence-only fallback, since plain-English admission prose has no extractable subject).
-    This is the literal evasion text from the incident, not a paraphrase."""
+    """Issue #27: a Pillar section naming no checkable subject (no file path, PR/issue
+    number, identifier, or quoted query) must block, even when a qualifying tool call exists
+    earlier in the turn — regardless of what words the Pillar uses. This is the literal
+    evasion text from the incident, not a paraphrase, but the fix no longer depends on
+    matching this or any other specific phrasing."""
     transcript = _write_transcript(tmp_path, [
         _queue_marker_record(),
         _tool_use_record_with_input("Bash", "toolu_a1", {"command": "git status -uno"}),
@@ -893,7 +896,31 @@ def test_c3_pillar_admission_of_nonverification_blocks_even_with_qualifying_call
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert "C3" in entries[-1]["violations"]
-    assert "admits its claims were not verified" in decision["reason"]
+    assert "naming no checkable subject" in decision["reason"]
+
+
+def test_c3_differently_phrased_nonverification_also_blocks(monkeypatch, tmp_path):
+    """The old fix depended on matching specific admission phrasing ('none yet', 'not yet
+    verified', etc.) and was bypassable by rephrasing. The new fix does not pattern-match
+    words at all — any Pillar naming nothing checkable blocks, regardless of phrasing,
+    including phrasing the old regex never covered (e.g. 'Unverified this session')."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Bash", "toolu_a3", {"command": "git status -uno"}),
+        _tool_result_record("toolu_a3"),
+    ])
+    stdin_data = {
+        "session_id": "c3-admission-rephrased",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "Unverified this session — did not get to it."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert "C3" in entries[-1]["violations"]
 
 
 def test_c3_real_verified_pillar_does_not_false_trigger_admission_check(monkeypatch, tmp_path):

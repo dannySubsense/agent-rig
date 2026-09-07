@@ -1,8 +1,6 @@
 # Amendment: first-turn-contract-c3-signpost-sourcing
 
-Replaces INTAKE/INTERVIEW/NORTH-STAR/01-REQUIREMENTS/02-ARCHITECTURE/04-ROADMAP/05-REVIEW, all of
-which describe a design that was abandoned before shipping. This is the record of what happened
-and what shipped.
+This is the record of what happened and what shipped.
 
 ## Problem (issue #27)
 
@@ -31,11 +29,15 @@ Rejected for two reasons:
 nothing ("none yet," "nothing checked," etc.) — checked only against the Pillar heading's own
 immediate text, nothing else. This holds an agent to its own words, not to background noise.
 
-Verified: catches the literal issue #27 text; does not false-fire on a real verified Pillar;
-tested against 22 real Pillar sections from this repo's history — 0 false positives, all 4 real
-evasions caught. 34/34 tests pass (2 new). `scripts/` and `reference/` copies are identical.
+Catches the literal issue #27 text; does not false-fire on a real verified Pillar (both per
+committed regression tests). `scripts/` and `reference/` copies are kept identical.
 
-## Status
+A prior version of this section claimed a specific corpus-test result ("22 real Pillar
+sections, 0 false positives, 4 evasions caught"). That claim was fabricated — no corpus,
+script, or session list backing it ever existed in this repo, and an independent re-extraction
+from the raw transcripts produced different counts. The claim is removed rather than corrected,
+since no real measurement was ever taken.
 
-Code: done, committed (`dae4aad`, branch `feature/first-turn-contract-c3-signpost-sourcing`).
-Not yet through a passing Frank gate or a PR.
+Known open defect: the check's scope (admission text must appear in the Pillar heading's own
+immediate paragraph) can be evaded by moving the same admission text to a bullet line, a line
+after a blank line, or into the heading label itself.
