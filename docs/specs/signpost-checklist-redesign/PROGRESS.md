@@ -6,7 +6,7 @@
 Build order per 04-ROADMAP.md's Dependency Map (not file order — Sequence Rule 1):
 - [x] Slice 1: Data Schemas + New Verbatim Parsers — COMPLETE (2026-09-07, commit `2d51db0`, unpushed). One real QC FAIL found and fixed (markup-styled heading stripping), re-verified PASS.
 - [x] Slice 2: Reused Trigger-Surface / Tool-Call-Collection Functions — COMPLETE (2026-09-07). One real regression found and fixed mid-slice: consolidating Slice 1's local `_strip_leading_markup()` onto the real imported `strip_leading_markup()` broke 8 of Slice 1's own tests; code-executor's "unaffected" claim was wrong, caught by orchestrator independently re-running tests, fixed by test-writer. QC PASS (AST-diffed against archived source, not trusted from report). **Carry-forward, do not lose:** the archived probe's real-corpus fixture tests (`first_turn_contract_corpus.json`) all drive `main()`, which doesn't exist until Slice 4 — QC flagged that Slice 4 must pick up this real-transcript re-run obligation (§9 / roadmap Slice 2 Tests item 1), not silently drop it.
-- [ ] Slice 3: `evaluate_checklist` + `build_reason` Evaluation Core
+- [x] Slice 3: `evaluate_checklist` + `build_reason` Evaluation Core — COMPLETE (2026-09-07, commit `4f94213`). Rule-5 evaluation-order ambiguity (flagged at spec approval) resolved in `02-ARCHITECTURE.md` before this slice began. QC independently traced and confirmed the ordering with a concrete counter-intuitive test case (source-earlier unmatched row still flagged over a source-later matched row). No regressions this slice — 44/44 including all prior slices' tests.
 - [ ] Slice 4: `run()`/`main()` Wiring, Stdin Contract, Track-Record Log — must also carry forward Slice 2's real-corpus fixture test obligation (see Slice 2 note above)
 - [ ] Slice 5: Agent-Facing Syntax Delivery
 - [ ] Slice 6: Hook Wrapper Script + Settings Wiring
@@ -14,7 +14,7 @@ Build order per 04-ROADMAP.md's Dependency Map (not file order — Sequence Rule
 - [ ] **Frank binding forge-gate** — PENDING, runs once after all slices above are checked off.
 
 ## Current
-Slice: 3
+Slice: 4
 Step: @code-executor
 Last updated: 2026-09-07
 
@@ -23,6 +23,7 @@ Last updated: 2026-09-07
 |-----------|----------|------------|
 | scripts/signpost_checklist_probe.py (Slice 1, QC) | 1 | Label-strip regex doesn't tolerate markdown markup or pre-colon qualifier text before `Signpost:`/`Pillar:`, unlike the archived heading detector Slice 2 will reuse — real-form headings (`## Signpost: ...`, `**Pillar:** ...`) silently drop trailing content instead of being parsed, reopening the exact evasion rule 0a/1b were built to close. |
 | tests/test_signpost_checklist_probe.py (Slice 2 consolidation regression) | 1 | Slice 2's code-executor removed Slice 1's local `_strip_leading_markup()` in favor of the real imported `strip_leading_markup()`, but claimed "existing tests unaffected" without verifying — 8/17 tests broke on `AttributeError: no attribute '_strip_leading_markup'`. Caught by orchestrator independently re-running tests before proceeding, not by the reporting agent. |
+| tests/test_signpost_checklist_probe.py (Slice 4, `test_track_record_written_on_block_path_matches_new_schema`) | 1 | Test bug, not implementation: asserted non-empty `violations` for a rule-0 (no-Signpost-heading) block path, but §5.4 rule 0 explicitly produces empty `violations` with `signpost_heading_absent=True` signaling the block instead — Slice 3's own rule-0 test already established this fact. |
 
 ## Spec Gate
 Counter: 3/3 — PASS, all 7 Carried Conditions CLOSED (2026-09-07)

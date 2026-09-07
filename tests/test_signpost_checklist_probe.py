@@ -16,8 +16,12 @@ Runnable two ways:
     python3 tests/test_signpost_checklist_probe.py   (falls back to a plain assert-based runner)
 """
 
+import contextlib
 import importlib.util
+import io
+import json
 import os
+import tempfile
 
 try:
     import pytest  # noqa: F401
@@ -886,6 +890,346 @@ def test_build_reason_per_row_violation_kinds_produce_distinct_sentences():
     assert "Unrecognized line in Pillar section" in stray_result.reason
     assert "does not match any Signpost line" in unmatched_result.reason
     assert dup_result.reason != stray_result.reason != unmatched_result.reason
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 — run()/main() wiring, stdin contract, gating order, track-record log.
+#
+# Spec: docs/specs/signpost-checklist-redesign/01-REQUIREMENTS.md (US-5) and
+# docs/specs/signpost-checklist-redesign/04-ROADMAP.md "## Slice 4" Tests section.
+# ---------------------------------------------------------------------------
+
+
+def _write_transcript_file(records):
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for r in records:
+            fh.write(json.dumps(r) + "\n")
+    return path
+
+
+@contextlib.contextmanager
+def _transcript_path(records):
+    path = _write_transcript_file(records)
+    try:
+        yield path
+    finally:
+        os.remove(path)
+
+
+@contextlib.contextmanager
+def _track_record_path(tmp_path):
+    original = probe.TRACK_RECORD_PATH
+    probe.TRACK_RECORD_PATH = tmp_path
+    try:
+        yield tmp_path
+    finally:
+        probe.TRACK_RECORD_PATH = original
+
+
+def _capture_stdout(fn, *args, **kwargs):
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        result = fn(*args, **kwargs)
+    return result, buf.getvalue()
+
+
+def _first_turn_queue_injected_records(last_message):
+    """One queue-marker record followed by exactly one assistant text record — queue
+    injected, first reply of session."""
+    return [
+        _queue_marker_record(),
+        _assistant_text_record(last_message),
+    ]
+
+
+# --- stop_hook_active present -> allow, no further processing ------------------------------
+
+def test_stop_hook_active_present_allows_with_no_further_processing():
+    # transcript_path deliberately points at a nonexistent path — if run() attempted to read
+    # it (i.e. did not short-circuit on stop_hook_active), load_transcript_records() would
+    # simply return [] (fail-safe), so instead we monkeypatch load_transcript_records to raise,
+    # proving it is never called when stop_hook_active is True.
+    original = probe.load_transcript_records
+    probe.load_transcript_records = lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("load_transcript_records must not be called when stop_hook_active")
+    )
+    try:
+        stdin_data = {
+            "session_id": "sess-1",
+            "transcript_path": "/nonexistent/path.jsonl",
+            "stop_hook_active": True,
+            "last_assistant_message": "no signpost heading at all",
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
+    finally:
+        probe.load_transcript_records = original
+    assert output == ""  # allow == silence
+
+
+# --- Queue marker absent -> mechanism does not activate (US-5 AC3) -------------------------
+
+def test_queue_marker_absent_mechanism_does_not_activate():
+    with _transcript_path([_assistant_text_record("no signpost heading here")]) as path:
+        stdin_data = {
+            "session_id": "sess-2",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": "no signpost heading here",
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
+    assert output == ""  # allow, despite content that would otherwise block
+
+
+# --- Not first reply of session -> mechanism does not activate (US-5 AC3) ------------------
+
+def test_not_first_reply_of_session_mechanism_does_not_activate():
+    records = [
+        _queue_marker_record(),
+        _assistant_text_record("first reply, prior turn"),
+        _assistant_text_record("no signpost heading here"),
+    ]
+    with _transcript_path(records) as path:
+        stdin_data = {
+            "session_id": "sess-3",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": "no signpost heading here",
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
+    assert output == ""  # allow, despite content that would otherwise block
+
+
+# --- signpost_heading_present = False -> rule 0's block -------------------------------------
+
+def test_run_computes_signpost_heading_absent_and_produces_rule0_block():
+    message = "This reply has no Signpost heading at all."
+    records = _first_turn_queue_injected_records(message)
+    with _transcript_path(records) as path:
+        stdin_data = {
+            "session_id": "sess-4",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": message,
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
+    assert output != ""
+    payload = json.loads(output)
+    assert payload["decision"] == "block"
+    assert "Signpost" in payload["reason"]
+
+
+# --- signpost_section_has_content = True, signpost_lines = [] -> rule 0a's block -----------
+
+def test_run_computes_section_has_content_with_no_lines_and_produces_rule0a_block():
+    message = "Signpost: I verified the build and the tests.\n\nPillar:\n"
+    records = _first_turn_queue_injected_records(message)
+    with _transcript_path(records) as path:
+        stdin_data = {
+            "session_id": "sess-5",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": message,
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
+    assert output != ""
+    payload = json.loads(output)
+    assert payload["decision"] == "block"
+    assert "no lines were written as" in payload["reason"]
+
+
+# --- non-empty pillar_unparsed_lines -> rule 1b's stray_prose violation --------------------
+
+def test_run_passes_non_empty_pillar_unparsed_lines_and_produces_stray_prose_violation():
+    message = (
+        "Signpost:\n- I ran the tests.\n\n"
+        "Pillar:\n"
+        "- [ ] I ran the tests. (unverified)\n"
+        "This is stray prose, not a valid row.\n"
+    )
+    records = _first_turn_queue_injected_records(message)
+    with _transcript_path(records) as path:
+        stdin_data = {
+            "session_id": "sess-6",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": message,
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
+    assert output != ""
+    payload = json.loads(output)
+    assert payload["decision"] == "block"
+    assert "Unrecognized line in Pillar section" in payload["reason"]
+    assert "This is stray prose, not a valid row." in payload["reason"]
+
+
+# --- Simulated exception inside evaluation path -> main() still exits allow (fail-open) ----
+
+def test_main_fail_opens_on_simulated_exception_in_evaluation_path():
+    original = probe.evaluate_checklist
+    probe.evaluate_checklist = lambda *a, **k: (_ for _ in ()).throw(
+        RuntimeError("simulated evaluation failure")
+    )
+    original_stdin_reader = probe.read_stdin
+    message = "Signpost:\n- I ran the tests.\n\nPillar:\n- [ ] I ran the tests. (unverified)\n"
+    records = _first_turn_queue_injected_records(message)
+    try:
+        with _transcript_path(records) as path:
+            stdin_data = {
+                "session_id": "sess-7",
+                "transcript_path": path,
+                "stop_hook_active": False,
+                "last_assistant_message": message,
+            }
+            probe.read_stdin = lambda: stdin_data
+            exit_code, output = _capture_stdout(probe.main)
+    finally:
+        probe.evaluate_checklist = original
+        probe.read_stdin = original_stdin_reader
+    assert exit_code == 0
+    assert output == ""  # allow == silence, fail-open on the unhandled exception
+
+
+# --- Track-record entries written on both block and allow paths, matching the new schema ---
+
+def _expected_track_record_keys():
+    return {
+        "timestamp", "session_id", "stop_hook_active", "queue_injected", "first_turn",
+        "decision", "violations", "reason", "probe_error",
+    }
+
+
+def test_track_record_written_on_block_path_matches_new_schema():
+    # Uses a rule 1b (stray_prose) scenario, not rule 0 (signpost_heading_absent), because
+    # rule 0 blocks are architecture-§5.4-defined to carry violations == [] (see
+    # test_rule0_signpost_heading_absent_blocks_with_no_violations) — a non-representative
+    # case for asserting the schema's violations field is populated on a block path.
+    message = (
+        "Signpost:\n- I ran the tests.\n\n"
+        "Pillar:\n"
+        "- [ ] I ran the tests. (unverified)\n"
+        "This is stray prose, not a valid row.\n"
+    )
+    records = _first_turn_queue_injected_records(message)
+    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
+    os.close(fd)
+    os.remove(track_path)  # write_track_record must create it fresh
+    try:
+        with _track_record_path(track_path), _transcript_path(records) as path:
+            stdin_data = {
+                "session_id": "sess-8",
+                "transcript_path": path,
+                "stop_hook_active": False,
+                "last_assistant_message": message,
+            }
+            probe.run(stdin_data)
+        with open(track_path) as fh:
+            lines = [json.loads(l) for l in fh if l.strip()]
+    finally:
+        if os.path.exists(track_path):
+            os.remove(track_path)
+    assert len(lines) == 1
+    entry = lines[0]
+    assert set(entry.keys()) == _expected_track_record_keys()
+    assert entry["decision"] == "block"
+    assert entry["session_id"] == "sess-8"
+    assert entry["queue_injected"] is True
+    assert entry["first_turn"] is True
+    assert entry["violations"] != []
+
+
+def test_track_record_written_on_allow_path_matches_new_schema():
+    message = "Signpost:\n- I ran the tests.\n\nPillar:\n- [ ] I ran the tests. (unverified)\n"
+    records = _first_turn_queue_injected_records(message)
+    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
+    os.close(fd)
+    os.remove(track_path)
+    try:
+        with _track_record_path(track_path), _transcript_path(records) as path:
+            stdin_data = {
+                "session_id": "sess-9",
+                "transcript_path": path,
+                "stop_hook_active": False,
+                "last_assistant_message": message,
+            }
+            probe.run(stdin_data)
+        with open(track_path) as fh:
+            lines = [json.loads(l) for l in fh if l.strip()]
+    finally:
+        if os.path.exists(track_path):
+            os.remove(track_path)
+    assert len(lines) == 1
+    entry = lines[0]
+    assert set(entry.keys()) == _expected_track_record_keys()
+    assert entry["decision"] == "allow"
+    assert entry["violations"] == []
+    assert entry["reason"] is None
+
+
+# --- Gating order matches architecture §5.1 exactly: short-circuit verified at each gate ---
+
+def test_gating_order_stop_hook_active_short_circuits_before_queue_marker_check():
+    original = probe.analyze_queue_injection_and_first_turn
+    probe.analyze_queue_injection_and_first_turn = lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("queue/first-turn analysis must not run when stop_hook_active")
+    )
+    try:
+        stdin_data = {
+            "session_id": "sess-10",
+            "transcript_path": "/nonexistent/path.jsonl",
+            "stop_hook_active": True,
+            "last_assistant_message": "no signpost heading",
+        }
+        # Must not raise — proves the stop_hook_active gate short-circuits before the
+        # queue-marker/first-turn gate is ever reached.
+        probe.run(stdin_data)
+    finally:
+        probe.analyze_queue_injection_and_first_turn = original
+
+
+def test_gating_order_queue_marker_check_short_circuits_before_section_parsing():
+    original = probe.find_signpost_pillar_positions
+    probe.find_signpost_pillar_positions = lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("section parsing must not run when queue marker is absent")
+    )
+    try:
+        with _transcript_path([_assistant_text_record("no signpost heading")]) as path:
+            stdin_data = {
+                "session_id": "sess-11",
+                "transcript_path": path,
+                "stop_hook_active": False,
+                "last_assistant_message": "no signpost heading",
+            }
+            # Must not raise — proves the queue-marker gate short-circuits before section
+            # parsing (which the first-turn gate also precedes) is ever reached.
+            probe.run(stdin_data)
+    finally:
+        probe.find_signpost_pillar_positions = original
+
+
+def test_gating_order_first_turn_check_short_circuits_before_section_parsing():
+    original = probe.find_signpost_pillar_positions
+    probe.find_signpost_pillar_positions = lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("section parsing must not run when this is not the first turn")
+    )
+    records = [
+        _queue_marker_record(),
+        _assistant_text_record("first reply, prior turn"),
+        _assistant_text_record("no signpost heading"),
+    ]
+    try:
+        with _transcript_path(records) as path:
+            stdin_data = {
+                "session_id": "sess-12",
+                "transcript_path": path,
+                "stop_hook_active": False,
+                "last_assistant_message": "no signpost heading",
+            }
+            # Must not raise — proves the first-turn gate (queue marker already present here)
+            # short-circuits before section parsing is ever reached.
+            probe.run(stdin_data)
+    finally:
+        probe.find_signpost_pillar_positions = original
 
 
 # ---------------------------------------------------------------------------

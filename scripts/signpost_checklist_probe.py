@@ -6,11 +6,12 @@ Replaces `first_turn_contract_probe.py`'s C1/C2/C3 body. See
 Slice 1 added the data schemas (§3) and the three new verbatim parsers (§4, §5.3):
 `extract_signpost_lines`, `extract_pillar_rows`, `parse_checklist_row_line`.
 
-Slice 2 (this addition) copies the architecture-designated §5.1 trigger-surface/tool-call-
-collection functions from the archived probe (archive/first-turn-contract-enforcement/scripts/
+Slice 2 copied the architecture-designated §5.1 trigger-surface/tool-call-collection functions
+from the archived probe (archive/first-turn-contract-enforcement/scripts/
 first_turn_contract_probe.py), unmodified in behavior, plus one additive change per §5.1a
-(`collect_qualifying_tool_calls()`). `evaluate_checklist`/`build_reason`/`run`/`main` (§5.4) are
-added in a later slice.
+(`collect_qualifying_tool_calls()`). Slice 3 added `evaluate_checklist`/`build_reason` (§5.4).
+Slice 4 (this addition) wires `run()`/`main()` (§4, §5.1's gating order) and the row-level
+`write_track_record()` schema.
 """
 
 import json
@@ -697,3 +698,164 @@ def emit_block(reason):
 def emit_allow():
     # §3.2 (archived probe) — silence-means-allow; emitting nothing is equivalent to `{}`.
     pass
+
+
+# --- §4/§5.4 run()/main() wiring --------------------------------------------
+
+
+def _compute_signpost_section_has_content(text, signpost_idx, pillar_idx):
+    """§4/§5.4 rule 0a — whether the Signpost section (heading line's trailing content,
+    per the `Signpost:` label being stripped, PLUS every line strictly between the
+    heading and the next heading/end-of-text) has any non-blank text, independent of
+    whether that text parses into a list-item `SignpostLine`. Mirrors
+    `extract_signpost_lines`'s own candidate-line collection so the two stay in sync;
+    kept separate because `extract_signpost_lines` cannot itself distinguish "truly
+    empty" from "content present but unparseable" by its return value alone (§4)."""
+    if signpost_idx is None:
+        return False
+
+    lines = text.split("\n")
+    section_end = pillar_idx if pillar_idx is not None else len(lines)
+
+    candidate_lines = []
+
+    heading_raw = lines[signpost_idx] if 0 <= signpost_idx < len(lines) else ""
+    label_match = _SIGNPOST_LABEL_RE.match(strip_leading_markup(heading_raw))
+    if label_match:
+        trailing = label_match.group(1)
+        if trailing:
+            candidate_lines.append(trailing)
+
+    for idx in range(signpost_idx + 1, section_end):
+        if 0 <= idx < len(lines):
+            candidate_lines.append(lines[idx])
+
+    return any(line.strip() for line in candidate_lines)
+
+
+def _find_pillar_section_end(lines, pillar_idx):
+    """Same section-boundary scan as the archived probe's `run()` (line 674-683): from
+    the line after the Pillar heading, the section ends at the next Signpost/Pillar
+    heading match, or end-of-text."""
+    if pillar_idx is None:
+        return len(lines)
+    section_end = len(lines)
+    for idx in range(pillar_idx + 1, len(lines)):
+        stripped = strip_leading_markup(lines[idx])
+        if _SIGNPOST_PILLAR_HEADING_RE.match(stripped):
+            section_end = idx
+            break
+    return section_end
+
+
+def _serialize_violation(violation):
+    """RowViolation -> a JSON-safe dict for the track-record log (§3's `EvaluationResult`
+    shape, row-level — not the archived probe's C1/C2/C3 string-label schema)."""
+    row = violation.row
+    return {
+        "kind": violation.kind,
+        "signpost_text": violation.signpost_text,
+        "row": (
+            {
+                "label": row.label,
+                "status": row.status,
+                "tool_use_id": row.tool_use_id,
+                "raw_line": row.raw_line,
+            }
+            if row is not None
+            else None
+        ),
+        "line_text": violation.line_text,
+    }
+
+
+def run(stdin_data: dict) -> None:
+    """Top-level entry point, same stdin contract, same stop_hook_active / queue-marker /
+    first-turn gating as the archived probe's `run()` (§5.1, unchanged) — that ordering is
+    fixed and not reordered here. Once gating passes, locates the Signpost/Pillar sections,
+    parses them, evaluates the checklist (§5.4), and emits block/allow, writing one
+    track-record row on every path."""
+    session_id = stdin_data.get("session_id")
+    transcript_path = stdin_data.get("transcript_path")
+    stop_hook_active = bool(stdin_data.get("stop_hook_active", False))
+    last_assistant_message = stdin_data.get("last_assistant_message") or ""
+
+    # §5.1 — stop_hook_active bypass, checked first. Always allow, no further processing.
+    if stop_hook_active:
+        write_track_record(session_id, True, False, False, "allow", [], None, None)
+        emit_allow()
+        return
+
+    records = load_transcript_records(transcript_path)
+    queue_injected, first_turn, current_turn_index = (
+        analyze_queue_injection_and_first_turn(records)
+    )
+
+    if not queue_injected:
+        write_track_record(session_id, False, False, False, "allow", [], None, None)
+        emit_allow()
+        return
+
+    if not first_turn:
+        write_track_record(session_id, False, True, False, "allow", [], None, None)
+        emit_allow()
+        return
+
+    signpost_idx, pillar_idx = find_signpost_pillar_positions(last_assistant_message)
+    signpost_heading_present = signpost_idx is not None
+    signpost_section_has_content = _compute_signpost_section_has_content(
+        last_assistant_message, signpost_idx, pillar_idx
+    )
+    signpost_lines = extract_signpost_lines(last_assistant_message, signpost_idx, pillar_idx)
+
+    lines = last_assistant_message.split("\n")
+    pillar_section_end = _find_pillar_section_end(lines, pillar_idx)
+    pillar_rows, pillar_unparsed_lines = extract_pillar_rows(
+        last_assistant_message, pillar_idx, pillar_section_end
+    )
+
+    preceding = records if current_turn_index is None else records[:current_turn_index]
+    qualifying_calls = collect_qualifying_tool_calls(preceding)
+
+    result = evaluate_checklist(
+        signpost_lines,
+        pillar_rows,
+        qualifying_calls,
+        signpost_heading_present,
+        signpost_section_has_content,
+        pillar_unparsed_lines,
+    )
+
+    if result.decision == "block":
+        violations_payload = [_serialize_violation(v) for v in result.violations]
+        write_track_record(
+            session_id, False, True, True, "block", violations_payload, result.reason, None
+        )
+        emit_block(result.reason)
+        return
+
+    write_track_record(session_id, False, True, True, "allow", [], None, None)
+    emit_allow()
+
+
+def main():
+    stdin_data = read_stdin()
+    try:
+        run(stdin_data)
+    except Exception as exc:  # noqa: BLE001 — this probe must never crash into a block
+        write_track_record(
+            stdin_data.get("session_id"),
+            stdin_data.get("stop_hook_active", False),
+            False,
+            False,
+            "probe_error",
+            [],
+            None,
+            f"{exc.__class__.__name__}: {exc}",
+        )
+        emit_allow()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
