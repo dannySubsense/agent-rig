@@ -14,7 +14,7 @@ Build order per 04-ROADMAP.md's Dependency Map (not file order — Sequence Rule
 - [ ] **Frank binding forge-gate** — PENDING, runs once after all slices above are checked off.
 
 ## Current
-Slice: 2
+Slice: 3
 Step: @code-executor
 Last updated: 2026-09-07
 
@@ -58,14 +58,10 @@ draft topologically wrong — it drew Rule 7 (unmatched-row check) as an indepen
 when `04-ROADMAP.md` Slice 3 specifies it as a residue pass run strictly *after* the per-line
 matching loop. Diagram corrected and republished to match.
 
-**Real open item surfaced by that correction, not resolved, flagged for forge:** Rule 5
-(`duplicate_id`) flags whichever `verified` row claiming a reused `tool_use_id` is "later," but
-`02-ARCHITECTURE.md` §5.4 never specifies whether "later" means source order in the agent's reply
-or evaluation order in the hook (matched rows evaluate in the main loop; unmatched rows evaluate
-in the Rule 7 residue pass, strictly after) — these two orderings can disagree for a row that
-appears above a matched row sharing its ID. Forge must pick one and state it explicitly in
-`evaluate_checklist()`'s implementation, or escalate back to spec if it's load-bearing enough to
-warrant a doc update first.
+**RESOLVED (2026-09-07, before Slice 3):** Rule 5's "earlier" is evaluation order, not
+source/reply order — spelled out explicitly now in `02-ARCHITECTURE.md` §5.4 rule 5 (main-loop
+rows evaluated before rule-7 residue-pass rows). Not escalated to Danny — resolvable directly from
+the spec's own existing wording ("in this evaluation"), which already implied this reading.
 
 ## Forge Gate
 Counter: 0/3

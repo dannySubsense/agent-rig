@@ -447,6 +447,448 @@ def test_collect_qualifying_tool_calls_tool_use_id_matches_real_tool_use_block_i
 
 
 # ---------------------------------------------------------------------------
+# Slice 3 — evaluate_checklist() + build_reason() evaluation core.
+#
+# Spec: docs/specs/signpost-checklist-redesign/01-REQUIREMENTS.md (US-2 AC1/AC2/AC3, US-3
+# AC1/AC2/AC3/AC4) and docs/specs/signpost-checklist-redesign/04-ROADMAP.md "## Slice 3" Tests
+# section. Per architecture §9's testability approach, these are pure-function tests against
+# evaluate_checklist()'s inputs/outputs directly — no transcript fixtures needed.
+# ---------------------------------------------------------------------------
+
+
+def _row(label, status, tool_use_id=None, raw_line=None):
+    return probe.PillarRow(
+        label=label,
+        status=status,
+        tool_use_id=tool_use_id,
+        raw_line=raw_line if raw_line is not None else f"- [{'x' if status == 'verified' else ' '}] {label}",
+    )
+
+
+def _line(text):
+    return probe.SignpostLine(text=text, raw_line=f"- {text}")
+
+
+def _call(tool_use_id, name="Read"):
+    return probe.QualifyingToolCall(tool_use_id=tool_use_id, name=name, tool_input={})
+
+
+# --- US-2 AC1: verified row must be backed by a real qualifying tool call -----------------
+
+def test_us2_ac1_verified_row_backed_by_real_tool_call_produces_no_violation():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("I read the config file.")],
+        pillar_rows=[_row("I read the config file.", "verified", tool_use_id="toolu_1")],
+        qualifying_calls=[_call("toolu_1")],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "allow"
+    assert result.violations == []
+
+
+# --- US-2 AC2: claimed tool_use_id absent from transcript -> unbacked/false_claim ----------
+
+def test_us2_ac2_verified_row_claiming_nonexistent_tool_call_is_false_claim():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("I ran the tests.")],
+        pillar_rows=[_row("I ran the tests.", "verified", tool_use_id="toolu_fake")],
+        qualifying_calls=[_call("toolu_real")],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    assert len(result.violations) == 1
+    assert result.violations[0].kind == "false_claim"
+
+
+# --- US-2 AC3: unverified row never penalized on its own -----------------------------------
+
+def test_us2_ac3_unverified_row_never_penalized():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("I have not checked this yet.")],
+        pillar_rows=[_row("I have not checked this yet.", "unverified")],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "allow"
+    assert result.violations == []
+
+
+# --- US-3 AC1: Signpost row absent from Pillar checklist -> FAIL ---------------------------
+
+def test_us3_ac1_missing_pillar_row_for_signpost_line_fails():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("I updated the docs.")],
+        pillar_rows=[],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    assert result.violations[0].kind == "missing"
+    assert result.violations[0].signpost_text == "I updated the docs."
+
+
+# --- US-3 AC2: verified row lacking tool-call-backed evidence -> FAIL ----------------------
+
+def test_us3_ac2_verified_row_lacking_evidence_fails():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("I fixed the bug.")],
+        pillar_rows=[_row("I fixed the bug.", "verified", tool_use_id="toolu_none")],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    assert result.violations[0].kind == "false_claim"
+
+
+# --- US-3 AC3: Pillar row matching no Signpost line is still evaluated + flagged -----------
+
+def test_us3_ac3_unmatched_pillar_row_still_evaluated_and_flagged():
+    result = probe.evaluate_checklist(
+        signpost_lines=[],
+        pillar_rows=[_row("I did something extra.", "unverified")],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    kinds = {v.kind for v in result.violations}
+    assert "unmatched_row" in kinds
+
+
+# --- US-3 AC4: all rows present/matched/valid -> PASS ---------------------------------------
+
+def test_us3_ac4_all_rows_matched_and_valid_passes():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("Line A."), _line("Line B.")],
+        pillar_rows=[
+            _row("Line A.", "unverified"),
+            _row("Line B.", "verified", tool_use_id="toolu_b"),
+        ],
+        qualifying_calls=[_call("toolu_b")],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "allow"
+    assert result.violations == []
+
+
+# --- Rule 0: Signpost heading absent entirely -> fail-closed block, no per-line violations --
+
+def test_rule0_signpost_heading_absent_blocks_with_no_violations():
+    result = probe.evaluate_checklist(
+        signpost_lines=[],
+        pillar_rows=[],
+        qualifying_calls=[],
+        signpost_heading_present=False,
+        signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    assert result.signpost_heading_absent is True
+    assert result.violations == []
+
+
+# --- Rule 0a: heading present, has content, zero parsed claim lines -> block -----------------
+
+def test_rule0a_heading_present_with_content_but_no_parsed_lines_blocks():
+    result = probe.evaluate_checklist(
+        signpost_lines=[],
+        pillar_rows=[],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    assert len(result.violations) == 1
+    assert result.violations[0].kind == "malformed_signpost"
+
+
+def test_rule0a_heading_line_trailing_prose_path_blocks_with_malformed_signpost():
+    # signpost_section_has_content derived specifically from trailing text on the heading line
+    # itself (e.g. "Signpost: I verified the build."), not text between headings.
+    text = "Signpost: I verified the build and the tests.\n"
+    signpost_idx, pillar_idx = probe.find_signpost_pillar_positions(text)
+    signpost_lines = probe.extract_signpost_lines(text, signpost_idx, pillar_idx)
+    heading_raw = text.split("\n")[signpost_idx]
+    label_match = probe._SIGNPOST_LABEL_RE.match(probe.strip_leading_markup(heading_raw))
+    signpost_section_has_content = bool((label_match.group(1) if label_match else "").strip())
+
+    assert signpost_lines == []
+    assert signpost_section_has_content is True
+
+    result = probe.evaluate_checklist(
+        signpost_lines=signpost_lines,
+        pillar_rows=[],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=signpost_section_has_content,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    assert result.violations[0].kind == "malformed_signpost"
+
+
+# --- Rule 1a: duplicate_label -----------------------------------------------------------------
+
+def test_rule1a_two_rows_matching_same_signpost_line_both_flagged_duplicate_label():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("I ran the tests.")],
+        pillar_rows=[
+            _row("I ran the tests.", "unverified"),
+            _row("I ran the tests.", "verified", tool_use_id="toolu_x"),
+        ],
+        qualifying_calls=[_call("toolu_x")],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    dup_violations = [v for v in result.violations if v.kind == "duplicate_label"]
+    assert len(dup_violations) == 2
+
+
+# --- Rule 1b: stray_prose --------------------------------------------------------------------
+
+def test_rule1b_non_conforming_pillar_line_flagged_stray_prose():
+    result = probe.evaluate_checklist(
+        signpost_lines=[],
+        pillar_rows=[],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=False,
+        pillar_unparsed_lines=["This is stray prose, not a valid row."],
+    )
+    assert result.decision == "block"
+    stray = [v for v in result.violations if v.kind == "stray_prose"]
+    assert len(stray) == 1
+    assert stray[0].line_text == "This is stray prose, not a valid row."
+
+
+def test_rule1b_bare_pillar_heading_line_does_not_self_flag():
+    text = "Signpost:\n- I ran the tests.\n\nPillar:\n- [ ] I ran the tests. (unverified)\n"
+    lines = text.split("\n")
+    signpost_idx, pillar_idx = probe.find_signpost_pillar_positions(text)
+    pillar_rows, unparsed = probe.extract_pillar_rows(text, pillar_idx, len(lines))
+    signpost_lines = probe.extract_signpost_lines(text, signpost_idx, pillar_idx)
+
+    result = probe.evaluate_checklist(
+        signpost_lines=signpost_lines,
+        pillar_rows=pillar_rows,
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=unparsed,
+    )
+    assert result.decision == "allow"
+    assert result.violations == []
+
+
+def test_rule1b_pillar_heading_with_trailing_content_flagged_stray_prose():
+    text = "Signpost:\n- I ran the tests.\n\nPillar: all verified, trust me\n"
+    lines = text.split("\n")
+    signpost_idx, pillar_idx = probe.find_signpost_pillar_positions(text)
+    pillar_rows, unparsed = probe.extract_pillar_rows(text, pillar_idx, len(lines))
+    signpost_lines = probe.extract_signpost_lines(text, signpost_idx, pillar_idx)
+
+    result = probe.evaluate_checklist(
+        signpost_lines=signpost_lines,
+        pillar_rows=pillar_rows,
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=unparsed,
+    )
+    assert result.decision == "block"
+    stray = [v for v in result.violations if v.kind == "stray_prose"]
+    assert len(stray) == 1
+    assert stray[0].line_text == "all verified, trust me"
+
+
+# --- Rule 5: duplicate_id -------------------------------------------------------------------
+
+def test_rule5_second_row_reusing_tool_use_id_flagged_duplicate_id():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("Line A."), _line("Line B.")],
+        pillar_rows=[
+            _row("Line A.", "verified", tool_use_id="toolu_shared"),
+            _row("Line B.", "verified", tool_use_id="toolu_shared"),
+        ],
+        qualifying_calls=[_call("toolu_shared")],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    assert len(result.violations) == 1
+    assert result.violations[0].kind == "duplicate_id"
+    assert result.violations[0].row.label == "Line B."
+
+
+def test_rule5_evaluation_order_unmatched_row_evaluated_later_is_flagged_duplicate_id():
+    # 2026-09-07 clarification: rule 5's "earlier" is resolved by evaluation order (main
+    # per-Signpost-line pass, then the rule-7 residue pass over unmatched rows) — NOT by the
+    # order rows appear in the agent's raw reply text. Here the unmatched row is placed FIRST
+    # in pillar_rows (as it would be if it appeared first in the raw text), but since it has no
+    # matching Signpost line it is evaluated in the later residue pass, so it — not the matched
+    # row — must be the one flagged duplicate_id.
+    unmatched = _row("Extra claim not in Signpost.", "verified", tool_use_id="toolu_shared")
+    matched = _row("Line A.", "verified", tool_use_id="toolu_shared")
+
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("Line A.")],
+        pillar_rows=[unmatched, matched],  # unmatched appears first in raw order
+        qualifying_calls=[_call("toolu_shared")],
+        signpost_heading_present=True,
+        signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    dup_id_violations = [v for v in result.violations if v.kind == "duplicate_id"]
+    assert len(dup_id_violations) == 1
+    assert dup_id_violations[0].row is unmatched
+    unmatched_row_violations = [v for v in result.violations if v.kind == "unmatched_row"]
+    assert len(unmatched_row_violations) == 1
+    assert unmatched_row_violations[0].row is unmatched
+
+
+# --- Rule 7: unmatched_row -------------------------------------------------------------------
+
+def test_rule7_unmatched_row_runs_through_rules_3_5_and_always_flagged_unmatched():
+    unmatched = _row("Nothing in Signpost matches this.", "verified", tool_use_id="toolu_fake")
+    result = probe.evaluate_checklist(
+        signpost_lines=[],
+        pillar_rows=[unmatched],
+        qualifying_calls=[],  # no real tool call -> rule 4 false_claim
+        signpost_heading_present=True,
+        signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    kinds = [v.kind for v in result.violations]
+    assert "false_claim" in kinds
+    assert "unmatched_row" in kinds
+
+
+def test_rule7_unmatched_row_always_flagged_regardless_of_status():
+    unmatched = _row("Unverified extra claim.", "unverified")
+    result = probe.evaluate_checklist(
+        signpost_lines=[],
+        pillar_rows=[unmatched],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "block"
+    assert len(result.violations) == 1
+    assert result.violations[0].kind == "unmatched_row"
+
+
+# --- Edge case: empty Signpost section (no heading content anywhere) -> allow --------------
+
+def test_edge_empty_signpost_section_with_no_pillar_content_allows():
+    result = probe.evaluate_checklist(
+        signpost_lines=[],
+        pillar_rows=[],
+        qualifying_calls=[],
+        signpost_heading_present=True,
+        signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+    assert result.decision == "allow"
+    assert result.violations == []
+
+
+# --- Edge case: no cross-call state between independent evaluate_checklist() calls ---------
+
+def test_edge_repeated_identical_signpost_line_across_two_calls_no_shared_state():
+    def run_once():
+        return probe.evaluate_checklist(
+            signpost_lines=[_line("I ran the tests.")],
+            pillar_rows=[_row("I ran the tests.", "verified", tool_use_id="toolu_shared")],
+            qualifying_calls=[_call("toolu_shared")],
+            signpost_heading_present=True,
+            signpost_section_has_content=True,
+            pillar_unparsed_lines=[],
+        )
+
+    result1 = run_once()
+    result2 = run_once()
+
+    # If claimed_tool_use_ids leaked across calls, the second call's use of "toolu_shared"
+    # would be misflagged as duplicate_id. Both calls must independently allow.
+    assert result1.decision == "allow"
+    assert result2.decision == "allow"
+    assert result1.violations == []
+    assert result2.violations == []
+
+
+# --- build_reason(): distinct, non-colliding strings per violation kind --------------------
+
+def test_build_reason_rule0_string_distinct_from_rule0a_and_per_row_strings():
+    rule0_result = probe.evaluate_checklist(
+        signpost_lines=[], pillar_rows=[], qualifying_calls=[],
+        signpost_heading_present=False, signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+    rule0a_result = probe.evaluate_checklist(
+        signpost_lines=[], pillar_rows=[], qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    missing_result = probe.evaluate_checklist(
+        signpost_lines=[_line("A claim.")], pillar_rows=[], qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+
+    reasons = {rule0_result.reason, rule0a_result.reason, missing_result.reason}
+    assert len(reasons) == 3  # all distinct, no collisions
+    assert "Signpost section" in rule0_result.reason
+    assert "no lines were written as" in rule0a_result.reason
+    assert "Missing Pillar row" in missing_result.reason
+
+
+def test_build_reason_per_row_violation_kinds_produce_distinct_sentences():
+    duplicate_label_row = _row("Dup line.", "unverified")
+    dup_result = probe.evaluate_checklist(
+        signpost_lines=[_line("Dup line.")],
+        pillar_rows=[duplicate_label_row, _row("Dup line.", "unverified")],
+        qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    stray_result = probe.evaluate_checklist(
+        signpost_lines=[], pillar_rows=[], qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=False,
+        pillar_unparsed_lines=["stray text here"],
+    )
+    unmatched_result = probe.evaluate_checklist(
+        signpost_lines=[], pillar_rows=[_row("Orphan.", "unverified")], qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+
+    assert "Duplicate Pillar row label" in dup_result.reason
+    assert "Unrecognized line in Pillar section" in stray_result.reason
+    assert "does not match any Signpost line" in unmatched_result.reason
+    assert dup_result.reason != stray_result.reason != unmatched_result.reason
+
+
+# ---------------------------------------------------------------------------
 # Plain-assert fallback runner (matches archived probe's test file convention).
 # ---------------------------------------------------------------------------
 

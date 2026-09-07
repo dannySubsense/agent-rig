@@ -497,6 +497,199 @@ def write_track_record(
         pass
 
 
+# --- §5.4 Evaluation core ---------------------------------------------------
+
+
+def _evaluate_verified_row(row, qualifying_calls, claimed_tool_use_ids):
+    """Rules 3-5 (§5.4), shared between the per-Signpost-line matching pass and the rule-7
+    residue pass. Returns a list of RowViolation (0 or 1 entries) and mutates
+    `claimed_tool_use_ids` (a set) in place when a row's tool_use_id is newly claimed.
+    Only called for rows with status == "verified"; "unverified" rows are never subject to
+    rules 3-5 (rule 2)."""
+    if row.tool_use_id is None:
+        # Rule 3: defensive — should not occur given §5.3's regex.
+        return [RowViolation(kind="false_claim", signpost_text=None, row=row, line_text=None)]
+
+    if not any(call.tool_use_id == row.tool_use_id for call in qualifying_calls):
+        # Rule 4: claimed tool_use_id does not exist in qualifying_calls.
+        return [RowViolation(kind="false_claim", signpost_text=None, row=row, line_text=None)]
+
+    if row.tool_use_id in claimed_tool_use_ids:
+        # Rule 5: tool_use_id already claimed by an earlier-evaluated "verified" row.
+        return [RowViolation(kind="duplicate_id", signpost_text=None, row=row, line_text=None)]
+
+    claimed_tool_use_ids.add(row.tool_use_id)
+    return []
+
+
+def evaluate_checklist(
+    signpost_lines,
+    pillar_rows,
+    qualifying_calls,
+    signpost_heading_present,
+    signpost_section_has_content,
+    pillar_unparsed_lines,
+):
+    """Pure function, no I/O. Implements §5.4's evaluation rules 0, 0a, 1, 1a, 1b, 2-5, 6, 7.
+    See architecture §5.4 for the full rule text — in particular the 2026-09-07 clarification
+    that rule 5's "earlier" is resolved as evaluation order (this function's own processing
+    order: the per-Signpost-line matching pass over `signpost_lines`, followed by the rule-7
+    residue pass over unmatched `pillar_rows`), not the order rows appear in the agent's raw
+    reply text."""
+    # Rule 0: Signpost heading absent entirely — immediate fail-closed block, no per-line
+    # rules evaluated.
+    if not signpost_heading_present:
+        result = EvaluationResult(
+            decision="block", violations=[], signpost_heading_absent=True, reason=None
+        )
+        return EvaluationResult(
+            decision=result.decision,
+            violations=result.violations,
+            signpost_heading_absent=result.signpost_heading_absent,
+            reason=build_reason(result),
+        )
+
+    # Rule 0a: heading present, section has content, but zero claim lines parsed —
+    # fail-closed block.
+    if signpost_section_has_content and not signpost_lines:
+        result = EvaluationResult(
+            decision="block",
+            violations=[
+                RowViolation(
+                    kind="malformed_signpost", signpost_text=None, row=None, line_text=None
+                )
+            ],
+            signpost_heading_absent=False,
+            reason=None,
+        )
+        return EvaluationResult(
+            decision=result.decision,
+            violations=result.violations,
+            signpost_heading_absent=result.signpost_heading_absent,
+            reason=build_reason(result),
+        )
+
+    violations = []
+    claimed_tool_use_ids = set()
+    matched_row_ids = set()
+
+    # Per-Signpost-line matching pass (rules 1, 1a, 1b's counterpart, 2-5).
+    for line in signpost_lines:
+        matches = [row for row in pillar_rows if row.label.strip() == line.text.strip()]
+
+        if not matches:
+            # Rule 1: no matching row found.
+            violations.append(
+                RowViolation(
+                    kind="missing", signpost_text=line.text, row=None, line_text=None
+                )
+            )
+            continue
+
+        if len(matches) > 1:
+            # Rule 1a: more than one PillarRow matches the same SignpostLine.text — every
+            # matching row is flagged; none proceed to rules 2-5.
+            for row in matches:
+                matched_row_ids.add(id(row))
+                violations.append(
+                    RowViolation(
+                        kind="duplicate_label", signpost_text=None, row=row, line_text=None
+                    )
+                )
+            continue
+
+        row = matches[0]
+        matched_row_ids.add(id(row))
+
+        # Rule 2: "unverified" is always allowed, never a violation.
+        if row.status == "unverified":
+            continue
+
+        # Rules 3-5.
+        violations.extend(_evaluate_verified_row(row, qualifying_calls, claimed_tool_use_ids))
+
+    # Rule 1b: every unparsed Pillar line is a stray-prose violation.
+    for raw_line in pillar_unparsed_lines:
+        violations.append(
+            RowViolation(kind="stray_prose", signpost_text=None, row=None, line_text=raw_line)
+        )
+
+    # Rule 7: residue pass over PillarRows with no matching SignpostLine, run strictly after
+    # the main per-line loop above. Each unmatched row is still run through rules 3-5 exactly
+    # as a matched row would be, and always additionally produces an "unmatched_row" violation.
+    for row in pillar_rows:
+        if id(row) in matched_row_ids:
+            continue
+        if row.status == "verified":
+            violations.extend(
+                _evaluate_verified_row(row, qualifying_calls, claimed_tool_use_ids)
+            )
+        violations.append(
+            RowViolation(kind="unmatched_row", signpost_text=None, row=row, line_text=None)
+        )
+
+    decision = "block" if violations else "allow"
+    result = EvaluationResult(
+        decision=decision,
+        violations=violations,
+        signpost_heading_absent=False,
+        reason=None,
+    )
+    return EvaluationResult(
+        decision=result.decision,
+        violations=result.violations,
+        signpost_heading_absent=result.signpost_heading_absent,
+        reason=build_reason(result) if violations else None,
+    )
+
+
+def build_reason(result) -> str:
+    """One sentence per violation, concatenated — quotes the exact Signpost/Pillar line text
+    involved. Rule-0 (`signpost_heading_absent`) and rule-0a (`malformed_signpost`) results
+    each get their own distinct, non-per-row message rather than a per-row violation list."""
+    if result.signpost_heading_absent:
+        return (
+            "Blocked: this turn was expected to include a Signpost section, but no Signpost "
+            "heading was found in the reply."
+        )
+
+    sentences = []
+    for violation in result.violations:
+        if violation.kind == "malformed_signpost":
+            sentences.append(
+                "Blocked: the Signpost section has content but no lines were written as "
+                "list items, so no claims could be parsed."
+            )
+        elif violation.kind == "missing":
+            sentences.append(
+                f'Missing Pillar row for Signpost line: "{violation.signpost_text}".'
+            )
+        elif violation.kind == "duplicate_label":
+            sentences.append(
+                f'Duplicate Pillar row label: "{violation.row.label}" matched more than one row.'
+            )
+        elif violation.kind == "stray_prose":
+            sentences.append(
+                f'Unrecognized line in Pillar section: "{violation.line_text}".'
+            )
+        elif violation.kind == "false_claim":
+            sentences.append(
+                f'Unbacked verification claim in row: "{violation.row.label}".'
+            )
+        elif violation.kind == "duplicate_id":
+            sentences.append(
+                f'Reused tool_use_id in row: "{violation.row.label}".'
+            )
+        elif violation.kind == "unmatched_row":
+            sentences.append(
+                f'Pillar row does not match any Signpost line: "{violation.row.label}".'
+            )
+        else:
+            sentences.append(f"Unrecognized violation kind: {violation.kind}.")
+
+    return " ".join(sentences)
+
+
 def emit_block(reason):
     print(json.dumps({"decision": "block", "reason": reason}))
 

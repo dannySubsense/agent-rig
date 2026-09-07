@@ -422,6 +422,13 @@ as a match):
    false claim, not allowed to pass on the strength of the claim alone).
 5. **Matching row found, valid `tool_use_id`, but that same `tool_use_id` was already claimed by
    an earlier `"verified"` row in this evaluation** → `RowViolation("duplicate_id", row=row)`.
+   **"Earlier" is resolved as evaluation order, not source/reply order** — the order rows are
+   actually processed by `evaluate_checklist()` (the per-Signpost-line matching pass, rules 1-6,
+   followed by the rule 7 residue pass over unmatched rows), not the order their lines appear in
+   the agent's raw reply text. This was flagged as ambiguous during an independent diagram
+   cross-check (2026-09-07) — resolved here rather than left implicit, since a row appearing
+   earlier in the reply but evaluated later (e.g. an unmatched row, evaluated in the rule 7 pass
+   after all matched rows) would otherwise be read two different ways.
    *Design addition beyond the literal ACs* — flagged explicitly for review: without this, one
    real tool call could trivially "back" every row regardless of relevance, which would satisfy
    AC-2's literal wording ("traceable to an actual tool call") while defeating the mechanism's
