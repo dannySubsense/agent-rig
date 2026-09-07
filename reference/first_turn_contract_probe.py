@@ -490,15 +490,48 @@ def _collect_qualifying_tool_calls(preceding):
     ]
 
 
+# Issue #27 (2026-09-07) — a Pillar section can satisfy C3's structural requirements (a
+# heading exists, qualifying tool calls exist) while its own text admits the claims under
+# it were never actually verified (e.g. "Pillar: none yet — nothing independently checked
+# this session"). §3.1's subject-extraction fallback ("no extractable subjects → presence-
+# only pass") cannot catch this, because plain-English admission prose has no backtick/
+# file-path/PR-number/quoted-query shape to extract. This is deliberately narrow, checked
+# ONLY against Pillar text — the current turn's own authored output, the one surface this
+# hook already has standing to gate (same as C1/C2 and the rest of C3). It is NOT sourced
+# from Signpost text: Signpost is injected/observed content the current agent did not
+# author, and gating on it (tried and reverted this same sprint, see
+# docs/specs/first-turn-contract-c3-signpost-sourcing/) repeats the REACTOR-AS-GATEKEEPER
+# mistake one layer up — see docs/specs/agent-rig-ddrs/00-DDR-INDEX.md item 15.
+_PILLAR_ADMITS_UNVERIFIED_RE = re.compile(
+    r"\b(none\s+yet|not\s+yet\s+(?:independently\s+)?(?:verified|checked|run)"
+    r"|nothing\s+(?:independently\s+)?(?:verified|checked)"
+    r"|haven'?t\s+(?:re-?)?(?:run|checked|verified))\b",
+    re.IGNORECASE,
+)
+
+
+def _pillar_admits_unverified(pillar_section_text):
+    """True if the Pillar section's own text contains a plain admission that its claims
+    were not (yet) verified this session. Checked against the whole section, not just the
+    heading line, since the admission is typically the section's body content."""
+    if not pillar_section_text:
+        return False
+    return bool(_PILLAR_ADMITS_UNVERIFIED_RE.search(pillar_section_text))
+
+
 def check_c3_violation(records, current_turn_index, pillar_idx, pillar_section_text):
     """§5.4/§3.3 — applies only if a Pillar heading was asserted (`pillar_idx is not
     None`). Returns `(violation: bool, unmatched_subjects: list)`. `unmatched_subjects` is
     the list of `(subject_type, value)` claim subjects that had no matching qualifying
     tool call — populated only for the "qualifying calls exist but some subject(s)
     unmatched" case (§4), empty otherwise (including the pure-absence and presence-only-
-    fallback cases)."""
+    fallback cases). A self-admission match (issue #27) is signaled via the special
+    subject type `"admission"` so `build_reason` can word it distinctly."""
     if pillar_idx is None:
         return False, []
+
+    if _pillar_admits_unverified(pillar_section_text):
+        return True, [("admission", _PILLAR_ADMITS_UNVERIFIED_RE.search(pillar_section_text).group(0))]
 
     if current_turn_index is None:
         preceding = records
@@ -545,7 +578,19 @@ def build_reason(
         )
     if "C3" in violations:
         quoted = pillar_line if pillar_line else "(Pillar heading)"
-        if c3_unmatched_subjects:
+        admission = next(
+            (value for subject_type, value in (c3_unmatched_subjects or [])
+             if subject_type == "admission"),
+            None,
+        )
+        if admission:
+            parts.append(
+                f"C3 violation: a Pillar heading was asserted (quoted: \"{quoted}\") "
+                f"whose own text admits its claims were not verified (matched: "
+                f"\"{admission}\"). An admitted-unverified Pillar is not a Pillar — run "
+                f"the actual verification, then report it."
+            )
+        elif c3_unmatched_subjects:
             named = ", ".join(f"`{value}`" for _subject_type, value in c3_unmatched_subjects)
             parts.append(
                 f"C3 violation: a Pillar heading was asserted (quoted: \"{quoted}\") "

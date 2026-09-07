@@ -1,5 +1,47 @@
 # Architecture: first-turn-contract-c3-signpost-sourcing
 
+## REDESIGN (2026-09-07, supersedes everything below)
+
+Danny's direct catch, after real data (see below) confirmed Frank's iteration-4 HALT finding that
+Signpost-sourced subject extraction over-fires on ordinary prose: **the entire Signpost-sourcing
+approach documented below is a category error, not a tunable false-positive rate.** Signpost text
+is injected/observed content the current agent did not author — extracting "required subjects"
+from it and hard-blocking on mismatches is gating something that should only be observed, the
+same REACTOR-AS-GATEKEEPER mistake as the deleted `_FILE_EXTENSION_ALLOWLIST` (DDR-INDEX item 15),
+one layer up. Pillar text is different: the current agent authors and asserts it right now, which
+is the one surface this hook already has standing to gate.
+
+**Empirical confirmation, real data, not hypothetical**: pulled all 18 real Signpost sections
+found across this repo's own session transcripts (`~/.claude/projects/-home-d-tuned-agent-rig/*.jsonl`)
+and ran the (now-abandoned) union-extraction design against them. Of 36 "path" subjects
+extracted, roughly 14 were noise indistinguishable in shape from real subjects: `'2/3'`, `'6/7'`,
+`'32/32'` (fractions), `'HIGH/MEDIUM'`, `'pushed/clean'`, `'stale/wrong'`,
+`'not-found/infra-failure'` (status-word pairs) — mixed with real ones like
+`'commands/lore-close.md'` and `'recovery/checkpoint-2-from-bfe41c4'` (an actual branch name).
+Backtick-presence does not cleanly separate them: the real branch name above was bare, not
+backticked, so requiring backticks would drop it — the same "requiring a slash drops bare
+filenames" trap the original C3 spec already knew about. No cheap structural signal fixed this,
+because the defect wasn't the signal choice, it was gating on this input source at all.
+
+**Actual fix, implemented directly in `scripts/first_turn_contract_probe.py` (mirrored to
+`reference/`), no Signpost involvement**: `check_c3_violation` gained a direct check —
+`_pillar_admits_unverified(pillar_section_text)` — that fires when the Pillar section's own text
+contains a plain-English admission of non-verification (`"none yet"`, `"not yet verified"`,
+`"nothing (independently )?checked"`, `"haven't (re-)?run/checked/verified"`), independent of
+subject extraction or qualifying-tool-call presence. This directly catches the literal issue #27
+text (`"Pillar: none yet — nothing independently checked this session."`) without ever parsing
+Signpost content. Verified: does not false-fire on a real, honestly-verified Pillar section (a
+"Pillar (verified this session): git status confirms..." fixture returns `False`). Verified
+against the same 18 real Signpost sections: 2 of 18 WOULD trip this regex if it were ever
+mistakenly run against Signpost text instead of Pillar — because Signpost content routinely
+self-describes as "not yet verified," which is its defining property in this hook's own doctrine
+— confirming why the Pillar-only scoping is load-bearing, not incidental. All 32 pre-existing
+tests still pass unchanged.
+
+Everything below this section describes the abandoned Signpost-sourcing design and is kept for
+history/context only — do not implement against it. `01-REQUIREMENTS.md` and `04-ROADMAP.md` need
+the equivalent correction before this sprint returns to Frank.
+
 ## Summary
 
 `check_c3_violation` currently sources claim subjects from `pillar_section_text` only. This
@@ -109,9 +151,14 @@ _DECISION_ID_RE = re.compile(r"\b([A-Za-z]+-\d+)\b")
 # ALLOWLIST (not a denylist) of decision-ID prefixes this repo's own tracking artifacts actually
 # use. See "Prose false-positive exclusion (G11-R/G13, iteration-3 redesign)" above for the full
 # citation and the reasoning for replacing the prior denylist. Checked case-insensitively against
-# the matched prefix. This set is complete against this repo's attested usage, not exhaustive
-# against hypothetical usage — extend it only by citing a new real, observed prefix the same way
-# `DDR` is cited here, never by anticipating a look-alike prose token.
+# the matched prefix. Correction (Frank spec-gate, iteration-4 review): `grep -rhoE
+# "\b[A-Z]{2,}-[0-9]{2,}\b" docs/` shows `US-10` (a user-story ID) occurring 28x in this repo's
+# docs — a real, attested hyphenated ID this allowlist deliberately excludes. This set is
+# therefore NOT complete against this repo's full attested usage; it covers `DDR` only, the one
+# prefix this sprint's own scope (issue #27, C3 hook hardening) needs. This is a stated
+# false-negative, not a safety defect (per Q1's control-boundary framing: narrower is the safe
+# direction for a mechanism that blocks sessions on a match) — extend to `US` or other real
+# prefixes only when a real Signpost claim actually needs one, cited the same way `DDR` is here.
 _DECISION_ID_PREFIX_ALLOWLIST = {"DDR"}
 
 def _looks_like_decision_id(match):
@@ -400,7 +447,9 @@ depends on the same unsourced constant) is visible rather than assumed away.
 - Story 1 / AC1 (now satisfiable as reworded — see 01-REQUIREMENTS.md's Out of Scope addition
   and the extraction pattern investigation above): branch name (`_FILE_PATH_RE`, already
   covered), commit SHA (new `_BARE_SHA_RE`/`_looks_like_sha`), PR/issue/decision ID (`#12`/`PR
-  #12` via existing `_PR_NUMBER_RE`; hyphenated `DDR-006`/`PR-012` via new `_DECISION_ID_RE`),
+  #12` via existing `_PR_NUMBER_RE`; hyphenated `DDR-006` via new `_DECISION_ID_RE`, gated on the
+  `{"DDR"}` prefix allowlist — `PR-012` is NOT matched by `_DECISION_ID_RE` since `PR` is not in
+  that allowlist; `PR` references are covered only via `_PR_NUMBER_RE`'s own `#`/`PR #n` forms),
   and file path (`_FILE_PATH_RE`, existing) are all reliably extracted by the union computation.
 - Story 1 / AC2 (issue #27 repro), AC3 (both empty → no fire): satisfied by the union
   computation — empty-Pillar-nonempty-Signpost fires on the Signpost subject; both-empty falls

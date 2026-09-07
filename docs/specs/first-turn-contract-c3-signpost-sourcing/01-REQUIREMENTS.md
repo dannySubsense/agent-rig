@@ -1,9 +1,14 @@
 # Requirements: first-turn-contract-c3-signpost-sourcing
 
-## Summary
-Change `check_c3_violation` in `scripts/first_turn_contract_probe.py` to source claim subjects
-from the Signpost section (in addition to the existing Pillar-sourced extraction), so an empty
-or evasive Pillar section can no longer silently pass C3 via the presence-only fallback.
+## REDESIGN (2026-09-07, supersedes the Summary/Stories below)
+
+See `02-ARCHITECTURE.md`'s "REDESIGN" section for the full account (real empirical evidence,
+reasoning, and implementation). Short version: Signpost-sourced subject extraction was abandoned
+as a category error (gating on injected/observed content the current agent doesn't author), not
+tuned for false positives. The actual, implemented fix is a direct check on Pillar's own text —
+`_pillar_admits_unverified` — that fires on plain-English admission of non-verification, with no
+Signpost involvement at all. Everything below this note describes the abandoned design; kept for
+history only.
 
 ## User Stories
 
@@ -91,8 +96,8 @@ so that this specific blind spot cannot silently reopen.
 - Deferred: Exhaustive coverage of every possible Signpost subject format; extraction patterns are
   scoped to what's needed against real examples from this repo's transcripts, not a formal grammar.
 - NOT: Propagating this fix to the other repos on `HOOK-DEPLOYMENT-ROSTER.md` also running
-  `first_turn_contract_probe.py` — scope is agent-rig only; propagation is separate follow-up work
-  tracked as its own issue after this sprint ships.
+  `first_turn_contract_probe.py` — scope is agent-rig only; propagation is
+  https://github.com/dannySubsense/agent-rig/issues/28, no owner assigned yet.
 
 ## Constraints
 

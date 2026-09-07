@@ -866,6 +866,59 @@ def test_c3_matching_ac8_path_basename_fallback_reachable_on_non_aligning_dirs()
 
 
 # ---------------------------------------------------------------------------
+# Issue #27 — Pillar self-admission of non-verification (2026-09-07)
+# ---------------------------------------------------------------------------
+
+def test_c3_pillar_admission_of_nonverification_blocks_even_with_qualifying_call(
+    monkeypatch, tmp_path
+):
+    """Issue #27: a Pillar section that admits its own claims were not verified must block,
+    even when a qualifying tool call exists earlier in the turn (previously satisfied C3's
+    presence-only fallback, since plain-English admission prose has no extractable subject).
+    This is the literal evasion text from the incident, not a paraphrase."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Bash", "toolu_a1", {"command": "git status -uno"}),
+        _tool_result_record("toolu_a1"),
+    ])
+    stdin_data = {
+        "session_id": "c3-admission-27",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "none yet — nothing independently checked this session."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is not None and decision["decision"] == "block"
+    assert "C3" in entries[-1]["violations"]
+    assert "admits its claims were not verified" in decision["reason"]
+
+
+def test_c3_real_verified_pillar_does_not_false_trigger_admission_check(monkeypatch, tmp_path):
+    """A genuinely verified Pillar section (with a matching qualifying tool call) must not be
+    caught by the new admission check — it names no admission phrase."""
+    transcript = _write_transcript(tmp_path, [
+        _queue_marker_record(),
+        _tool_use_record_with_input("Bash", "toolu_a2", {"command": "git status -uno"}),
+        _tool_result_record("toolu_a2"),
+    ])
+    stdin_data = {
+        "session_id": "c3-admission-real",
+        "transcript_path": transcript,
+        "stop_hook_active": False,
+        "last_assistant_message": _signpost_then_pillar(
+            "verified this session: `git status -uno` confirms clean tree."
+        ),
+    }
+    stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
+    decision = _decision(stdout_text)
+    assert decision is None
+    assert entries[-1]["decision"] == "allow"
+
+
+# ---------------------------------------------------------------------------
 # Drift guard — reference/ vs scripts/ (spec §10, Slice 2)
 # ---------------------------------------------------------------------------
 

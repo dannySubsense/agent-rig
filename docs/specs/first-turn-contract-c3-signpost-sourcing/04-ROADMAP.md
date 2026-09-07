@@ -1,5 +1,18 @@
 # Roadmap: first-turn-contract-c3-signpost-sourcing
 
+## REDESIGN (2026-09-07, supersedes the slices below)
+
+See `02-ARCHITECTURE.md`'s "REDESIGN" section. The Signpost-sourcing slices below were never
+executed against the abandoned design (only the extension-allowlist deletion and the new
+`_pillar_admits_unverified` check were actually implemented, directly, in
+`scripts/first_turn_contract_probe.py` + `reference/`). Actual work done, as a single slice:
+add `_PILLAR_ADMITS_UNVERIFIED_RE` + `_pillar_admits_unverified` + a `check_c3_violation`
+branch that returns an `("admission", matched_text)` sentinel + a `build_reason` branch wording
+it distinctly. Verified: literal issue #27 text triggers it; a real verified-Pillar fixture does
+not false-trigger; 2/18 real Signpost sections would trigger it if misapplied there (confirming
+Pillar-only scoping matters); all 32 pre-existing tests pass unchanged. Everything below this
+note describes the abandoned design; kept for history only.
+
 ## Dependency Map
 
 | Unit | Depends On |
