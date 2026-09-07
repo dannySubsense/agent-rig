@@ -32,9 +32,8 @@ import sys
 from datetime import datetime, timezone
 
 repo_dir, stdin_path, cause = sys.argv[1], sys.argv[2], sys.argv[3]
-track_record_path = os.environ.get(
-    "SIGNPOST_TRACK_RECORD_PATH",
-    os.path.join(repo_dir, "docs", "tooling", "signpost-checklist-track-record.jsonl"),
+track_record_path = os.path.join(
+    repo_dir, "docs", "tooling", "signpost-checklist-track-record.jsonl"
 )
 
 session_id = None
@@ -68,9 +67,9 @@ except Exception:
 PYEOF
 }
 
-# 5s budget — measured 2026-09-07: 0.31s wall time, 50 MB RSS against the largest real
-# transcript on this host (13.4 MB, out of 72 files scanned), giving ~16x headroom against
-# the 5s bound.
+# 5s budget — same bound as no-preamble-no-meta-narration.sh's own probe: this probe is a
+# similarly cheap, bounded-work operation, so the same generous bound is reused without
+# re-measurement.
 PROBE_EXIT=0
 timeout 5 "$REPO_DIR/scripts/signpost_checklist_probe.py" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
 

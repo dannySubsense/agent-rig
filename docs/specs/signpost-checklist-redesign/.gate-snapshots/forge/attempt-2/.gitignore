@@ -1,0 +1,32 @@
+CLAUDE.md
+MACHINE-SETUP.md
+.env
+.env*.local
+node_modules/
+.next/
+dist/
+__pycache__/
+*.pyc
+
+# first-turn-contract-enforcement track record — repo-local, working-copy only (spec §6):
+# gitignored so every Stop-hook append does not permanently dirty the tree (would corrupt
+# session-queue-hardening's git-state dirty: derivation).
+docs/tooling/first-turn-contract-track-record.jsonl
+
+# domain-boundary-provenance-hook track record — repo-local, working-copy only (spec §6):
+# same rationale as the sibling entry above, gitignored so every PreToolUse-hook append does
+# not permanently dirty the tree.
+docs/tooling/domain-boundary-provenance-track-record.jsonl
+
+# progress-proof-per-slice-hook track record — repo-local, working-copy only (spec §6):
+# same rationale as the sibling entries above, gitignored so every PreToolUse-hook append does
+# not permanently dirty the tree.
+docs/tooling/progress-proof-per-slice-track-record.jsonl
+
+# no-preamble-no-meta-narration-hook track record — repo-local, working-copy only (spec §7/§8):
+# same rationale as the sibling entries above, gitignored so every Stop-hook append does not
+# permanently dirty the tree.
+docs/tooling/no-preamble-no-meta-narration-track-record.jsonl
+
+# same rationale — signpost-checklist-redesign's own per-invocation audit log
+docs/tooling/signpost-checklist-track-record.jsonl

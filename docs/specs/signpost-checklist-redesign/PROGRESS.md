@@ -1,6 +1,6 @@
 # Progress: signpost-checklist-redesign
 
-## Status: IN_PROGRESS
+## Status: COMPLETE (Frank binding forge-gate PASSed, attempt 2/3, 2026-09-07)
 
 ## Slices
 Build order per 04-ROADMAP.md's Dependency Map (not file order — Sequence Rule 1):
@@ -68,11 +68,14 @@ rows evaluated before rule-7 residue-pass rows). Not escalated to Danny — reso
 the spec's own existing wording ("in this evaluation"), which already implied this reading.
 
 ## Forge Gate
-Counter: 0/3
+Counter: 2/3
 
 | Attempt | Date | Verdict | Findings Summary | Snapshot |
 |---|---|---|---|---|
+| 1 | 2026-09-07 | FAIL | F1: test suite + wrapper write fabricated/stale-schema rows into the live gitignored audit log (measured 158→172 in one pytest run; 3 pre-fix `flagged_clauses` lines still present, causing KeyError on read) — the exact log the sprint's "live daily use with feedback" validation model depends on. F2 (Layer 1 FAIL): real fidelity gap — CLAUDE.md/build_reason() never state the Pillar section runs to end-of-reply or next heading; an honest agent whose reply ends with an ordinary closing sentence after the Pillar block gets wrongly blocked (`stray_prose`), reproduced live against 3/3 real first-turn replies on this host including this session's own. F3: HOOK-DEPLOYMENT-ROSTER.md agent-rig row stale ("forge not yet run") — hook has been live since Slice 6. Timeout: unsourced `timeout 5` measured (0.31s/50MB against largest real transcript, 13.4MB) — needs recording, not yet a defect. Layer 1 FAIL, Layer 2 PASS (project North Star Established, drift checks satisfied except F3). | .gate-snapshots/forge/attempt-1/ |
+| 2 | 2026-09-07 | **PASS** | Layer 1 PASS, Layer 2 PASS. All three attempt-1 findings independently re-verified resolved, not trusted from report: F1 (log isolation via `SIGNPOST_TRACK_RECORD_PATH` env var honored by both probe and wrapper, live log sha256-identical before/after full suite, 4 genuine live entries reconciled against this session's own real transcript); F2 (Pillar-section boundary rule now stated matching in both channels, Frank re-ran his own live reproduction — trailing closer now blocks with an informative reason, prose-before-Signpost now allows silently); F3 (roster corrected, verification method upgraded to direct file read). Timeout measurement recorded and independently re-measured by Frank (0.35s/50.6MB vs. recorded 0.31s/50MB — consistent). 2 non-blocking Carried Conditions: (1) Slice 7's real-first-turn validation obligation stays open — live log's 4 entries are all `first_turn:false`, re-run once a genuine `first_turn:true` row lands; (2) this table row + attempt-2 snapshot, closed same session. | .gate-snapshots/forge/attempt-2/ |
 
-Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
-Deep-diagnosis evidence:
-Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
+Convergence judgment: not applicable — PASS reached at attempt 2, no attempt 3 needed.
+Orchestrator independent re-derivation: AGREES — read every changed file myself before and after
+each fix dispatch, ran the full suite and log-hash check independently at each step, did not rely
+on Frank's or any subagent's report alone for any of the three findings.

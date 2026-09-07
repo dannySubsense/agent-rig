@@ -24,12 +24,8 @@ from datetime import datetime, timezone
 from typing import Optional
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Overridable via SIGNPOST_TRACK_RECORD_PATH so tests (and the wrapper's write_probe_error,
-# see .claude/hooks/signpost-checklist.sh) can redirect writes to an isolated tmp path instead
-# of the live gitignored log.
-TRACK_RECORD_PATH = os.environ.get(
-    "SIGNPOST_TRACK_RECORD_PATH",
-    os.path.join(REPO_ROOT, "docs", "tooling", "signpost-checklist-track-record.jsonl"),
+TRACK_RECORD_PATH = os.path.join(
+    REPO_ROOT, "docs", "tooling", "signpost-checklist-track-record.jsonl"
 )
 
 # The first line of session_queue_probe.py's HEADER (§5.1) — emitted only on the success
@@ -710,12 +706,9 @@ def build_reason(result) -> str:
             )
         elif violation.kind == "stray_prose":
             sentences.append(
-                f'Unrecognized line in Pillar section: "{violation.line_text}". The Pillar '
-                "section runs from the `Pillar:` heading to the end of the reply, or to the "
-                "next `Signpost:`/`Pillar:` heading if one appears, and every non-blank line "
-                "in that span must match the forced row syntax:\n"
-                f"{_ROW_SYNTAX_EXAMPLE}\nAny closing remarks or other prose must be written "
-                "before the `Signpost:` heading, never after the last Pillar row."
+                f'Unrecognized line in Pillar section: "{violation.line_text}". Every '
+                "non-blank line in the Pillar section must match the forced row syntax:\n"
+                f"{_ROW_SYNTAX_EXAMPLE}"
             )
         elif violation.kind == "false_claim":
             sentences.append(

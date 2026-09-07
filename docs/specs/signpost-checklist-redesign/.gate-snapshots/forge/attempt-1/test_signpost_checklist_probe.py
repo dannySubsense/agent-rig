@@ -954,42 +954,30 @@ def test_stop_hook_active_present_allows_with_no_further_processing():
     probe.load_transcript_records = lambda *a, **k: (_ for _ in ()).throw(
         AssertionError("load_transcript_records must not be called when stop_hook_active")
     )
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
     try:
-        with _track_record_path(track_path):
-            stdin_data = {
-                "session_id": "sess-1",
-                "transcript_path": "/nonexistent/path.jsonl",
-                "stop_hook_active": True,
-                "last_assistant_message": "no signpost heading at all",
-            }
-            _, output = _capture_stdout(probe.run, stdin_data)
+        stdin_data = {
+            "session_id": "sess-1",
+            "transcript_path": "/nonexistent/path.jsonl",
+            "stop_hook_active": True,
+            "last_assistant_message": "no signpost heading at all",
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
     finally:
         probe.load_transcript_records = original
-        if os.path.exists(track_path):
-            os.remove(track_path)
     assert output == ""  # allow == silence
 
 
 # --- Queue marker absent -> mechanism does not activate (US-5 AC3) -------------------------
 
 def test_queue_marker_absent_mechanism_does_not_activate():
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
-    try:
-        with _track_record_path(track_path):
-            with _transcript_path([_assistant_text_record("no signpost heading here")]) as path:
-                stdin_data = {
-                    "session_id": "sess-2",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": "no signpost heading here",
-                }
-                _, output = _capture_stdout(probe.run, stdin_data)
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
+    with _transcript_path([_assistant_text_record("no signpost heading here")]) as path:
+        stdin_data = {
+            "session_id": "sess-2",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": "no signpost heading here",
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
     assert output == ""  # allow, despite content that would otherwise block
 
 
@@ -1001,21 +989,14 @@ def test_not_first_reply_of_session_mechanism_does_not_activate():
         _assistant_text_record("first reply, prior turn"),
         _assistant_text_record("no signpost heading here"),
     ]
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
-    try:
-        with _track_record_path(track_path):
-            with _transcript_path(records) as path:
-                stdin_data = {
-                    "session_id": "sess-3",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": "no signpost heading here",
-                }
-                _, output = _capture_stdout(probe.run, stdin_data)
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
+    with _transcript_path(records) as path:
+        stdin_data = {
+            "session_id": "sess-3",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": "no signpost heading here",
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
     assert output == ""  # allow, despite content that would otherwise block
 
 
@@ -1024,21 +1005,14 @@ def test_not_first_reply_of_session_mechanism_does_not_activate():
 def test_run_computes_signpost_heading_absent_and_produces_rule0_block():
     message = "This reply has no Signpost heading at all."
     records = _first_turn_queue_injected_records(message)
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
-    try:
-        with _track_record_path(track_path):
-            with _transcript_path(records) as path:
-                stdin_data = {
-                    "session_id": "sess-4",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": message,
-                }
-                _, output = _capture_stdout(probe.run, stdin_data)
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
+    with _transcript_path(records) as path:
+        stdin_data = {
+            "session_id": "sess-4",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": message,
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
     assert output != ""
     payload = json.loads(output)
     assert payload["decision"] == "block"
@@ -1050,21 +1024,14 @@ def test_run_computes_signpost_heading_absent_and_produces_rule0_block():
 def test_run_computes_section_has_content_with_no_lines_and_produces_rule0a_block():
     message = "Signpost: I verified the build and the tests.\n\nPillar:\n"
     records = _first_turn_queue_injected_records(message)
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
-    try:
-        with _track_record_path(track_path):
-            with _transcript_path(records) as path:
-                stdin_data = {
-                    "session_id": "sess-5",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": message,
-                }
-                _, output = _capture_stdout(probe.run, stdin_data)
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
+    with _transcript_path(records) as path:
+        stdin_data = {
+            "session_id": "sess-5",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": message,
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
     assert output != ""
     payload = json.loads(output)
     assert payload["decision"] == "block"
@@ -1081,87 +1048,19 @@ def test_run_passes_non_empty_pillar_unparsed_lines_and_produces_stray_prose_vio
         "This is stray prose, not a valid row.\n"
     )
     records = _first_turn_queue_injected_records(message)
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
-    try:
-        with _track_record_path(track_path):
-            with _transcript_path(records) as path:
-                stdin_data = {
-                    "session_id": "sess-6",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": message,
-                }
-                _, output = _capture_stdout(probe.run, stdin_data)
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
+    with _transcript_path(records) as path:
+        stdin_data = {
+            "session_id": "sess-6",
+            "transcript_path": path,
+            "stop_hook_active": False,
+            "last_assistant_message": message,
+        }
+        _, output = _capture_stdout(probe.run, stdin_data)
     assert output != ""
     payload = json.loads(output)
     assert payload["decision"] == "block"
     assert "Unrecognized line in Pillar section" in payload["reason"]
     assert "This is stray prose, not a valid row." in payload["reason"]
-
-
-# --- Pillar-section-boundary regression (Frank forge-gate F2, 2026-09-07) ------------------
-# Real first-turn replies end with an ordinary closing sentence after the Pillar rows. The
-# Pillar section runs from `Pillar:` to end-of-reply/next heading, so trailing prose there is
-# a violation; the same prose placed before `Signpost:` is not.
-
-def test_run_trailing_closer_after_pillar_rows_blocks_stray_prose():
-    message = (
-        "Signpost:\n- claim A\n\n"
-        "Pillar:\n"
-        "- [ ] claim A (unverified)\n"
-        "What would you like to work on?\n"
-    )
-    records = _first_turn_queue_injected_records(message)
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
-    try:
-        with _track_record_path(track_path):
-            with _transcript_path(records) as path:
-                stdin_data = {
-                    "session_id": "sess-boundary-1",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": message,
-                }
-                _, output = _capture_stdout(probe.run, stdin_data)
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
-    assert output != ""
-    payload = json.loads(output)
-    assert payload["decision"] == "block"
-    assert "Unrecognized line in Pillar section" in payload["reason"]
-    assert "What would you like to work on?" in payload["reason"]
-
-
-def test_run_closer_before_signpost_heading_allows():
-    message = (
-        "What would you like to work on?\n\n"
-        "Signpost:\n- claim A\n\n"
-        "Pillar:\n"
-        "- [ ] claim A (unverified)\n"
-    )
-    records = _first_turn_queue_injected_records(message)
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
-    try:
-        with _track_record_path(track_path):
-            with _transcript_path(records) as path:
-                stdin_data = {
-                    "session_id": "sess-boundary-2",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": message,
-                }
-                _, output = _capture_stdout(probe.run, stdin_data)
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
-    assert output == ""  # allow == silence
 
 
 # --- Simulated exception inside evaluation path -> main() still exits allow (fail-open) ----
@@ -1174,24 +1073,19 @@ def test_main_fail_opens_on_simulated_exception_in_evaluation_path():
     original_stdin_reader = probe.read_stdin
     message = "Signpost:\n- I ran the tests.\n\nPillar:\n- [ ] I ran the tests. (unverified)\n"
     records = _first_turn_queue_injected_records(message)
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
     try:
-        with _track_record_path(track_path):
-            with _transcript_path(records) as path:
-                stdin_data = {
-                    "session_id": "sess-7",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": message,
-                }
-                probe.read_stdin = lambda: stdin_data
-                exit_code, output = _capture_stdout(probe.main)
+        with _transcript_path(records) as path:
+            stdin_data = {
+                "session_id": "sess-7",
+                "transcript_path": path,
+                "stop_hook_active": False,
+                "last_assistant_message": message,
+            }
+            probe.read_stdin = lambda: stdin_data
+            exit_code, output = _capture_stdout(probe.main)
     finally:
         probe.evaluate_checklist = original
         probe.read_stdin = original_stdin_reader
-        if os.path.exists(track_path):
-            os.remove(track_path)
     assert exit_code == 0
     assert output == ""  # allow == silence, fail-open on the unhandled exception
 
@@ -1279,23 +1173,18 @@ def test_gating_order_stop_hook_active_short_circuits_before_queue_marker_check(
     probe.analyze_queue_injection_and_first_turn = lambda *a, **k: (_ for _ in ()).throw(
         AssertionError("queue/first-turn analysis must not run when stop_hook_active")
     )
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
     try:
-        with _track_record_path(track_path):
-            stdin_data = {
-                "session_id": "sess-10",
-                "transcript_path": "/nonexistent/path.jsonl",
-                "stop_hook_active": True,
-                "last_assistant_message": "no signpost heading",
-            }
-            # Must not raise — proves the stop_hook_active gate short-circuits before the
-            # queue-marker/first-turn gate is ever reached.
-            probe.run(stdin_data)
+        stdin_data = {
+            "session_id": "sess-10",
+            "transcript_path": "/nonexistent/path.jsonl",
+            "stop_hook_active": True,
+            "last_assistant_message": "no signpost heading",
+        }
+        # Must not raise — proves the stop_hook_active gate short-circuits before the
+        # queue-marker/first-turn gate is ever reached.
+        probe.run(stdin_data)
     finally:
         probe.analyze_queue_injection_and_first_turn = original
-        if os.path.exists(track_path):
-            os.remove(track_path)
 
 
 def test_gating_order_queue_marker_check_short_circuits_before_section_parsing():
@@ -1303,24 +1192,19 @@ def test_gating_order_queue_marker_check_short_circuits_before_section_parsing()
     probe.find_signpost_pillar_positions = lambda *a, **k: (_ for _ in ()).throw(
         AssertionError("section parsing must not run when queue marker is absent")
     )
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
     try:
-        with _track_record_path(track_path):
-            with _transcript_path([_assistant_text_record("no signpost heading")]) as path:
-                stdin_data = {
-                    "session_id": "sess-11",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": "no signpost heading",
-                }
-                # Must not raise — proves the queue-marker gate short-circuits before section
-                # parsing (which the first-turn gate also precedes) is ever reached.
-                probe.run(stdin_data)
+        with _transcript_path([_assistant_text_record("no signpost heading")]) as path:
+            stdin_data = {
+                "session_id": "sess-11",
+                "transcript_path": path,
+                "stop_hook_active": False,
+                "last_assistant_message": "no signpost heading",
+            }
+            # Must not raise — proves the queue-marker gate short-circuits before section
+            # parsing (which the first-turn gate also precedes) is ever reached.
+            probe.run(stdin_data)
     finally:
         probe.find_signpost_pillar_positions = original
-        if os.path.exists(track_path):
-            os.remove(track_path)
 
 
 def test_gating_order_first_turn_check_short_circuits_before_section_parsing():
@@ -1333,24 +1217,19 @@ def test_gating_order_first_turn_check_short_circuits_before_section_parsing():
         _assistant_text_record("first reply, prior turn"),
         _assistant_text_record("no signpost heading"),
     ]
-    fd, track_path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
     try:
-        with _track_record_path(track_path):
-            with _transcript_path(records) as path:
-                stdin_data = {
-                    "session_id": "sess-12",
-                    "transcript_path": path,
-                    "stop_hook_active": False,
-                    "last_assistant_message": "no signpost heading",
-                }
-                # Must not raise — proves the first-turn gate (queue marker already present
-                # here) short-circuits before section parsing is ever reached.
-                probe.run(stdin_data)
+        with _transcript_path(records) as path:
+            stdin_data = {
+                "session_id": "sess-12",
+                "transcript_path": path,
+                "stop_hook_active": False,
+                "last_assistant_message": "no signpost heading",
+            }
+            # Must not raise — proves the first-turn gate (queue marker already present here)
+            # short-circuits before section parsing is ever reached.
+            probe.run(stdin_data)
     finally:
         probe.find_signpost_pillar_positions = original
-        if os.path.exists(track_path):
-            os.remove(track_path)
 
 
 # ---------------------------------------------------------------------------

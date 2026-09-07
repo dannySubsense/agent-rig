@@ -31,51 +31,26 @@ WRAPPER_PATH = os.path.join(REPO_ROOT, ".claude", "hooks", "signpost-checklist.s
 PROBE_PATH = os.path.join(REPO_ROOT, "scripts", "signpost_checklist_probe.py")
 
 
-def _isolated_track_record_env():
-    """Redirect TRACK_RECORD_PATH (probe) / track_record_path (wrapper's write_probe_error)
-    to a per-call tmp path via SIGNPOST_TRACK_RECORD_PATH, honored by both
-    scripts/signpost_checklist_probe.py and .claude/hooks/signpost-checklist.sh, so subprocess
-    invocations never write into the live gitignored log."""
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    os.close(fd)
-    os.remove(path)  # writers must create it fresh
-    env = dict(os.environ)
-    env["SIGNPOST_TRACK_RECORD_PATH"] = path
-    return env, path
-
-
 def _run_wrapper(stdin_payload, wrapper_path=WRAPPER_PATH):
-    env, track_path = _isolated_track_record_env()
-    try:
-        return subprocess.run(
-            ["bash", wrapper_path],
-            input=json.dumps(stdin_payload),
-            capture_output=True,
-            text=True,
-            cwd=REPO_ROOT,
-            timeout=15,
-            env=env,
-        )
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
+    return subprocess.run(
+        ["bash", wrapper_path],
+        input=json.dumps(stdin_payload),
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=15,
+    )
 
 
 def _run_probe_directly(stdin_payload):
-    env, track_path = _isolated_track_record_env()
-    try:
-        return subprocess.run(
-            ["python3", PROBE_PATH],
-            input=json.dumps(stdin_payload),
-            capture_output=True,
-            text=True,
-            cwd=REPO_ROOT,
-            timeout=15,
-            env=env,
-        )
-    finally:
-        if os.path.exists(track_path):
-            os.remove(track_path)
+    return subprocess.run(
+        ["python3", PROBE_PATH],
+        input=json.dumps(stdin_payload),
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=15,
+    )
 
 
 # ---------------------------------------------------------------------------
