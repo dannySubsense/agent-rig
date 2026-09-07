@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pillar Verdict Flow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #f6f4ee;
+    --bg-panel: #ffffff;
+    --bg-inset: #eeece3;
+    --ink: #201d17;
+    --ink-soft: #55503f;
+    --line: #cfc9b8;
+    --accent: #b5791f;
+    --accent-soft: #e8d3a8;
+    --block: #a13a3a;
+    --block-soft: #f1dcd7;
+    --allow: #3f7d4f;
+    --allow-soft: #dbe9d9;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --serif: 'Newsreader', Georgia, serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16140f;
+      --bg-panel: #1e1b14;
+      --bg-inset: #262218;
+      --ink: #ece7d8;
+      --ink-soft: #b6ae97;
+      --line: #3a3626;
+      --accent: #e0ab55;
+      --accent-soft: #3a2f18;
+      --block: #e0817a;
+      --block-soft: #3a2320;
+      --allow: #8fc79c;
+      --allow-soft: #1f3323;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16140f;
+    --bg-panel: #1e1b14;
+    --bg-inset: #262218;
+    --ink: #ece7d8;
+    --ink-soft: #b6ae97;
+    --line: #3a3626;
+    --accent: #e0ab55;
+    --accent-soft: #3a2f18;
+    --block: #e0817a;
+    --block-soft: #3a2320;
+    --allow: #8fc79c;
+    --allow-soft: #1f3323;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 3.5rem 1.75rem 6rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--accent);
+    display: inline-block;
+    transform: rotate(45deg);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(2.1rem, 5vw, 3rem);
+    line-height: 1.08;
+    margin: 0.6rem 0 0.4rem;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+
+  .dek {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0 0 2.2rem;
+  }
+
+  .methodology {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    padding: 1.1rem 1.35rem;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+    margin-bottom: 2.6rem;
+  }
+  .methodology b { color: var(--ink); font-weight: 600; }
+  .methodology code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--bg-inset);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 1.5rem;
+    margin: 3rem 0 0.3rem;
+    letter-spacing: -0.005em;
+  }
+  .section-note {
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+    margin: 0 0 1.2rem;
+    max-width: 65ch;
+  }
+
+  .diagram-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1.5rem 1.25rem 1rem;
+    overflow-x: auto;
+  }
+  .diagram-panel pre.mermaid { margin: 0; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.4rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    padding: 1rem 0.25rem 0;
+    border-top: 1px dashed var(--line);
+    margin-top: 1.25rem;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .swatch { width: 0.7rem; height: 0.7rem; border-radius: 2px; display: inline-block; }
+  .swatch.block { background: var(--block); }
+  .swatch.allow { background: var(--allow); }
+  .swatch.check { background: var(--accent); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+  }
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--line);
+  }
+  td {
+    padding: 0.7rem 0.8rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.rule {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  td.kind {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+
+  .verdict-tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    padding: 0.12rem 0.45rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+  }
+  .verdict-tag.block { background: var(--block-soft); color: var(--block); }
+  .verdict-tag.allow { background: var(--allow-soft); color: var(--allow); }
+
+  .review-box {
+    background: var(--bg-inset);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1.4rem 1.5rem;
+    margin-top: 3rem;
+  }
+  .review-box h2 { margin-top: 0; }
+  .review-box ul { margin: 0.6rem 0 0; padding-left: 1.2rem; }
+  .review-box li { margin-bottom: 0.5rem; color: var(--ink-soft); }
+
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="eyebrow">signpost-checklist-redesign &middot; consistency re-derivation, Frank-corrected</div>
+  <h1>Pillar Verdict Flow</h1>
+  <p class="dek">
+    The block/allow decision the Stop-hook computes, traced fresh from
+    <code>02-ARCHITECTURE.md</code>'s current rule set — drawn without re-reading
+    <code>INTAKE.md</code>'s original sketch, as a check on whether the finished spec
+    still says what we think it says.
+  </p>
+
+  <div class="methodology">
+    <b>Method, and its actual limit.</b> Every node and edge below cites the architecture
+    section it comes from. Nothing here was copied from the Intake diagram or from memory of
+    an earlier draft — this is what the current <code>evaluate_checklist()</code> contract
+    implies, reasoned from <code>§4</code> and <code>§5.4</code> alone. A Cold Frank opinion
+    pass on the first draft made the honest framing explicit, in his words: <i>"it's a redraw
+    by the same hand from the same document — that's a consistency check, not independence —
+    useful, but it validates that the author can read their own §5.4, not that §5.4 is
+    right."</i> Treat this as a proofread of the spec text, not a second, independently
+    sourced opinion on the mechanism.
+  </div>
+
+  <h2>Gate &amp; evaluation flow</h2>
+  <p class="section-note">
+    <b>Corrected 2026-09-07</b> after a Cold Frank opinion pass (not a gate) found the first
+    draft's topology wrong: it drew the unmatched-row check (Rule 7) as an independent sweep
+    running in parallel with the per-line matching loop. The spec says otherwise —
+    <code>04-ROADMAP.md</code> Slice 3 is explicit that Rule 7 is computed
+    <i>"by iterating <code>pillar_rows</code> after the per-Signpost-line matching pass"</i> —
+    a residue pass over whatever the loop didn't consume, not a parallel check. That correction
+    also surfaced a real, undecided spec ambiguity: Rule 5 flags whichever <code>verified</code>
+    row claiming a reused ID comes "later," but with Rule 7 running strictly after the main loop,
+    an unmatched row that appears <i>above</i> a matched row sharing its ID is evaluated
+    <i>after</i> it — the spec never says whether "earlier" means source order or evaluation
+    order. Flagged below at the node where it bites, not resolved here.
+  </p>
+
+  <div class="diagram-panel">
+<pre class="mermaid">
+flowchart TD
+    A["Stop event fires"] --> B{"stop_hook_active?<br/>(§5.1)"}
+    B -->|"yes — forced retry"| ALLOW0["ALLOW<br/>no checks run"]
+    B -->|"no"| C{"Queue-marker<br/>injected this session?"}
+    C -->|"no"| ALLOW1["ALLOW<br/>nothing to check"]
+    C -->|"yes"| D{"First reply<br/>of session?"}
+    D -->|"no — turn 2+"| ALLOW2["ALLOW<br/>hook fires turn 1 only<br/>(known 1-in-10 detection<br/>gap, accepted, US-5)"]
+    D -->|"yes"| E{"Signpost heading<br/>present? (§4)"}
+    E -->|"no — Rule 0"| BLOCK0["BLOCK<br/>heading required<br/>no rules below evaluated"]
+    E -->|"yes"| F{"Section content, incl.<br/>heading-line trailing text?"}
+    F -->|"none at all"| ZERO["signpost_lines = []<br/>nothing to verify"]
+    F -->|"content, 0 list-item<br/>lines parsed — Rule 0a"| BLOCK0A["BLOCK<br/>malformed_signpost"]
+    F -->|"content, ≥1 list-item<br/>lines parsed"| PARSED["signpost_lines populated"]
+
+    ZERO --> LOOP
+    PARSED --> LOOP["Per Signpost line:<br/>find Pillar rows with<br/>label == line.text (§5.4)"]
+
+    LOOP --> M1{"# matching<br/>rows"}
+    M1 -->|"0 — Rule 1"| VMISS["missing"]
+    M1 -->|">1 — Rule 1a"| VDUP["duplicate_label<br/>(each row, consumed)"]
+    M1 -->|"1 — consumed"| M2{"row status"}
+    M2 -->|"unverified — Rule 2"| OK1["no violation<br/>honest disclosure"]
+    M2 -->|"verified, no id — Rule 3"| VF1["false_claim"]
+    M2 -->|"verified, id not in<br/>qualifying_calls — Rule 4"| VF2["false_claim"]
+    M2 -->|"verified, id reused by an<br/>earlier-EVALUATED row — Rule 5"| VF3["duplicate_id<br/>⚠ 'earlier' = source order<br/>or evaluation order?<br/>spec doesn't say"]
+    M2 -->|"verified, valid<br/>unique id"| OK2["no violation"]
+
+    LOOP -->|"rows the loop never<br/>matched to any line"| RESIDUE["Residue pass — Rule 7<br/>runs AFTER the loop above,<br/>not in parallel with it"]
+    RESIDUE --> M2B{"row status<br/>(same Rules 3-5,<br/>run again here)"}
+    M2B -->|"unverified"| VUNM1["unmatched_row only"]
+    M2B -->|"verified, backed<br/>+ unmatched"| VUNM2["unmatched_row<br/>+ no Rule-3/4/5 violation"]
+    M2B -->|"verified, unbacked<br/>or duplicate id"| VUNM3["unmatched_row<br/>+ false_claim / duplicate_id"]
+
+    B -->|"reaches parsing<br/>(same gate as E)"| UNPARSED["Non-blank Pillar lines<br/>failing forced syntax (§5.3),<br/>incl. heading-line trailing text"]
+    E -->|"yes, gated same as<br/>the main loop"| UNPARSED
+    UNPARSED -->|"Rule 1b"| VSTRAY["stray_prose<br/>(each line)"]
+
+    VMISS & VDUP & VF1 & VF2 & VF3 & VUNM1 & VUNM2 & VUNM3 & VSTRAY --> ANYV{"any violation<br/>collected?"}
+    OK1 & OK2 --> ANYV
+    ANYV -->|"yes"| BLOCKF["BLOCK<br/>reason = build_reason()"]
+    ANYV -->|"no — Rule 6 /<br/>zero-rows allow"| ALLOWF["ALLOW"]
+
+    classDef block fill:#a13a3a,stroke:#a13a3a,color:#fff
+    classDef allow fill:#3f7d4f,stroke:#3f7d4f,color:#fff
+    classDef check fill:#b5791f,stroke:#b5791f,color:#fff
+    classDef flag fill:#e0ab55,stroke:#a13a3a,color:#201d17,stroke-width:2px
+    class BLOCK0,BLOCK0A,BLOCKF block
+    class ALLOW0,ALLOW1,ALLOW2,ALLOWF allow
+    class B,C,D,E,F,M1,M2,M2B,ANYV check
+    class VF3 flag
+</pre>
+    <div class="legend">
+      <span><span class="swatch check"></span> gate / decision point</span>
+      <span><span class="swatch block"></span> block outcome</span>
+      <span><span class="swatch allow"></span> allow outcome</span>
+    </div>
+  </div>
+
+  <h2>Rule reference</h2>
+  <p class="section-note">
+    Every branch in the diagram above, cross-referenced to its architecture section and
+    the violation kind it produces (<code>02-ARCHITECTURE.md §5.4</code>).
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Rule</th><th>Condition</th><th>Kind</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="rule">0</td><td>Signpost heading entirely absent on a gated turn</td><td class="kind">—</td><td><span class="verdict-tag block">block</span></td></tr>
+      <tr><td class="rule">0a</td><td>Heading present, non-blank content (incl. heading-line trailing text), zero list-item claims parsed</td><td class="kind">malformed_signpost</td><td><span class="verdict-tag block">block</span></td></tr>
+      <tr><td class="rule">1</td><td>No Pillar row matches a Signpost line</td><td class="kind">missing</td><td><span class="verdict-tag block">block</span></td></tr>
+      <tr><td class="rule">1a</td><td>More than one Pillar row matches the same Signpost line</td><td class="kind">duplicate_label</td><td><span class="verdict-tag block">block</span></td></tr>
+      <tr><td class="rule">1b</td><td>A non-blank Pillar line fails the forced row syntax</td><td class="kind">stray_prose</td><td><span class="verdict-tag block">block</span></td></tr>
+      <tr><td class="rule">2</td><td>Matched row status is <code>unverified</code></td><td class="kind">—</td><td><span class="verdict-tag allow">no violation</span></td></tr>
+      <tr><td class="rule">3</td><td>Matched row claims <code>verified</code> with no <code>tool_use_id</code></td><td class="kind">false_claim</td><td><span class="verdict-tag block">block</span></td></tr>
+      <tr><td class="rule">4</td><td>Claimed <code>tool_use_id</code> not found in real tool calls</td><td class="kind">false_claim</td><td><span class="verdict-tag block">block</span></td></tr>
+      <tr><td class="rule">5</td><td>Claimed <code>tool_use_id</code> already used by an earlier row</td><td class="kind">duplicate_id</td><td><span class="verdict-tag block">block</span></td></tr>
+      <tr><td class="rule">6</td><td>Every line resolved, zero violations collected</td><td class="kind">—</td><td><span class="verdict-tag allow">allow</span></td></tr>
+      <tr><td class="rule">7</td><td>A parsed Pillar row matches no Signpost line (still runs Rules 3–5)</td><td class="kind">unmatched_row</td><td><span class="verdict-tag block">block</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="review-box">
+    <h2>Corrected against a Cold Frank opinion pass (2026-09-07)</h2>
+    <ul>
+      <li>The first draft drew Rule 7 (unmatched rows) as an independent sweep running in
+        parallel with the per-Signpost-line matching loop. Corrected: it's a residue pass over
+        whatever the loop didn't consume, run strictly after it — <code>04-ROADMAP.md</code>
+        Slice 3's own wording, missed in the first drawing.</li>
+      <li>That correction surfaced a real, still-open spec ambiguity: Rule 5's "earlier row"
+        could mean source order in the reply or evaluation order in the hook — the spec never
+        says which, and they now disagree once Rule 7 is drawn correctly as a later pass.
+        Flagged at the Rule 5 node above; not resolved by this diagram, spec text should settle
+        it before forge.</li>
+      <li>The stray-prose (1b) and unmatched-row (7) checks are gated behind the same trigger
+        chain as everything else — the first draft floated them ungated, implying they'd run
+        even on an <code>ALLOW</code> from an earlier gate, which the spec doesn't say.</li>
+    </ul>
+  </div>
+
+  <footer>
+    signpost-checklist-redesign &middot; spec-gate PASS (attempt 3/3) &middot; drawn 2026-09-07,
+    corrected 2026-09-07 after Cold Frank opinion pass
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+</script>
+</body>
+</html>
+
