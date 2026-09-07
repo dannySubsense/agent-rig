@@ -2,6 +2,10 @@
 
 **Status**: LIVE in agent-rig (wired 2026-09-07, Slice 6, commit `079009b` area). Frank binding
 forge-gate PASS, attempt 2/3, 2026-09-07 (`docs/specs/signpost-checklist-redesign/PROGRESS.md`).
+As of this doc, the gated path has zero real `first_turn:true` executions — all 19/19 live audit
+log entries recorded so far are `first_turn:false` (allow) — and Slice 7's real-transcript
+validation of the new parsers against a genuine `first_turn:true` reply remains an open, tracked
+obligation (forge Carried Condition (1)), not a completed one.
 **Spec of record**: `docs/specs/signpost-checklist-redesign/02-ARCHITECTURE.md` (design, all 11
 evaluation rules) and `01-REQUIREMENTS.md` (user stories, scope, propagation boundary). This
 document does not restate either — read them directly for rationale and edge-case reasoning.
@@ -81,9 +85,13 @@ section, duplicate-label/duplicate-ID handling, and unmatched-row handling) is `
 Same surface, reused verbatim per `02-ARCHITECTURE.md` §5.1: `Stop` event, only the first reply of
 a session, only when the session-queue briefing marker was injected, `stop_hook_active` bypasses
 unconditionally. **Known limitation, accepted (2026-09-07, Danny), not fixed this sprint**: the
-inherited first-turn detection has a measured ~1-in-10 gap where assistant text emitted before the
-first tool call in turn 1 causes the real first reply to be treated as turn 2+ and skipped. See
-`01-REQUIREMENTS.md` US-5 for the full acceptance and rationale.
+inherited first-turn detection has a measured gap — 1 of the 10 most recent real agent-rig
+transcripts (US-5) — where assistant text emitted before the first tool call in turn 1 causes the
+real first reply to be treated as turn 2+ and skipped. See `01-REQUIREMENTS.md` US-5 for the full
+acceptance and rationale. **Also note:** as of this doc, the live audit log has zero real
+`first_turn:true` executions (19/19 entries are `first_turn:false`/allow) — Slice 7's
+real-transcript validation of this trigger surface and the new parsers remains an open, tracked
+obligation, not a completed one.
 
 ## 7. What this tool does NOT get authority over
 
