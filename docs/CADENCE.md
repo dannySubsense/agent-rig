@@ -14,6 +14,26 @@
 7. **Frank's binding forge-gate** (`LANE: forge-gate`) — same two-layer, independent-attempt-counter design as the spec-gate, run once at implementation completion.
 8. **PR / commit** — per this repo's Git Workflow (`CLAUDE.md`): PR/feature-branch flow, manual-push-only. The draft PR is opened at Git Flow Determination (session start of `/forge-start`), before Slice 1, not created at the end, via a one-time consent prompt with two variants selected by whether the `docs/INVARIANTS.md` rule 5 rescope below is confirmed live: **FALLBACK** (current, live state) — "PR-flow session: I'll create feature/X and open a draft PR (pushed once now, and again when ready for review). Approve?"; **RESCOPE-CONFIRMED** (only once confirmed live) — "...and push slice commits to that branch as they land." Approving either variant is a session-flow acknowledgment only, not sign-off on the rescope itself — that's a separate decision Danny makes elsewhere. **PROPOSED CHANGE — pending Danny's sign-off, not yet live:** the branch would be pushed again after each slice's verified commit to keep the PR's diff live, per `docs/INVARIANTS.md` rule 5's PROPOSED rescope (same pending decision, one package across `INVARIANTS.md`, this file, and `forge-start.md`'s Git Flow Determination / Forge Cycle step 6 / End-of-Feature step 4 — not three independent proposals). Until confirmed, the fallback is the original blanket manual-push-only policy: no per-slice pushes, only the initial branch/spec-doc push and the final ready-for-review push, both already covered by explicit consent (FALLBACK prompt variant above). The PR is marked ready-for-review (not newly created) once Frank's binding forge-gate reaches PASS. DDR status (if one was used) updates to `ACCEPTED (shipped, PR #N)`.
 
+## Decision Matrix + Escalation Chain (Danny, 2026-09-07, verbatim)
+
+Applies whenever a command or instruction says "decide" without further qualification:
+
+**Decision Matrix** — apply, in this order of weight: best-practices approach, most-correct path
+forward, YAGNI, risk-averse, repo-safety-first, defensive, slow-and-deliberate. Speed is
+explicitly NOT a measure of progress on this project.
+
+**Escalation Chain**:
+1. Apply the Decision Matrix above.
+2. If genuinely undecidable by the matrix, dispatch Cold Frank to decide.
+3. If the orchestrator and Cold Frank agree this is a matter for Danny specifically (not just
+   "hard"), surface it to Danny for discussion and his call.
+
+Distinct from, and does not replace: DDR-001's Ask-vs-Act Decision Flow (Standing → Blast radius
+→ False-choice gate, `docs/specs/agent-rig-ddrs/DDR-001-ask-vs-act-decision-flow.md` — governs
+*whether* to ask vs. act at all) and the Research Data Integrity numeric-constant disposition rule
+(`~/.claude/CLAUDE.md` — governs disposition of numeric constants specifically). All three are
+separate, binding, and triggered by different conditions.
+
 ## Non-negotiables carried into every phase
 
 - One Frank gate per major phase (spec, forge) — not per-slice, not per-doc.
