@@ -3,15 +3,47 @@
 Replaces `first_turn_contract_probe.py`'s C1/C2/C3 body. See
 `docs/specs/signpost-checklist-redesign/02-ARCHITECTURE.md` for the governing design.
 
-This slice (Slice 1) adds only the data schemas (§3) and the three new verbatim parsers
-(§4, §5.3): `extract_signpost_lines`, `extract_pillar_rows`, `parse_checklist_row_line`.
-Trigger-surface/tool-call-collection functions (§5.1) and `evaluate_checklist`/`build_reason`/
-`run` (§5.4) are added in later slices.
+Slice 1 added the data schemas (§3) and the three new verbatim parsers (§4, §5.3):
+`extract_signpost_lines`, `extract_pillar_rows`, `parse_checklist_row_line`.
+
+Slice 2 (this addition) copies the architecture-designated §5.1 trigger-surface/tool-call-
+collection functions from the archived probe (archive/first-turn-contract-enforcement/scripts/
+first_turn_contract_probe.py), unmodified in behavior, plus one additive change per §5.1a
+(`collect_qualifying_tool_calls()`). `evaluate_checklist`/`build_reason`/`run`/`main` (§5.4) are
+added in a later slice.
 """
 
+import json
+import os
 import re
+import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TRACK_RECORD_PATH = os.path.join(
+    REPO_ROOT, "docs", "tooling", "signpost-checklist-track-record.jsonl"
+)
+
+# The first line of session_queue_probe.py's HEADER (§5.1) — emitted only on the success
+# path (a tagged queue row was found and injected). Copied unchanged from the archived probe
+# per §5.1.
+QUEUE_MARKER = "SESSION QUEUE — SIGNPOST, NOT PILLAR."
+
+# Tools excluded from the qualifying-tool-call set (§5.1a) — bookkeeping, not verification.
+# Renamed from the archived probe's `C3_EXCLUDED_TOOLS`; same value.
+EXCLUDED_TOOLS = {"TodoWrite"}
+
+# §5.2/§5.3 (archived probe) — heading-line predicate: after leading whitespace/#/* markup is
+# stripped, a line starting with Signpost or Pillar, followed (before end of line) by a colon
+# that closes the heading label. Trailing prose on the same line is permitted. Copied
+# unchanged from the archived probe per §5.1 — heading detection itself is unchanged by this
+# redesign.
+_SIGNPOST_PILLAR_HEADING_RE = re.compile(
+    r"^(Signpost|Pillar)\b[^:\n]*:\s*\**\s*$|^(Signpost|Pillar)\b[^:\n]*:\s*\**\s*\S",
+    re.IGNORECASE,
+)
 
 # --- §3 Data Schemas -------------------------------------------------------
 
@@ -84,17 +116,6 @@ _SIGNPOST_LABEL_RE = re.compile(r"^signpost\b[^:\n]*:\s*\**\s*(.*)$", re.IGNOREC
 _PILLAR_LABEL_RE = re.compile(r"^pillar\b[^:\n]*:\s*\**\s*(.*)$", re.IGNORECASE)
 
 
-def _strip_leading_markup(line: str) -> str:
-    """Strip leading whitespace and markdown emphasis markers (#, *) — matches
-    `strip_leading_markup()` in the archived first_turn_contract_probe.py (§5.2), which
-    Slice 2 will import unchanged. Duplicated narrowly here so Slice 1's label-stripping
-    isn't narrower than the heading detector it must interoperate with."""
-    s = line
-    while s and s[0] in " \t#*":
-        s = s[1:]
-    return s
-
-
 # --- §4 API Contracts -------------------------------------------------------
 
 
@@ -122,7 +143,7 @@ def extract_signpost_lines(
 
     # Heading line itself: label stripped, trailing content (if any) is a candidate line.
     heading_raw = lines[signpost_idx] if 0 <= signpost_idx < len(lines) else ""
-    label_match = _SIGNPOST_LABEL_RE.match(_strip_leading_markup(heading_raw))
+    label_match = _SIGNPOST_LABEL_RE.match(strip_leading_markup(heading_raw))
     if label_match:
         trailing = label_match.group(1)
         if trailing:
@@ -163,7 +184,7 @@ def extract_pillar_rows(text: str, pillar_idx: Optional[int], section_end_idx: i
     candidate_lines = []
 
     heading_raw = lines[pillar_idx] if 0 <= pillar_idx < len(lines) else ""
-    label_match = _PILLAR_LABEL_RE.match(_strip_leading_markup(heading_raw))
+    label_match = _PILLAR_LABEL_RE.match(strip_leading_markup(heading_raw))
     if label_match:
         trailing = label_match.group(1)
         if trailing:
@@ -215,3 +236,271 @@ def parse_checklist_row_line(raw_line: str) -> Optional[PillarRow]:
             raw_line=raw_line,
         )
     return None
+
+
+# --- §5.1 Reused trigger-surface / stdin contract (copied unchanged from the archived probe:
+# archive/first-turn-contract-enforcement/scripts/first_turn_contract_probe.py) -------------
+
+
+def read_stdin():
+    """Best-effort stdin JSON parse. Absence or malformed stdin must not crash the probe;
+    the caller treats a resulting empty dict as "nothing to check", which allows."""
+    try:
+        raw = sys.stdin.read()
+    except Exception:
+        return {}
+    if not raw or not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
+def strip_leading_markup(line):
+    """Strip leading whitespace and markdown emphasis markers (#, *), per §5.2 (archived
+    probe)."""
+    s = line
+    while s and s[0] in " \t#*":
+        s = s[1:]
+    return s
+
+
+def find_signpost_pillar_positions(text):
+    """§5.2 (archived probe) — first Signpost heading line index and first Pillar heading
+    line index (by line number in `text`), or None for either not found."""
+    signpost_idx = None
+    pillar_idx = None
+    for idx, raw_line in enumerate(text.split("\n")):
+        stripped = strip_leading_markup(raw_line)
+        m = _SIGNPOST_PILLAR_HEADING_RE.match(stripped)
+        if not m:
+            continue
+        label = (m.group(1) or m.group(2)).lower()
+        if label == "signpost" and signpost_idx is None:
+            signpost_idx = idx
+        elif label == "pillar" and pillar_idx is None:
+            pillar_idx = idx
+    return signpost_idx, pillar_idx
+
+
+def find_pillar_heading_line(text, pillar_idx):
+    """Recover the raw heading line at `pillar_idx` for quoting in a reason string."""
+    if pillar_idx is None:
+        return None
+    lines = text.split("\n")
+    if 0 <= pillar_idx < len(lines):
+        return lines[pillar_idx].strip()
+    return None
+
+
+def load_transcript_records(transcript_path):
+    """Parse the transcript JSONL, filtered to isSidechain: false (§5.1). Malformed lines
+    are skipped; a missing/unreadable file yields an empty list (fail toward "not
+    queue-injected", never toward blocking)."""
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return []
+    records = []
+    try:
+        with open(transcript_path, errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(obj, dict):
+                    continue
+                if obj.get("isSidechain") is not False:
+                    continue
+                records.append(obj)
+    except Exception:
+        return []
+    return records
+
+
+def _extract_message_texts(message):
+    """Pull every text string out of a `message` dict's content, whether content is a
+    bare string (user turns can be) or a list of content blocks (text blocks only —
+    tool_use/tool_result/thinking blocks carry no prose to scan)."""
+    if not isinstance(message, dict):
+        return []
+    content = message.get("content")
+    if isinstance(content, str):
+        return [content]
+    if isinstance(content, list):
+        texts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text")
+                if isinstance(text, str):
+                    texts.append(text)
+        return texts
+    return []
+
+
+def _extract_attachment_texts(attachment):
+    """Pull text out of an `attachment` record's payload (e.g. SessionStart hook
+    `additionalContext`, seen on this host as `type: "attachment"` records with no
+    `message` key). `attachment.content` may be a bare string, a list of strings, or a
+    list of content blocks; `attachment.stdout` (hook stdout capture) may also carry
+    injected text."""
+    if not isinstance(attachment, dict):
+        return []
+    texts = []
+    for key in ("content", "stdout"):
+        value = attachment.get(key)
+        if isinstance(value, str):
+            texts.append(value)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    texts.append(item)
+                elif isinstance(item, dict):
+                    text = item.get("text")
+                    if isinstance(text, str):
+                        texts.append(text)
+    return texts
+
+
+def extract_texts(record):
+    """Pull every text string out of a transcript record — `message.content` (assistant
+    and user turns) plus `attachment.content`/`attachment.stdout` (SessionStart queue
+    injection and other hook-emitted records, which carry no `message` key on this
+    host — see docs/tooling/first-turn-contract-enforcement.md §5.1)."""
+    texts = _extract_message_texts(record.get("message"))
+    texts.extend(_extract_attachment_texts(record.get("attachment")))
+    return texts
+
+
+def is_assistant_text_record(record):
+    """An assistant record carrying real (non-empty, after stripping) text content —
+    i.e. not a thinking-only or tool-use-only record (§5.1)."""
+    if record.get("type") != "assistant":
+        return False
+    return any(t.strip() for t in extract_texts(record))
+
+
+def analyze_queue_injection_and_first_turn(records):
+    """§5.1 — (a) is the session queue-injected (HEADER marker present at or before the
+    first assistant record), and (b) is the turn currently ending the *first* turn (at
+    most one prior assistant-text record). Returns
+    (queue_injected: bool, first_turn: bool, current_turn_index: int|None) where
+    current_turn_index is the position, in `records`, of the last assistant-text record
+    (the one `last_assistant_message` corresponds to), or None if no such record exists
+    yet in the transcript."""
+    first_assistant_idx = None
+    for idx, r in enumerate(records):
+        if r.get("type") == "assistant":
+            first_assistant_idx = idx
+            break
+
+    queue_injected = False
+    if first_assistant_idx is not None:
+        scan_range = records[: first_assistant_idx + 1]
+    else:
+        scan_range = records
+    for r in scan_range:
+        for text in extract_texts(r):
+            if QUEUE_MARKER in text:
+                queue_injected = True
+                break
+        if queue_injected:
+            break
+
+    assistant_text_indices = [
+        idx for idx, r in enumerate(records) if is_assistant_text_record(r)
+    ]
+    first_turn = len(assistant_text_indices) <= 1
+    current_turn_index = assistant_text_indices[-1] if assistant_text_indices else None
+
+    return queue_injected, first_turn, current_turn_index
+
+
+# --- §5.1a Reused with one additive change (not byte-identical) ----------------------------
+
+
+def collect_qualifying_tool_calls(preceding):
+    """Shared collection of completed, non-excluded tool calls from `preceding` records.
+
+    Copied from the archived probe's `_collect_qualifying_tool_calls()`
+    (archive/first-turn-contract-enforcement/scripts/first_turn_contract_probe.py:474-503) —
+    same tool_use/tool_result correlation logic and `EXCLUDED_TOOLS` filtering — with one
+    additive change per architecture §5.1a: `tool_id` (already available as the dict key in
+    the archived loop) is captured into each returned item, and results are returned as
+    `QualifyingToolCall` instances rather than bare `(name, input)` tuples, so rule 4 (§5.4)
+    has a real `tool_use_id` to look up a claimed ID against."""
+    tool_use_info = {}
+    tool_result_ids = set()
+    for r in preceding:
+        message = r.get("message")
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if btype == "tool_use":
+                tool_id = block.get("id")
+                if tool_id:
+                    tool_use_info[tool_id] = (block.get("name"), block.get("input"))
+            elif btype == "tool_result":
+                tool_id = block.get("tool_use_id")
+                if tool_id:
+                    tool_result_ids.add(tool_id)
+
+    return [
+        QualifyingToolCall(tool_use_id=tool_id, name=name, tool_input=tool_input)
+        for tool_id, (name, tool_input) in tool_use_info.items()
+        if tool_id in tool_result_ids and name not in EXCLUDED_TOOLS
+    ]
+
+
+# --- §5.1 emit/track-record helpers (mechanism unchanged; schema updated per §3's
+# EvaluationResult) -------------------------------------------------------------------------
+
+
+def write_track_record(
+    session_id, stop_hook_active, queue_injected, first_turn,
+    decision, violations, reason, probe_error,
+):
+    """Appends one entry per invocation to the gitignored track-record log. Mechanism
+    (best-effort append, never raises into the caller) unchanged from the archived probe;
+    `violations` here is a list of serialized `RowViolation` (or equivalent) entries per
+    §3's `EvaluationResult`, rather than the archived probe's C1/C2/C3 string labels."""
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id,
+        "stop_hook_active": bool(stop_hook_active),
+        "queue_injected": bool(queue_injected),
+        "first_turn": bool(first_turn),
+        "decision": decision,
+        "violations": violations,
+        "reason": reason,
+        "probe_error": probe_error,
+    }
+    try:
+        os.makedirs(os.path.dirname(TRACK_RECORD_PATH), exist_ok=True)
+        with open(TRACK_RECORD_PATH, "a") as fh:
+            fh.write(json.dumps(entry) + "\n")
+    except Exception:
+        # The track record is an audit trail, not a gate — a write failure here must not
+        # change or block the probe's decision to Claude Code.
+        pass
+
+
+def emit_block(reason):
+    print(json.dumps({"decision": "block", "reason": reason}))
+
+
+def emit_allow():
+    # §3.2 (archived probe) — silence-means-allow; emitting nothing is equivalent to `{}`.
+    pass

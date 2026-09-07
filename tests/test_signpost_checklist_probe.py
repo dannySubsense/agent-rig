@@ -47,7 +47,7 @@ def _find_headings(text):
     signpost_idx = None
     pillar_idx = None
     for i, line in enumerate(lines):
-        stripped = probe._strip_leading_markup(line)
+        stripped = probe.strip_leading_markup(line)
         if signpost_idx is None and probe._SIGNPOST_LABEL_RE.match(stripped):
             signpost_idx = i
         if pillar_idx is None and probe._PILLAR_LABEL_RE.match(stripped):
@@ -247,7 +247,7 @@ def test_extract_pillar_rows_heading_trailing_content_is_evaluated_as_normal_lin
 
 # ---------------------------------------------------------------------------
 # QC fix coverage: markdown-styled and qualified heading forms handled by
-# _strip_leading_markup() + the updated _SIGNPOST_LABEL_RE/_PILLAR_LABEL_RE.
+# strip_leading_markup() + the updated _SIGNPOST_LABEL_RE/_PILLAR_LABEL_RE.
 # ---------------------------------------------------------------------------
 
 
@@ -265,7 +265,7 @@ def test_markdown_heading_prefix_trailing_prose_is_content_not_a_claim_line():
     # content at the label-match stage, not silently dropped — confirms the `##` prefix
     # doesn't defeat the label match.
     heading_raw = text.split("\n")[signpost_idx]
-    label_match = probe._SIGNPOST_LABEL_RE.match(probe._strip_leading_markup(heading_raw))
+    label_match = probe._SIGNPOST_LABEL_RE.match(probe.strip_leading_markup(heading_raw))
     assert label_match is not None
     assert label_match.group(1) == "I verified the build and the tests."
 
@@ -273,7 +273,7 @@ def test_markdown_heading_prefix_trailing_prose_is_content_not_a_claim_line():
 def test_bold_styled_signpost_label_alone_strips_to_valid_empty_heading():
     text = "**Signpost:**\n"
     heading_raw = text.split("\n")[0]
-    label_match = probe._SIGNPOST_LABEL_RE.match(probe._strip_leading_markup(heading_raw))
+    label_match = probe._SIGNPOST_LABEL_RE.match(probe.strip_leading_markup(heading_raw))
     assert label_match is not None
     assert label_match.group(1) == ""
 
@@ -305,12 +305,145 @@ def test_qualified_signpost_heading_pre_colon_text_strips_correctly():
     assert pillar_idx is None
 
     heading_raw = text.split("\n")[signpost_idx]
-    label_match = probe._SIGNPOST_LABEL_RE.match(probe._strip_leading_markup(heading_raw))
+    label_match = probe._SIGNPOST_LABEL_RE.match(probe.strip_leading_markup(heading_raw))
     assert label_match is not None
     assert label_match.group(1) == "I verified the build."
 
     lines = probe.extract_signpost_lines(text, signpost_idx, pillar_idx)
     assert lines == []
+
+
+# ---------------------------------------------------------------------------
+# Slice 2 — reused trigger-surface / tool-call-collection functions (§5.1),
+# copied from the archived probe, plus the one additive change (§5.1a) to
+# collect_qualifying_tool_calls().
+#
+# No dedicated unit tests for these functions exist in
+# archive/first-turn-contract-enforcement/tests/test_first_turn_contract_probe.py — that
+# suite exercises them only indirectly through probe.run() end-to-end fixtures. Per the
+# roadmap's fallback instruction, minimal smoke tests are written here against a
+# representative transcript fixture built in the same real-record shape the archived
+# suite's own fixture builders use (attachment-shaped queue marker, assistant text/tool_use/
+# tool_result records) rather than a synthetic shape.
+# ---------------------------------------------------------------------------
+
+def _queue_marker_record():
+    """Real SessionStart injection shape (§5.1) — mirrors the archived suite's own fixture
+    builder (attachment-shaped, no `message` key)."""
+    return {
+        "parentUuid": None,
+        "isSidechain": False,
+        "attachment": {
+            "type": "hook_additional_context",
+            "content": [probe.QUEUE_MARKER + "\nSIGNPOST — from the queue.\n"],
+            "hookName": "SessionStart",
+            "toolUseID": "SessionStart",
+            "hookEvent": "SessionStart",
+        },
+        "type": "attachment",
+        "uuid": "test-attachment-uuid",
+    }
+
+
+def _assistant_text_record(text):
+    return {
+        "type": "assistant",
+        "isSidechain": False,
+        "message": {"content": [{"type": "text", "text": text}]},
+    }
+
+
+def _tool_use_record(name, tool_id, tool_input=None):
+    return {
+        "type": "assistant",
+        "isSidechain": False,
+        "message": {
+            "content": [
+                {"type": "tool_use", "id": tool_id, "name": name, "input": tool_input or {}}
+            ]
+        },
+    }
+
+
+def _tool_result_record(tool_id):
+    return {
+        "type": "user",
+        "isSidechain": False,
+        "message": {"content": [{"type": "tool_result", "tool_use_id": tool_id}]},
+    }
+
+
+def test_smoke_heading_detection_finds_signpost_and_pillar_positions():
+    text = "Signpost:\n- I ran the tests.\n\nPillar:\n- [ ] I ran the tests. (unverified)\n"
+    signpost_idx, pillar_idx = probe.find_signpost_pillar_positions(text)
+    assert signpost_idx == 0
+    assert pillar_idx == 3
+    assert probe.find_pillar_heading_line(text, pillar_idx) == "Pillar:"
+
+
+def test_smoke_analyze_queue_injection_and_first_turn_on_real_shaped_transcript():
+    records = [
+        _queue_marker_record(),
+        _assistant_text_record("Signpost:\n- I ran the tests.\n\nPillar:\n"),
+    ]
+    queue_injected, first_turn, current_turn_index = probe.analyze_queue_injection_and_first_turn(
+        records
+    )
+    assert queue_injected is True
+    assert first_turn is True
+    assert current_turn_index == 1
+
+
+def test_smoke_collect_qualifying_tool_calls_correlates_tool_use_and_result():
+    records = [
+        _tool_use_record("Read", "toolu_001"),
+        _tool_result_record("toolu_001"),
+        _tool_use_record("TodoWrite", "toolu_002"),
+        _tool_result_record("toolu_002"),
+    ]
+    calls = probe.collect_qualifying_tool_calls(records)
+    names = {c.name for c in calls}
+    assert "Read" in names
+    assert "TodoWrite" not in names  # excluded via EXCLUDED_TOOLS
+
+
+def test_grep_no_deleted_c2_c3_machinery_symbols_in_new_file():
+    deleted_symbols = [
+        "_C2_LABEL_RE",
+        "find_c2_heading_line",
+        "_extract_claim_subjects",
+        "_subject_matches_target",
+        "_path_components_align",
+        "_phrase_boundary_match",
+        "_FILE_PATH_RE",
+        "_PR_NUMBER_RE",
+        "_IDENTIFIER_RE",
+        "_QUOTED_QUERY_RE",
+        "_GH_",
+        "check_c3_violation",
+    ]
+    with open(PROBE_PATH) as fh:
+        source = fh.read()
+    for symbol in deleted_symbols:
+        assert symbol not in source, f"deleted-machinery symbol {symbol!r} found in {PROBE_PATH}"
+
+
+def test_collect_qualifying_tool_calls_tool_use_id_matches_real_tool_use_block_id():
+    records = [
+        _tool_use_record("Read", "toolu_real_id_123"),
+        _tool_result_record("toolu_real_id_123"),
+        _tool_use_record("Bash", "toolu_real_id_456"),
+        _tool_result_record("toolu_real_id_456"),
+    ]
+    calls = probe.collect_qualifying_tool_calls(records)
+    assert len(calls) == 2
+    returned_ids = {c.tool_use_id for c in calls}
+    real_ids = set()
+    for r in records:
+        for block in r.get("message", {}).get("content", []):
+            if block.get("type") == "tool_use":
+                real_ids.add(block["id"])
+    assert returned_ids == real_ids
 
 
 # ---------------------------------------------------------------------------
