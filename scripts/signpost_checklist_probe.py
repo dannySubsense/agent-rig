@@ -644,46 +644,89 @@ def evaluate_checklist(
     )
 
 
+# §5.3 forced row syntax, quoted verbatim for the self-teaching reason strings below. Keep this
+# in sync with the CLAUDE.md "Signpost/Pillar Checklist Row Syntax" section — both channels must
+# describe the same syntax (Slice 5, architecture §5.3).
+_ROW_SYNTAX_EXAMPLE = (
+    "- [x] <verbatim Signpost line text> (verified: tool_use_id=<id>)\n"
+    "- [ ] <verbatim Signpost line text> (unverified)"
+)
+
+_TRANSCRIPT_LOOKUP_INSTRUCTION = (
+    "A tool_use_id is never already visible in your reply context. Before writing a "
+    "(verified: tool_use_id=<id>) row, you must actively look it up: read your own current "
+    "session's transcript file (the most recently modified *.jsonl under "
+    "~/.claude/projects/<project>/) and search backward from the end of that file for the "
+    "tool_use block matching the call you want to cite, to read that block's real id. This is "
+    "an active lookup step you must perform every time, not something already in your context. "
+    "Skipping it leaves only two honest options: perform the lookup, or write (unverified)."
+)
+
+_ROW_SYNTAX_INSTRUCTION = (
+    "Each Pillar row must be written in exactly one of these two forced forms, one row per "
+    f"Signpost line, label copied verbatim from the Signpost line:\n{_ROW_SYNTAX_EXAMPLE}\n"
+    f"{_TRANSCRIPT_LOOKUP_INSTRUCTION}"
+)
+
+
 def build_reason(result) -> str:
     """One sentence per violation, concatenated — quotes the exact Signpost/Pillar line text
     involved. Rule-0 (`signpost_heading_absent`) and rule-0a (`malformed_signpost`) results
-    each get their own distinct, non-per-row message rather than a per-row violation list."""
+    each get their own distinct, non-per-row message rather than a per-row violation list, and
+    every reason string is a complete, self-teaching specification of the required row syntax
+    (Slice 5, architecture §5.3) — not merely a list of which rows were violated — so an agent
+    that hits this block without CLAUDE.md guidance in context can still recover."""
     if result.signpost_heading_absent:
         return (
             "Blocked: this turn was expected to include a Signpost section, but no Signpost "
-            "heading was found in the reply."
+            "heading was found in the reply. Add a `Signpost:` section listing each claim as "
+            f"its own list item, and a matching `Pillar:` section. {_ROW_SYNTAX_INSTRUCTION}"
         )
 
     sentences = []
     for violation in result.violations:
         if violation.kind == "malformed_signpost":
             sentences.append(
-                "Blocked: the Signpost section has content but no lines were written as "
-                "list items, so no claims could be parsed."
+                "Blocked: the Signpost section has content — including any text written "
+                "directly on the `Signpost:` heading line — but no lines were written as list "
+                "items (`-`, `*`, `+`, or `N.`), so no claims could be parsed. Rewrite each "
+                "claim as its own list item; do not add a Pillar row without a matching "
+                f"Signpost list item. {_ROW_SYNTAX_INSTRUCTION}"
             )
         elif violation.kind == "missing":
             sentences.append(
-                f'Missing Pillar row for Signpost line: "{violation.signpost_text}".'
+                f'Missing Pillar row for Signpost line: "{violation.signpost_text}". Add a row '
+                f"in the required syntax:\n{_ROW_SYNTAX_EXAMPLE}\n{_TRANSCRIPT_LOOKUP_INSTRUCTION}"
             )
         elif violation.kind == "duplicate_label":
             sentences.append(
-                f'Duplicate Pillar row label: "{violation.row.label}" matched more than one row.'
+                f'Duplicate Pillar row label: "{violation.row.label}" matched more than one row. '
+                "Each Signpost line may have exactly one matching Pillar row."
             )
         elif violation.kind == "stray_prose":
             sentences.append(
-                f'Unrecognized line in Pillar section: "{violation.line_text}".'
+                f'Unrecognized line in Pillar section: "{violation.line_text}". Every '
+                "non-blank line in the Pillar section must match the forced row syntax:\n"
+                f"{_ROW_SYNTAX_EXAMPLE}"
             )
         elif violation.kind == "false_claim":
             sentences.append(
-                f'Unbacked verification claim in row: "{violation.row.label}".'
+                f'Unbacked verification claim in row: "{violation.row.label}". A '
+                "(verified: tool_use_id=<id>) row must cite a real tool_use_id found in this "
+                f"turn's qualifying tool calls. {_TRANSCRIPT_LOOKUP_INSTRUCTION} If the claim "
+                "was not actually verified, write (unverified) instead."
             )
         elif violation.kind == "duplicate_id":
             sentences.append(
-                f'Reused tool_use_id in row: "{violation.row.label}".'
+                f'Reused tool_use_id in row: "{violation.row.label}". Each verified row must '
+                "cite a distinct tool_use_id — one real tool call cannot back more than one row."
             )
         elif violation.kind == "unmatched_row":
             sentences.append(
-                f'Pillar row does not match any Signpost line: "{violation.row.label}".'
+                f'Pillar row does not match any Signpost line: "{violation.row.label}". This '
+                "row's label does not equal any Signpost line's text. Either correct the label "
+                "to match an existing Signpost line verbatim, or add the missing Signpost list "
+                "item this row was meant to back — do not leave an orphaned row in place."
             )
         else:
             sentences.append(f"Unrecognized violation kind: {violation.kind}.")

@@ -7,14 +7,14 @@ Build order per 04-ROADMAP.md's Dependency Map (not file order — Sequence Rule
 - [x] Slice 1: Data Schemas + New Verbatim Parsers — COMPLETE (2026-09-07, commit `2d51db0`, unpushed). One real QC FAIL found and fixed (markup-styled heading stripping), re-verified PASS.
 - [x] Slice 2: Reused Trigger-Surface / Tool-Call-Collection Functions — COMPLETE (2026-09-07). One real regression found and fixed mid-slice: consolidating Slice 1's local `_strip_leading_markup()` onto the real imported `strip_leading_markup()` broke 8 of Slice 1's own tests; code-executor's "unaffected" claim was wrong, caught by orchestrator independently re-running tests, fixed by test-writer. QC PASS (AST-diffed against archived source, not trusted from report). **Carry-forward, do not lose:** the archived probe's real-corpus fixture tests (`first_turn_contract_corpus.json`) all drive `main()`, which doesn't exist until Slice 4 — QC flagged that Slice 4 must pick up this real-transcript re-run obligation (§9 / roadmap Slice 2 Tests item 1), not silently drop it.
 - [x] Slice 3: `evaluate_checklist` + `build_reason` Evaluation Core — COMPLETE (2026-09-07, commit `4f94213`). Rule-5 evaluation-order ambiguity (flagged at spec approval) resolved in `02-ARCHITECTURE.md` before this slice began. QC independently traced and confirmed the ordering with a concrete counter-intuitive test case (source-earlier unmatched row still flagged over a source-later matched row). No regressions this slice — 44/44 including all prior slices' tests.
-- [ ] Slice 4: `run()`/`main()` Wiring, Stdin Contract, Track-Record Log — must also carry forward Slice 2's real-corpus fixture test obligation (see Slice 2 note above)
-- [ ] Slice 5: Agent-Facing Syntax Delivery
+- [x] Slice 4: `run()`/`main()` Wiring, Stdin Contract, Track-Record Log — COMPLETE (2026-09-07, commit `079009b`). Slice 2's real-corpus fixture carry-forward resolved: assessed and confirmed non-transferable (old prose-format corpus, zero row-syntax matches) — stays live as Slice 7's obligation instead, not silently dropped. One real test bug found and fixed (rule-0 track-record test wrongly expected non-empty violations). One real QC FAIL found and fixed directly (new track-record log missing from `.gitignore`). 56/56 tests passing.
+- [x] Slice 5: Agent-Facing Syntax Delivery — COMPLETE (2026-09-07). Both channels (CLAUDE.md, `build_reason()`) confirmed byte-identical grammar and identical transcript-self-lookup instruction, read side by side by QC not trusted from report. 63/63 tests passing. **Non-blocking advisory logged, not fixed:** two `CLAUDE_MD_PATH`-dependent tests raise `ValueError` rather than skip on a fresh clone lacking `CLAUDE.md` (it's gitignored) — optional per roadmap Tests item 5, revisit in a later slice if it becomes a real problem.
 - [ ] Slice 6: Hook Wrapper Script + Settings Wiring
 - [ ] Slice 7: Real-Transcript Validation of New Parsers
 - [ ] **Frank binding forge-gate** — PENDING, runs once after all slices above are checked off.
 
 ## Current
-Slice: 4
+Slice: 5
 Step: @code-executor
 Last updated: 2026-09-07
 

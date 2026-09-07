@@ -1233,6 +1233,113 @@ def test_gating_order_first_turn_check_short_circuits_before_section_parsing():
 
 
 # ---------------------------------------------------------------------------
+# Slice 5 — build_reason() self-teaching row syntax + CLAUDE.md cross-check.
+#
+# Spec: docs/specs/signpost-checklist-redesign/04-ROADMAP.md "## Slice 5" Tests section.
+# ---------------------------------------------------------------------------
+
+CLAUDE_MD_PATH = os.path.join(REPO_ROOT, "CLAUDE.md")
+
+
+def _read_claude_md_signpost_section():
+    """Extract the '## Signpost/Pillar Checklist Row Syntax' section verbatim from CLAUDE.md,
+    from its heading up to (not including) the next '## ' heading or end of file. Mechanical
+    stand-in for the roadmap's "person with no prior knowledge" manual read-through."""
+    with open(CLAUDE_MD_PATH) as fh:
+        text = fh.read()
+    marker = "## Signpost/Pillar Checklist Row Syntax"
+    start = text.index(marker)
+    rest = text[start + len(marker):]
+    next_heading = rest.find("\n## ")
+    section = rest if next_heading == -1 else rest[:next_heading]
+    return marker + section
+
+
+def test_build_reason_representative_violation_set_contains_row_grammar_both_forms():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("First claim."), _line("Second claim.")],
+        pillar_rows=[_row("Second claim.", "verified", tool_use_id="nonexistent-id")],
+        qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    kinds = {v.kind for v in result.violations}
+    assert kinds == {"missing", "false_claim"}
+    assert "(verified: tool_use_id=<id>)" in result.reason
+    assert "(unverified)" in result.reason
+
+
+def test_build_reason_rule0_is_distinct_plain_statement():
+    result = probe.evaluate_checklist(
+        signpost_lines=[], pillar_rows=[], qualifying_calls=[],
+        signpost_heading_present=False, signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+    assert result.signpost_heading_absent is True
+    assert result.violations == []
+    assert "Signpost section" in result.reason
+    assert "Missing Pillar row" not in result.reason
+    assert result.reason != ""
+
+
+def test_build_reason_rule0a_is_distinct_from_rule0_and_per_row_messages():
+    result = probe.evaluate_checklist(
+        signpost_lines=[], pillar_rows=[], qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    assert any(v.kind == "malformed_signpost" for v in result.violations)
+    assert "no lines were written as" in result.reason
+    assert "Signpost heading was found" not in result.reason
+    assert "Missing Pillar row" not in result.reason
+
+
+def test_build_reason_unmatched_row_produces_distinct_self_teaching_reason():
+    result = probe.evaluate_checklist(
+        signpost_lines=[], pillar_rows=[_row("Orphan row.", "unverified")], qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=False,
+        pillar_unparsed_lines=[],
+    )
+    assert any(v.kind == "unmatched_row" for v in result.violations)
+    assert "does not match any Signpost line" in result.reason
+    assert '"Orphan row."' in result.reason
+
+
+def test_build_reason_instructs_transcript_self_lookup_before_writing_verified_row():
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("A claim.")], pillar_rows=[], qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    reason = result.reason
+    assert "transcript" in reason
+    assert "*.jsonl" in reason
+    assert "search backward" in reason
+    assert "tool_use" in reason
+
+
+def test_claude_md_section_contains_row_grammar_both_forms_and_lookup_instruction():
+    section = _read_claude_md_signpost_section()
+    assert "(verified: tool_use_id=<id>)" in section
+    assert "(unverified)" in section
+    assert "*.jsonl" in section
+    assert "search backward" in section
+
+
+def test_claude_md_and_build_reason_describe_the_same_syntax_no_divergent_wording():
+    section = _read_claude_md_signpost_section()
+    result = probe.evaluate_checklist(
+        signpost_lines=[_line("A claim.")], pillar_rows=[], qualifying_calls=[],
+        signpost_heading_present=True, signpost_section_has_content=True,
+        pillar_unparsed_lines=[],
+    )
+    reason = result.reason
+    for phrase in ("verified", "unverified", "tool_use_id", "search backward"):
+        assert phrase in section
+        assert phrase in reason
+
+
+# ---------------------------------------------------------------------------
 # Plain-assert fallback runner (matches archived probe's test file convention).
 # ---------------------------------------------------------------------------
 
