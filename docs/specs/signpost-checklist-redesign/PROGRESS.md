@@ -1,5 +1,28 @@
 # Progress: signpost-checklist-redesign
 
+## Status: IN_PROGRESS
+
+## Slices
+Build order per 04-ROADMAP.md's Dependency Map (not file order — Sequence Rule 1):
+- [ ] Slice 1: Data Schemas + New Verbatim Parsers
+- [ ] Slice 2: Reused Trigger-Surface / Tool-Call-Collection Functions
+- [ ] Slice 3: `evaluate_checklist` + `build_reason` Evaluation Core
+- [ ] Slice 4: `run()`/`main()` Wiring, Stdin Contract, Track-Record Log
+- [ ] Slice 5: Agent-Facing Syntax Delivery
+- [ ] Slice 6: Hook Wrapper Script + Settings Wiring
+- [ ] Slice 7: Real-Transcript Validation of New Parsers
+- [ ] **Frank binding forge-gate** — PENDING, runs once after all slices above are checked off.
+
+## Current
+Slice: 1
+Step: @code-executor
+Last updated: 2026-09-07
+
+## Fix Attempts
+| Test/File | Attempts | Last Error |
+|-----------|----------|------------|
+| scripts/signpost_checklist_probe.py (Slice 1, QC) | 1 | Label-strip regex doesn't tolerate markdown markup or pre-colon qualifier text before `Signpost:`/`Pillar:`, unlike the archived heading detector Slice 2 will reuse — real-form headings (`## Signpost: ...`, `**Pillar:** ...`) silently drop trailing content instead of being parsed, reopening the exact evasion rule 0a/1b were built to close. |
+
 ## Spec Gate
 Counter: 3/3 — PASS, all 7 Carried Conditions CLOSED (2026-09-07)
 
