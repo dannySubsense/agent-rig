@@ -10,12 +10,12 @@ Build order per 04-ROADMAP.md's Dependency Map (not file order — Sequence Rule
 - [x] Slice 4: `run()`/`main()` Wiring, Stdin Contract, Track-Record Log — COMPLETE (2026-09-07, commit `079009b`). Slice 2's real-corpus fixture carry-forward resolved: assessed and confirmed non-transferable (old prose-format corpus, zero row-syntax matches) — stays live as Slice 7's obligation instead, not silently dropped. One real test bug found and fixed (rule-0 track-record test wrongly expected non-empty violations). One real QC FAIL found and fixed directly (new track-record log missing from `.gitignore`). 56/56 tests passing.
 - [x] Slice 5: Agent-Facing Syntax Delivery — COMPLETE (2026-09-07). Both channels (CLAUDE.md, `build_reason()`) confirmed byte-identical grammar and identical transcript-self-lookup instruction, read side by side by QC not trusted from report. 63/63 tests passing. **Non-blocking advisory logged, not fixed:** two `CLAUDE_MD_PATH`-dependent tests raise `ValueError` rather than skip on a fresh clone lacking `CLAUDE.md` (it's gitignored) — optional per roadmap Tests item 5, revisit in a later slice if it becomes a real problem.
 - [x] Slice 6: Hook Wrapper Script + Settings Wiring — COMPLETE (2026-09-07). **Mechanism is now LIVE** — `.claude/settings.json` Stop array wired, `no-preamble-no-meta-narration.sh` entry untouched. Two real QC FAILs found and fixed: (1) wrapper's error-path JSON borrowed the sibling wrapper's `flagged_clauses` field instead of matching this probe's own schema; (2) the fail-open test moved the real, live probe script aside — orchestrator flagged this risk before dispatch, QC confirmed it, rewritten to use an isolated tmp_path fixture that never touches the live file. Both re-traced independently by QC after fix, not trusted from report. 66/66 tests passing.
-- [ ] Slice 7: Real-Transcript Validation of New Parsers
+- [x] Slice 7: Real-Transcript Validation of New Parsers — Done-When satisfied via the spec-sanctioned zero-data path (2026-09-07), NOT via a real validation pass. Scan scope: 72 transcript files under `~/.claude/projects/*/*.jsonl`, independently re-scanned by two different methods (test-runner: 823 assistant blocks via `extract_pillar_rows`; QC: 9,968 blocks via raw `_PILLAR_ROW_RE` regex, plus an independent zero-Pillar-heading confirmation). Result: **0 real Pillar checklist rows in the new forced syntax exist anywhere yet** — expected, since the mechanism only went live this session (Slice 6). 4 loose pre-filter matches inspected and confirmed to be prose/spec-discussion text, not real rows. No synthetic data was fabricated. **Open carry-forward, surfaced explicitly per roadmap's own Done-When clause — not closed:** real parser validation against genuine first-turn Signpost-checklist replies has not happened and cannot happen until this repo produces one. Re-run this slice's validation once real data exists.
 - [ ] **Frank binding forge-gate** — PENDING, runs once after all slices above are checked off.
 
 ## Current
-Slice: 6
-Step: @code-executor
+Slice: 7
+Step: (real-transcript validation, see roadmap)
 Last updated: 2026-09-07
 
 ## Fix Attempts
@@ -26,6 +26,7 @@ Last updated: 2026-09-07
 | tests/test_signpost_checklist_probe.py (Slice 4, `test_track_record_written_on_block_path_matches_new_schema`) | 1 | Test bug, not implementation: asserted non-empty `violations` for a rule-0 (no-Signpost-heading) block path, but §5.4 rule 0 explicitly produces empty `violations` with `signpost_heading_absent=True` signaling the block instead — Slice 3's own rule-0 test already established this fact. |
 | .claude/hooks/signpost-checklist.sh (Slice 6, QC) | 1 | Wrapper's error-path JSON borrowed the sibling no-preamble wrapper's `flagged_clauses` field instead of matching this probe's own `write_track_record()` schema (`queue_injected`/`first_turn`/`violations`) — two incompatible shapes in one log file. |
 | tests/test_signpost_checklist_wrapper.py (Slice 6, QC) | 1 | Orchestrator flagged this risk before dispatch, QC confirmed it: `test_wrapper_fails_open_when_probe_script_missing` moved the real, now-live probe script aside with only a `finally`-block restore — unsafe under a kill/parallel-run and a real risk to the live hook, not just a test-quality nit. |
+| docs/specs/signpost-checklist-redesign/PROGRESS.md (Slice 7, QC) | 1 | Orchestrator's own miss, not an agent's: the verified zero-data finding was reported by agents but never written into `PROGRESS.md` before dispatching QC — Done-When requires the gap be *surfaced*, not merely *observed* in agent transcripts. Fixed directly, no re-dispatch needed. |
 
 ## Spec Gate
 Counter: 3/3 — PASS, all 7 Carried Conditions CLOSED (2026-09-07)
