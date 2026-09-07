@@ -15,6 +15,23 @@ resolved them as live design parameters rather than deferred scope: require-all-
 (GATE-LOG.md, Amendment Confirmation re-check, PASS) after one round-trip fix to §5's preamble.
 Re-locked 2026-08-27. See §7 for the closed/narrowed entries.
 
+**Amendment (2026-09-07)**: §3.1's file-extension allowlist superseded its own PROVISIONAL/
+self-owned tag (`owner: wright` — an agent naming itself, disqualified under the global rule
+hardened 2026-09-05/06) with a real citation: a reproducible repo-wide extension census (`find .
+-type f ... | sed -n 's/.*\.\([A-Za-z0-9]*\)$/\1/p' | sort | uniq -c | sort -rn`, run at commit
+702aa67) showing `.py .md .sh .json .jsonl` with real, non-singleton presence and `.yml` as a
+singleton but verified load-bearing file (`.github/workflows/scrub-gate.yml`, live CI, DDR-003
+§3.2). `.ts`/`.tsx`/`.yaml` dropped — zero occurrences anywhere in this repo; they were
+speculative inclusions, not evidence-based. Cited and applied by Danny, 2026-09-07, during the
+`first-turn-contract-c3-signpost-sourcing` sprint (which surfaced the stale tag while extending
+extraction to a second input source). Flagged honestly, not silently: this census measures which
+extensions exist in the repo, as a proxy for which extensions would appear in a real Pillar
+file-path citation — the two are not the same population, and no corpus of real Pillar-section
+text was available to measure the actual target population directly (the same class of gap this
+sprint's Frank spec-gate found in the Signpost extraction-pattern work). This is better evidence
+than a self-certified tag, not a closed question — revisit if/when real Pillar transcript data
+becomes available. New allowlist: `.py`, `.md`, `.sh`, `.json`, `.jsonl`, `.yml`.
+
 **Date**: 2026-08-27
 **Author**: wright
 **Parent Intake**: `docs/tooling/first-turn-contract-c3-claim-matching/INTAKE.md` (APPROVED)
@@ -69,7 +86,7 @@ v1 — it is not a free-text NLP extraction. A token qualifies if it matches one
 
 | Subject type | Extraction pattern | Example |
 |---|---|---|
-| File path | Backtick- or plain-token substrings containing at least one `/` or a recognized extension (`.py`, `.md`, `.ts`, `.tsx`, `.json`, `.sh`, `.yml`, `.yaml`) [PROVISIONAL — owner: wright; rationale: covers the file types actually touched by this repo's own tooling and test suite as of this spec; extend as needed], via regex `` `?([\w./\-]+\.\w+|[\w\-]+/[\w./\-]+)`? `` | `` `scripts/first_turn_contract_probe.py` `` |
+| File path | Backtick- or plain-token substrings containing at least one `/` or a recognized extension (`.py`, `.md`, `.sh`, `.json`, `.jsonl`, `.yml`) [Cited, see 2026-09-07 Amendment above — superseded the prior PROVISIONAL/self-owned tag with a reproducible repo-wide extension census], via regex `` `?([\w./\-]+\.\w+|[\w\-]+/[\w./\-]+)`? `` | `` `scripts/first_turn_contract_probe.py` `` |
 | PR/issue number | `#\d+` or `PR\s*#?\d+` (case-insensitive) | `PR #42`, `#42` |
 | Identifier / symbol | Backtick-quoted bare identifier (function/class/var name), regex `` `([A-Za-z_][\w]*)` `` | `` `check_c3_violation` `` |
 | Command / gh reference | Inside backticked or fenced code spans containing `gh `, capture the PR/issue number per above; otherwise treat the whole backticked command string as the subject | `` `gh pr view 42` `` |

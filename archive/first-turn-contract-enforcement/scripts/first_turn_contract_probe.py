@@ -54,7 +54,13 @@ _SIGNPOST_PILLAR_HEADING_RE = re.compile(
 # up to a colon that closes the label, then either end of line or trailing content.
 _GENERIC_HEADING_RE = re.compile(r"^([^:\n]+):\s*\**\s*($|\S)")
 
-# §5.3 — the forbidden third-section label.
+# §5.3 — the forbidden third-section label. KNOWN LIMITATION, not fixed here (2026-09-07):
+# this is word-hunting for one specific phrasing and misses real variants (e.g. "Unverified
+# this session:"). An attempted structural redesign (any non-Signpost/Pillar heading is
+# forbidden) was tried the same day and reverted — it broke on real transcript data,
+# mistaking ordinary prose sentences that end in a colon for headings. Left as the
+# original, narrower check rather than shipping a broken generalization under time
+# pressure; needs real design work, not a five-minute fix.
 _C2_LABEL_RE = re.compile(r"^not\s+(yet\s+)?verified(\s+this\s+session)?\s*$", re.IGNORECASE)
 
 
@@ -105,7 +111,7 @@ def find_signpost_pillar_positions(text):
 def find_c2_heading_line(text):
     """§5.3 — the first heading line (generic shape) whose label matches the forbidden
     "not (yet) verified (this session)" pattern. Returns the raw (unstripped) line text,
-    or None."""
+    or None. See `_C2_LABEL_RE`'s comment for this check's known limitation."""
     for raw_line in text.split("\n"):
         stripped = strip_leading_markup(raw_line)
         m = _GENERIC_HEADING_RE.match(stripped)
@@ -252,16 +258,13 @@ def analyze_queue_injection_and_first_turn(records):
     return queue_injected, first_turn, current_turn_index
 
 
-# §3.1 — file-path extension allowlist. PROVISIONAL — owner: wright; rationale: covers the
-# file types actually touched by this repo's own tooling and test suite as of this spec;
-# extend as needed (see SPEC.md §3.1 for the full degradation-path rationale).
-_FILE_EXTENSION_ALLOWLIST = {
-    ".py", ".md", ".ts", ".tsx", ".json", ".sh", ".yml", ".yaml",
-}
-
 # §3.1 — file path token: backtick- or plain-token substrings containing at least one `/`
-# or a dotted extension. Extension membership in the allowlist above is checked after the
-# regex match (the regex itself is permissive; the allowlist filter narrows it).
+# or a dotted extension. No allowlist: whatever extension actually appears in the text is
+# the one checked (Danny, 2026-09-07) — an enumerated allowlist was tried and rejected as
+# self-defeating: it requires citing "which extensions this repo currently has," which is
+# circular (a description of today's repo contents, not a real bound) and drifts the moment
+# the repo's file types change. See docs/tooling/first-turn-contract-c3-claim-matching/SPEC.md
+# 2026-09-07 amendment for the full history (cited allowlist, then deleted).
 _FILE_PATH_RE = re.compile(r"`?([\w./\-]+\.\w+|[\w\-]+/[\w./\-]+)`?")
 
 # §3.1 — PR/issue number: `#\d+` or `PR\s*#?\d+`, case-insensitive.
@@ -318,7 +321,12 @@ def _extract_claim_subjects(pillar_section_text):
             seen.add(key)
             subjects.append(key)
 
-    # Backtick spans: gh-command references, bare identifiers.
+    # Backtick spans: gh-command references, bare identifiers, and (2026-09-07, issue #27
+    # root-cause fix) any other non-path, non-PR backtick content — a bare shell command
+    # like `git status -uno` is just as checkable as a file path and should not be silently
+    # dropped, leaving the Pillar with zero extractable subjects. Content already shaped as
+    # a file path or a PR reference is left to those dedicated branches (below/above) rather
+    # than double-classified.
     for m in _BACKTICK_RE.finditer(pillar_section_text):
         content = m.group(1)
         if _GH_REFERENCE_RE.search(content):
@@ -333,17 +341,14 @@ def _extract_claim_subjects(pillar_section_text):
                 _add("command", content)
         elif _IDENTIFIER_RE.match(content):
             _add("identifier", content)
+        elif not _FILE_PATH_RE.search(content) and _pr_number_from_text(content) is None:
+            _add("command", content)
 
-    # File paths (backticked or plain), filtered by the extension allowlist for the
-    # dotted-extension branch; the slash-containing branch needs no filtering (§3.1).
+    # File paths (backticked or plain) — both regex branches (slash-containing, and
+    # dotted-extension) are accepted as-is, no extension filtering (§3.1, 2026-09-07).
     for m in _FILE_PATH_RE.finditer(pillar_section_text):
         token = m.group(1)
-        if "/" in token:
-            _add("path", token)
-        else:
-            _, ext = os.path.splitext(token)
-            if ext in _FILE_EXTENSION_ALLOWLIST:
-                _add("path", token)
+        _add("path", token)
 
     # PR/issue numbers anywhere in the section text (prose or backticked).
     for m in _PR_NUMBER_RE.finditer(pillar_section_text):
@@ -498,13 +503,28 @@ def _collect_qualifying_tool_calls(preceding):
     ]
 
 
+# Issue #27 (2026-09-07) — a Pillar section could satisfy C3's structural requirements (a
+# heading exists, qualifying tool calls exist) while its own text admits the claims under
+# it were never actually verified (e.g. "Pillar: none yet — nothing independently checked
+# this session"), because the old §3.4 presence-only fallback let any Pillar with zero
+# extractable subjects pass automatically. Two word-matching attempts at patching this
+# (whole-section regex, then heading-paragraph-scoped regex) both shipped with fabricated
+# or unreproducible test claims and were both independently found bypassable by
+# reformatting (Cold Frank, commit 6883cc7) — chasing specific admission phrasing is not
+# viable against an LLM author, who has no fixed vocabulary for "I didn't check this."
+# Root-caused instead (2026-09-07, Danny): the real defect is the presence-only fallback
+# itself — see §3.4 below, now flipped to fail-closed. A Pillar naming nothing checkable
+# fails regardless of what words it uses, closing the issue #27 gap and every future
+# rephrasing of it in one place, with no text-pattern matching involved.
+
+
 def check_c3_violation(records, current_turn_index, pillar_idx, pillar_section_text):
     """§5.4/§3.3 — applies only if a Pillar heading was asserted (`pillar_idx is not
     None`). Returns `(violation: bool, unmatched_subjects: list)`. `unmatched_subjects` is
     the list of `(subject_type, value)` claim subjects that had no matching qualifying
     tool call — populated only for the "qualifying calls exist but some subject(s)
-    unmatched" case (§4), empty otherwise (including the pure-absence and presence-only-
-    fallback cases)."""
+    unmatched" case (§4), empty otherwise (including the pure-absence and zero-subjects
+    cases)."""
     if pillar_idx is None:
         return False, []
 
@@ -519,8 +539,13 @@ def check_c3_violation(records, current_turn_index, pillar_idx, pillar_section_t
 
     subjects = _extract_claim_subjects(pillar_section_text)
     if not subjects:
-        # §3.4 — presence-only fallback: qualifying calls exist, so C3 passes.
-        return False, []
+        # §3.4 — flipped 2026-09-07 (issue #27 root cause, superseding the old
+        # presence-only pass): a Pillar naming zero checkable subjects (no file path, PR
+        # number, identifier, or quoted query) fails, regardless of qualifying tool calls
+        # existing elsewhere in the transcript for unrelated reasons. A Pillar that names
+        # nothing specific has nothing for this check to verify against — it is not
+        # entitled to a pass just because activity happened nearby.
+        return True, [("no_subject", "")]
 
     targets = [_extract_tool_target(name, tool_input) for name, tool_input in qualifying]
 
@@ -553,7 +578,17 @@ def build_reason(
         )
     if "C3" in violations:
         quoted = pillar_line if pillar_line else "(Pillar heading)"
-        if c3_unmatched_subjects:
+        no_subject = any(
+            subject_type == "no_subject" for subject_type, _value in (c3_unmatched_subjects or [])
+        )
+        if no_subject:
+            parts.append(
+                f"C3 violation: a Pillar heading was asserted (quoted: \"{quoted}\") "
+                f"naming no checkable subject (no file path, PR/issue number, identifier, "
+                f"or quoted query). A Pillar with nothing specific to verify against is not "
+                f"a Pillar — name what you checked, or run real verification first."
+            )
+        elif c3_unmatched_subjects:
             named = ", ".join(f"`{value}`" for _subject_type, value in c3_unmatched_subjects)
             parts.append(
                 f"C3 violation: a Pillar heading was asserted (quoted: \"{quoted}\") "
