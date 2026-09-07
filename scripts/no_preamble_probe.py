@@ -29,7 +29,9 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from hook_telemetry import write_telemetry_event  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRACK_RECORD_PATH = os.path.join(
@@ -362,24 +364,19 @@ def build_reason(flagged_clauses):
 
 def write_track_record(session_id, stop_hook_active, mode, decision, flagged_clauses,
                         reason, probe_error):
-    entry = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "session_id": session_id,
-        "stop_hook_active": bool(stop_hook_active),
-        "mode": mode,
-        "decision": decision,
-        "flagged_clauses": flagged_clauses,
-        "reason": reason,
-        "probe_error": probe_error,
-    }
-    try:
-        os.makedirs(os.path.dirname(TRACK_RECORD_PATH), exist_ok=True)
-        with open(TRACK_RECORD_PATH, "a") as fh:
-            fh.write(json.dumps(entry) + "\n")
-    except Exception:
-        # The track record is an audit trail, not a gate — a write failure
-        # here must not change or block the probe's decision to Claude Code.
-        pass
+    write_telemetry_event(
+        hook_name="no-preamble-no-meta-narration",
+        jsonl_path=TRACK_RECORD_PATH,
+        session_id=session_id,
+        decision=decision,
+        reason=reason,
+        probe_error=probe_error,
+        payload={
+            "stop_hook_active": bool(stop_hook_active),
+            "mode": mode,
+            "flagged_clauses": flagged_clauses,
+        },
+    )
 
 
 def emit_block(reason):

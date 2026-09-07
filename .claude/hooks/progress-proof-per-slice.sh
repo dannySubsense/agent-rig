@@ -37,13 +37,16 @@ cat >"$STDIN_FILE"
 # or it would double-log. Never lets a failure here affect the wrapper's own exit code.
 write_probe_error() {
   local cause="$1"
-  python3 - "$CLAUDE_PROJECT_DIR" "$STDIN_FILE" "$cause" <<'PYEOF' || true
+  python3 - "$CLAUDE_PROJECT_DIR" "$REPO_DIR" "$STDIN_FILE" "$cause" <<'PYEOF' || true
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
-project_dir, stdin_path, cause = sys.argv[1], sys.argv[2], sys.argv[3]
+project_dir, repo_dir, stdin_path, cause = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+
+sys.path.insert(0, os.path.join(repo_dir, "scripts"))
+from hook_telemetry import write_telemetry_event
+
 track_record_path = os.path.join(
     project_dir, "docs", "tooling", "progress-proof-per-slice-track-record.jsonl"
 )
@@ -61,25 +64,15 @@ try:
 except Exception:
     pass
 
-entry = {
-    "timestamp": datetime.now(timezone.utc).isoformat(),
-    "session_id": session_id,
-    "file_path": file_path,
-    "file_in_scope": None,
-    "transitions_found": None,
-    "transitions_verified": None,
-    "matched_by": None,
-    "proof_status": None,
-    "decision": "probe_error",
-    "reason": None,
-    "probe_error": cause,
-}
-try:
-    os.makedirs(os.path.dirname(track_record_path), exist_ok=True)
-    with open(track_record_path, "a") as fh:
-        fh.write(json.dumps(entry) + "\n")
-except Exception:
-    pass
+write_telemetry_event(
+    hook_name="progress-proof-per-slice",
+    jsonl_path=track_record_path,
+    session_id=session_id,
+    decision="probe_error",
+    reason=None,
+    probe_error=cause,
+    payload={"file_path": file_path},
+)
 PYEOF
 }
 

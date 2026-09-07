@@ -1200,9 +1200,12 @@ def test_main_fail_opens_on_simulated_exception_in_evaluation_path():
 
 def _expected_track_record_keys():
     return {
-        "timestamp", "session_id", "stop_hook_active", "queue_injected", "first_turn",
-        "decision", "violations", "reason", "probe_error",
+        "hook_name", "timestamp", "session_id", "decision", "reason", "probe_error", "payload",
     }
+
+
+def _expected_payload_keys():
+    return {"stop_hook_active", "queue_injected", "first_turn", "violations"}
 
 
 def test_track_record_written_on_block_path_matches_new_schema():
@@ -1237,11 +1240,12 @@ def test_track_record_written_on_block_path_matches_new_schema():
     assert len(lines) == 1
     entry = lines[0]
     assert set(entry.keys()) == _expected_track_record_keys()
+    assert set(entry["payload"].keys()) == _expected_payload_keys()
     assert entry["decision"] == "block"
     assert entry["session_id"] == "sess-8"
-    assert entry["queue_injected"] is True
-    assert entry["first_turn"] is True
-    assert entry["violations"] != []
+    assert entry["payload"]["queue_injected"] is True
+    assert entry["payload"]["first_turn"] is True
+    assert entry["payload"]["violations"] != []
 
 
 def test_track_record_written_on_allow_path_matches_new_schema():
@@ -1267,8 +1271,9 @@ def test_track_record_written_on_allow_path_matches_new_schema():
     assert len(lines) == 1
     entry = lines[0]
     assert set(entry.keys()) == _expected_track_record_keys()
+    assert set(entry["payload"].keys()) == _expected_payload_keys()
     assert entry["decision"] == "allow"
-    assert entry["violations"] == []
+    assert entry["payload"]["violations"] == []
     assert entry["reason"] is None
 
 
@@ -1458,6 +1463,49 @@ def test_claude_md_and_build_reason_describe_the_same_syntax_no_divergent_wordin
     for phrase in ("verified", "unverified", "tool_use_id", "search backward"):
         assert phrase in section
         assert phrase in reason
+
+
+# ---------------------------------------------------------------------------
+# hook-telemetry-schema Slice 1 — write path migrated to write_telemetry_event().
+# Spec: docs/tooling/hook-telemetry-schema/SPEC.md §9. Confirms the call site, not the
+# probe's own decision logic (already covered above).
+# ---------------------------------------------------------------------------
+
+def test_write_track_record_calls_write_telemetry_event_with_expected_hook_name_and_payload():
+    calls = []
+
+    def _spy(**kwargs):
+        calls.append(kwargs)
+
+    original = probe.write_telemetry_event
+    probe.write_telemetry_event = _spy
+    try:
+        probe.write_track_record(
+            session_id="sess-spy",
+            stop_hook_active=False,
+            queue_injected=True,
+            first_turn=True,
+            decision="block",
+            violations=["v1"],
+            reason="because",
+            probe_error=None,
+        )
+    finally:
+        probe.write_telemetry_event = original
+
+    assert len(calls) == 1
+    call = calls[0]
+    assert call["hook_name"] == "signpost-checklist"
+    assert call["session_id"] == "sess-spy"
+    assert call["decision"] == "block"
+    assert call["reason"] == "because"
+    assert call["probe_error"] is None
+    assert call["payload"] == {
+        "stop_hook_active": False,
+        "queue_injected": True,
+        "first_turn": True,
+        "violations": ["v1"],
+    }
 
 
 # ---------------------------------------------------------------------------
