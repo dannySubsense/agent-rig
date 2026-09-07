@@ -252,16 +252,13 @@ def analyze_queue_injection_and_first_turn(records):
     return queue_injected, first_turn, current_turn_index
 
 
-# §3.1 — file-path extension allowlist. PROVISIONAL — owner: wright; rationale: covers the
-# file types actually touched by this repo's own tooling and test suite as of this spec;
-# extend as needed (see SPEC.md §3.1 for the full degradation-path rationale).
-_FILE_EXTENSION_ALLOWLIST = {
-    ".py", ".md", ".ts", ".tsx", ".json", ".sh", ".yml", ".yaml",
-}
-
 # §3.1 — file path token: backtick- or plain-token substrings containing at least one `/`
-# or a dotted extension. Extension membership in the allowlist above is checked after the
-# regex match (the regex itself is permissive; the allowlist filter narrows it).
+# or a dotted extension. No allowlist: whatever extension actually appears in the text is
+# the one checked (Danny, 2026-09-07) — an enumerated allowlist was tried and rejected as
+# self-defeating: it requires citing "which extensions this repo currently has," which is
+# circular (a description of today's repo contents, not a real bound) and drifts the moment
+# the repo's file types change. See docs/tooling/first-turn-contract-c3-claim-matching/SPEC.md
+# 2026-09-07 amendment for the full history (cited allowlist, then deleted).
 _FILE_PATH_RE = re.compile(r"`?([\w./\-]+\.\w+|[\w\-]+/[\w./\-]+)`?")
 
 # §3.1 — PR/issue number: `#\d+` or `PR\s*#?\d+`, case-insensitive.
@@ -334,16 +331,11 @@ def _extract_claim_subjects(pillar_section_text):
         elif _IDENTIFIER_RE.match(content):
             _add("identifier", content)
 
-    # File paths (backticked or plain), filtered by the extension allowlist for the
-    # dotted-extension branch; the slash-containing branch needs no filtering (§3.1).
+    # File paths (backticked or plain) — both regex branches (slash-containing, and
+    # dotted-extension) are accepted as-is, no extension filtering (§3.1, 2026-09-07).
     for m in _FILE_PATH_RE.finditer(pillar_section_text):
         token = m.group(1)
-        if "/" in token:
-            _add("path", token)
-        else:
-            _, ext = os.path.splitext(token)
-            if ext in _FILE_EXTENSION_ALLOWLIST:
-                _add("path", token)
+        _add("path", token)
 
     # PR/issue numbers anywhere in the section text (prose or backticked).
     for m in _PR_NUMBER_RE.finditer(pillar_section_text):
