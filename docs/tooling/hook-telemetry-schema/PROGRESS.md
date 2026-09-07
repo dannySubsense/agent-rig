@@ -52,3 +52,11 @@ Counter: 0/3
 Convergence judgment (attempt 3 only): SHRINKING | STATIC | THRASHING
 Deep-diagnosis evidence:
 Orchestrator independent re-derivation: AGREES | DISAGREES — [if disagrees, both readings recorded here before escalation]
+
+| Attempt | Date | Verdict | Findings Summary | Snapshot |
+|---|---|---|---|---|
+| 1 | 2026-09-07 | PASS | Independently re-verified: reran pytest (211/211), exercised all three migrated wrapper `write_probe_error()` failure paths live in an isolated fake repo (not just read the code), confirmed aggregator reads mixed-shape logs correctly against real on-disk data, confirmed no writer-side decision remapping anywhere. Layer 1 PASS, Layer 2 PASS (not PROVISIONAL — project NORTHSTAR Established). One non-blocking Carried Condition: `reference/no_preamble_probe.py` is byte-identical to `scripts/no_preamble_probe.py` (correct, per that hook's own drift-guard discipline) but now imports `hook_telemetry`, which has no `reference/` counterpart — mirror is not standalone-executable post-migration. Non-blocking (mirror is never independently invoked; live path is `scripts/`), but a real open item, not just a QC note. | commit b3329d58feb55afa7de0ab7ebf33591aa2a74a57 |
+
+**Carried Condition (open, not blocking this gate):** `reference/no_preamble_probe.py` needs either a `reference/hook_telemetry.py` mirror or an explicit documented decision that the mirror is byte-parity-only and not standalone-executable going forward — this is a cross-cutting concern for the no-preamble-no-meta-narration-hook's own spec (`docs/tooling/no-preamble-no-meta-narration-hook/SPEC.md:401`), not this sprint's scope. Surface to Danny as a follow-up decision, do not silently resolve either direction.
+
+Orchestrator independent review: read the full diff and PASS-relevant sections of SPEC.md against the four changed probe files, three wrapper scripts, and the new hook_telemetry.py/hook_telemetry_aggregate.py myself; independently re-ran the full test suite (211/211) before delegating to Frank. AGREES with Frank's verdict and both findings.
