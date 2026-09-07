@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Signpost/Pillar checklist probe — new probe core for the signpost-checklist-redesign sprint.
 
 Replaces `first_turn_contract_probe.py`'s C1/C2/C3 body. See

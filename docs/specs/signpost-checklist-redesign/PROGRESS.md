@@ -9,12 +9,12 @@ Build order per 04-ROADMAP.md's Dependency Map (not file order — Sequence Rule
 - [x] Slice 3: `evaluate_checklist` + `build_reason` Evaluation Core — COMPLETE (2026-09-07, commit `4f94213`). Rule-5 evaluation-order ambiguity (flagged at spec approval) resolved in `02-ARCHITECTURE.md` before this slice began. QC independently traced and confirmed the ordering with a concrete counter-intuitive test case (source-earlier unmatched row still flagged over a source-later matched row). No regressions this slice — 44/44 including all prior slices' tests.
 - [x] Slice 4: `run()`/`main()` Wiring, Stdin Contract, Track-Record Log — COMPLETE (2026-09-07, commit `079009b`). Slice 2's real-corpus fixture carry-forward resolved: assessed and confirmed non-transferable (old prose-format corpus, zero row-syntax matches) — stays live as Slice 7's obligation instead, not silently dropped. One real test bug found and fixed (rule-0 track-record test wrongly expected non-empty violations). One real QC FAIL found and fixed directly (new track-record log missing from `.gitignore`). 56/56 tests passing.
 - [x] Slice 5: Agent-Facing Syntax Delivery — COMPLETE (2026-09-07). Both channels (CLAUDE.md, `build_reason()`) confirmed byte-identical grammar and identical transcript-self-lookup instruction, read side by side by QC not trusted from report. 63/63 tests passing. **Non-blocking advisory logged, not fixed:** two `CLAUDE_MD_PATH`-dependent tests raise `ValueError` rather than skip on a fresh clone lacking `CLAUDE.md` (it's gitignored) — optional per roadmap Tests item 5, revisit in a later slice if it becomes a real problem.
-- [ ] Slice 6: Hook Wrapper Script + Settings Wiring
+- [x] Slice 6: Hook Wrapper Script + Settings Wiring — COMPLETE (2026-09-07). **Mechanism is now LIVE** — `.claude/settings.json` Stop array wired, `no-preamble-no-meta-narration.sh` entry untouched. Two real QC FAILs found and fixed: (1) wrapper's error-path JSON borrowed the sibling wrapper's `flagged_clauses` field instead of matching this probe's own schema; (2) the fail-open test moved the real, live probe script aside — orchestrator flagged this risk before dispatch, QC confirmed it, rewritten to use an isolated tmp_path fixture that never touches the live file. Both re-traced independently by QC after fix, not trusted from report. 66/66 tests passing.
 - [ ] Slice 7: Real-Transcript Validation of New Parsers
 - [ ] **Frank binding forge-gate** — PENDING, runs once after all slices above are checked off.
 
 ## Current
-Slice: 5
+Slice: 6
 Step: @code-executor
 Last updated: 2026-09-07
 
@@ -24,6 +24,8 @@ Last updated: 2026-09-07
 | scripts/signpost_checklist_probe.py (Slice 1, QC) | 1 | Label-strip regex doesn't tolerate markdown markup or pre-colon qualifier text before `Signpost:`/`Pillar:`, unlike the archived heading detector Slice 2 will reuse — real-form headings (`## Signpost: ...`, `**Pillar:** ...`) silently drop trailing content instead of being parsed, reopening the exact evasion rule 0a/1b were built to close. |
 | tests/test_signpost_checklist_probe.py (Slice 2 consolidation regression) | 1 | Slice 2's code-executor removed Slice 1's local `_strip_leading_markup()` in favor of the real imported `strip_leading_markup()`, but claimed "existing tests unaffected" without verifying — 8/17 tests broke on `AttributeError: no attribute '_strip_leading_markup'`. Caught by orchestrator independently re-running tests before proceeding, not by the reporting agent. |
 | tests/test_signpost_checklist_probe.py (Slice 4, `test_track_record_written_on_block_path_matches_new_schema`) | 1 | Test bug, not implementation: asserted non-empty `violations` for a rule-0 (no-Signpost-heading) block path, but §5.4 rule 0 explicitly produces empty `violations` with `signpost_heading_absent=True` signaling the block instead — Slice 3's own rule-0 test already established this fact. |
+| .claude/hooks/signpost-checklist.sh (Slice 6, QC) | 1 | Wrapper's error-path JSON borrowed the sibling no-preamble wrapper's `flagged_clauses` field instead of matching this probe's own `write_track_record()` schema (`queue_injected`/`first_turn`/`violations`) — two incompatible shapes in one log file. |
+| tests/test_signpost_checklist_wrapper.py (Slice 6, QC) | 1 | Orchestrator flagged this risk before dispatch, QC confirmed it: `test_wrapper_fails_open_when_probe_script_missing` moved the real, now-live probe script aside with only a `finally`-block restore — unsafe under a kill/parallel-run and a real risk to the live hook, not just a test-quality nit. |
 
 ## Spec Gate
 Counter: 3/3 — PASS, all 7 Carried Conditions CLOSED (2026-09-07)
