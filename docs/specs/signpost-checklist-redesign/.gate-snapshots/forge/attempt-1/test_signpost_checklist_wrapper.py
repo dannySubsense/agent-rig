@@ -1,0 +1,161 @@
+"""Tests for .claude/hooks/signpost-checklist.sh — Slice 6 (hook wrapper + settings wiring).
+
+Spec: docs/specs/signpost-checklist-redesign/04-ROADMAP.md "## Slice 6" Tests section.
+
+Integration-style: invokes the real wrapper script via subprocess against crafted stdin
+payloads, comparing its block/allow decision to calling scripts/signpost_checklist_probe.py
+directly, and confirms fail-open behavior on a deliberately broken probe invocation. No
+precedent wrapper-level test file exists in
+archive/first-turn-contract-enforcement/tests/ (checked before writing this) — this is a new
+file, following that directory's naming/docstring convention.
+
+Runnable two ways:
+    pytest tests/test_signpost_checklist_wrapper.py
+    python3 tests/test_signpost_checklist_wrapper.py   (falls back to a plain assert-based runner)
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+
+try:
+    import pytest  # noqa: F401
+    HAVE_PYTEST = True
+except ImportError:
+    HAVE_PYTEST = False
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WRAPPER_PATH = os.path.join(REPO_ROOT, ".claude", "hooks", "signpost-checklist.sh")
+PROBE_PATH = os.path.join(REPO_ROOT, "scripts", "signpost_checklist_probe.py")
+
+
+def _run_wrapper(stdin_payload, wrapper_path=WRAPPER_PATH):
+    return subprocess.run(
+        ["bash", wrapper_path],
+        input=json.dumps(stdin_payload),
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=15,
+    )
+
+
+def _run_probe_directly(stdin_payload):
+    return subprocess.run(
+        ["python3", PROBE_PATH],
+        input=json.dumps(stdin_payload),
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=15,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Slice 6 Test 1: wrapper decision matches direct probe invocation.
+# ---------------------------------------------------------------------------
+
+def test_wrapper_stop_hook_active_matches_direct_probe_allow():
+    """stop_hook_active=True is an unconditional, deterministic allow (run()'s first gate,
+    no transcript needed) — same crafted payload through the wrapper and the probe directly
+    must produce the same (empty-stdout, exit-0, allow) decision."""
+    payload = {
+        "session_id": "wrapper-test-session",
+        "stop_hook_active": True,
+        "transcript_path": "/nonexistent/does-not-matter.jsonl",
+        "last_assistant_message": "irrelevant on this gate",
+    }
+    wrapper_result = _run_wrapper(payload)
+    probe_result = _run_probe_directly(payload)
+
+    assert probe_result.returncode == 0
+    assert wrapper_result.returncode == 0
+    assert probe_result.stdout.strip() in ("", "{}")
+    assert wrapper_result.stdout.strip() == ""
+
+
+def test_wrapper_no_queue_marker_matches_direct_probe_allow():
+    """No queue-injection marker in the transcript -> mechanism does not activate (US-5 AC3),
+    an allow decision reachable without stop_hook_active. Verifies the wrapper relays the same
+    allow decision as the probe for a second, distinct gating path."""
+    payload = {
+        "session_id": "wrapper-test-session-2",
+        "stop_hook_active": False,
+        "transcript_path": "/nonexistent/does-not-matter.jsonl",
+        "last_assistant_message": "irrelevant on this gate",
+    }
+    wrapper_result = _run_wrapper(payload)
+    probe_result = _run_probe_directly(payload)
+
+    assert probe_result.returncode == 0
+    assert wrapper_result.returncode == 0
+    assert probe_result.stdout.strip() in ("", "{}")
+    assert wrapper_result.stdout.strip() == ""
+
+
+# ---------------------------------------------------------------------------
+# Slice 6 Test 2: wrapper fails open on a broken probe invocation.
+# ---------------------------------------------------------------------------
+
+def test_wrapper_fails_open_when_probe_script_missing(tmp_path=None):
+    """A deliberately broken probe invocation (script path does not exist) must not make the
+    wrapper block or crash — it must exit 0 with no blocking output, matching repo convention
+    (fail-open on every failure mode, per the wrapper's own header comment).
+
+    Isolated fixture, never touches the real live probe: the wrapper resolves
+    REPO_DIR as two directories up from its own BASH_SOURCE
+    (.claude/hooks/../.. -> repo root, see signpost-checklist.sh line 9), so a copy of the
+    wrapper placed at <tmp>/.claude/hooks/signpost-checklist.sh resolves REPO_DIR to <tmp> —
+    a throwaway directory where scripts/signpost_checklist_probe.py is simply never created.
+    This is structurally isolated: nothing here reads, moves, or deletes the real repo's
+    scripts/signpost_checklist_probe.py, so no failure mode (assertion, SIGKILL, SIGINT,
+    collection abort, parallel test runs) can leave the live probe absent.
+    """
+    own_tmp_dir = tmp_path is None
+    tmp_root = tempfile.mkdtemp(prefix="signpost-wrapper-test-") if own_tmp_dir else str(tmp_path)
+    try:
+        fixture_hooks_dir = os.path.join(tmp_root, ".claude", "hooks")
+        os.makedirs(fixture_hooks_dir, exist_ok=True)
+        fixture_wrapper_path = os.path.join(fixture_hooks_dir, "signpost-checklist.sh")
+        shutil.copy(WRAPPER_PATH, fixture_wrapper_path)
+        os.chmod(fixture_wrapper_path, 0o755)
+        # Deliberately do NOT create tmp_root/scripts/ — the probe path the wrapper resolves
+        # to (tmp_root/scripts/signpost_checklist_probe.py) is missing by construction.
+
+        payload = {
+            "session_id": "wrapper-test-session-broken",
+            "stop_hook_active": False,
+            "transcript_path": "/nonexistent/does-not-matter.jsonl",
+            "last_assistant_message": "irrelevant on this gate",
+        }
+        result = _run_wrapper(payload, wrapper_path=fixture_wrapper_path)
+        assert result.returncode == 0
+        assert result.stdout.strip() == ""
+    finally:
+        if own_tmp_dir:
+            shutil.rmtree(tmp_root, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
+# Plain-assert fallback runner (matches archived probe's test file convention).
+# ---------------------------------------------------------------------------
+
+def _run_all():
+    tests = [obj for name, obj in globals().items() if name.startswith("test_")]
+    failures = 0
+    for t in tests:
+        try:
+            t()
+            print(f"PASS {t.__name__}")
+        except AssertionError as e:
+            failures += 1
+            print(f"FAIL {t.__name__}: {e}")
+    print(f"\n{len(tests) - failures}/{len(tests)} passed")
+    if failures:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__" and not HAVE_PYTEST:
+    _run_all()
