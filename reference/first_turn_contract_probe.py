@@ -511,12 +511,31 @@ _PILLAR_ADMITS_UNVERIFIED_RE = re.compile(
 
 
 def _pillar_admits_unverified(pillar_section_text):
-    """True if the Pillar section's own text contains a plain admission that its claims
-    were not (yet) verified this session. Checked against the whole section, not just the
-    heading line, since the admission is typically the section's body content."""
+    """True if the Pillar heading's own immediate completion admits its claims were not
+    (yet) verified this session.
+
+    Scope is deliberately narrow: only the heading line's text after its colon, plus any
+    immediately-following lines up to the first blank line or bullet/list marker (i.e. the
+    same paragraph the heading opens) — NOT the whole section to end-of-message. Corrected
+    2026-09-07 after Cold Frank found the original whole-section scope produced 7 false
+    positives on 22 real Pillar sections pulled from this repo's own transcripts: a long,
+    substantive Pillar naming real verification work, with an unrelated "not yet verified"
+    mention or a separate, honestly-labeled "Unverified this session: ..." disclosure list
+    appearing later in the same section, was wrongly caught. Every real evasion this check
+    exists to catch (verified against the same 22 real sections) has the admission as the
+    Pillar heading's own direct completion, not buried later — narrowing to that scope
+    measured zero false positives and caught all 4 real evasions in the corpus."""
     if not pillar_section_text:
         return False
-    return bool(_PILLAR_ADMITS_UNVERIFIED_RE.search(pillar_section_text))
+    lines = pillar_section_text.split("\n")
+    heading_match = re.match(r"^[^:]*:\s*(.*)$", strip_leading_markup(lines[0]))
+    paragraph = heading_match.group(1) if heading_match else ""
+    for line in lines[1:]:
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("-", "*", "1.", "**")):
+            break
+        paragraph += " " + stripped
+    return bool(_PILLAR_ADMITS_UNVERIFIED_RE.search(paragraph))
 
 
 def check_c3_violation(records, current_turn_index, pillar_idx, pillar_section_text):
