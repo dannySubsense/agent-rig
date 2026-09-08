@@ -1,9 +1,9 @@
 """Tests for scripts/session_queue_probe.py — the SessionStart staleness/parser logic and the
 FOOTER contract the injected text delivers to the reading agent.
 
-Loads the copy the hook EXECUTES (scripts/). The spec (§4) requires reference/ to be kept
-identical to it; test_reference_copy_matches_executed_copy enforces that mechanically instead of
-by the spec's manual "confirm identical after edit".
+Loads the copy the hook EXECUTES (scripts/) — the only copy that exists (the byte-parity
+reference/ mirror and its drift-guard test were retired, see DDR-013,
+docs/specs/agent-rig-ddrs/00-DDR-INDEX.md).
 
 Spec: docs/tooling/session-queue-hardening.md §2b (three staleness cases) and §3 (writer-session-id
 regex). Writer contract: commands/lore-close.md Step 4 ("session-queue-meta:" fenced block).
@@ -30,12 +30,11 @@ except ImportError:
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Load the copy the SessionStart wrapper actually executes (.claude/hooks/session-queue.sh runs
-# "$REPO_DIR/scripts/session_queue_probe.py"), NOT the reference/ propagation template. Until
-# 2026-08-14 these tests loaded reference/, so every green run validated a file the harness never
-# executed — invisible only because the two copies happened to be byte-identical. Drift between
-# them is now caught explicitly by test_reference_copy_matches_executed_copy below.
+# "$REPO_DIR/scripts/session_queue_probe.py"). Until 2026-08-14 these tests loaded a byte-parity
+# reference/ mirror instead, so every green run validated a file the harness never executed —
+# invisible only because the two copies happened to be identical at the time. That mirror (and
+# its drift-guard test) has since been retired (DDR-013) rather than kept manually in sync.
 PROBE_PATH = os.path.join(REPO_ROOT, "scripts", "session_queue_probe.py")
-REFERENCE_PROBE_PATH = os.path.join(REPO_ROOT, "reference", "session_queue_probe.py")
 
 
 def _load_probe():
@@ -290,20 +289,6 @@ def test_subagent_transcripts_never_counted(monkeypatch, tmp_path):
 # one string the whole mechanism exists to deliver was the one string nothing constrained.
 # These tests pin the three properties that failure proved were load-bearing.
 # ---------------------------------------------------------------------------
-
-def test_reference_copy_matches_executed_copy():
-    """reference/ is the propagation template; scripts/ is what the hook runs. A fix landing in
-    one and not the other ships a probe nothing tested — the exact gap that hid the FOOTER
-    defect until 2026-08-14, when the tests were still loading reference/."""
-    with open(PROBE_PATH, "rb") as f:
-        executed = f.read()
-    with open(REFERENCE_PROBE_PATH, "rb") as f:
-        reference = f.read()
-    assert executed == reference, (
-        "reference/session_queue_probe.py has drifted from scripts/session_queue_probe.py — "
-        "the tests exercise scripts/, so the reference copy would propagate untested code."
-    )
-
 
 def test_footer_orders_signpost_before_pillar():
     """Order is the point, not just the labels: the signpost is what tells you which primary
