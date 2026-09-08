@@ -25,7 +25,15 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hook_telemetry import write_telemetry_event  # noqa: E402
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Prefer SIGNPOST_REPO_DIR (set by the wrapper to the invoking project's cwd) so a
+# globally-installed copy of this probe (~/.claude/scripts/) resolves against the
+# actual calling repo instead of two levels up from its own install location. Falls
+# back to the __file__-based computation, preserving agent-rig's own existing
+# repo-local behavior (and existing tests) exactly when the env var isn't set.
+REPO_ROOT = os.environ.get(
+    "SIGNPOST_REPO_DIR",
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+)
 # Overridable via SIGNPOST_TRACK_RECORD_PATH so tests (and the wrapper's write_probe_error,
 # see .claude/hooks/signpost-checklist.sh) can redirect writes to an isolated tmp path instead
 # of the live gitignored log.

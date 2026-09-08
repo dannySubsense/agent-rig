@@ -75,11 +75,23 @@ write_telemetry_event(
 PYEOF
 }
 
+# Resolve the probe path: prefer the repo-local copy (agent-rig's own case, zero change
+# in behavior), fall back to the global install location (~/.claude/scripts/) when this
+# wrapper is deployed to a project that doesn't carry its own scripts/ copy.
+PROBE_PATH="$REPO_DIR/scripts/no_preamble_probe.py"
+if [ ! -f "$PROBE_PATH" ]; then
+  PROBE_PATH="$HOME/.claude/scripts/no_preamble_probe.py"
+fi
+
+# Tell the probe which project it's actually running against — required whenever the
+# probe is not physically inside the repo it serves (the global-install case above).
+export NO_PREAMBLE_REPO_DIR="$REPO_DIR"
+
 # 5s budget — same bound as first-turn-contract.sh's own probe (§7 of that document):
 # this probe is a strictly cheaper operation (single-message regex scan, no transcript
 # read at all), so the same generous bound is reused without re-measurement.
 PROBE_EXIT=0
-timeout 5 "$REPO_DIR/scripts/no_preamble_probe.py" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
+timeout 5 "$PROBE_PATH" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
 
 OUT="$(cat "$STDOUT_FILE")"
 

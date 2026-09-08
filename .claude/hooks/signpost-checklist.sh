@@ -67,11 +67,23 @@ write_telemetry_event(
 PYEOF
 }
 
+# Resolve the probe path: prefer the repo-local copy (agent-rig's own case, zero change
+# in behavior), fall back to the global install location (~/.claude/scripts/) when this
+# wrapper is deployed to a project that doesn't carry its own scripts/ copy.
+PROBE_PATH="$REPO_DIR/scripts/signpost_checklist_probe.py"
+if [ ! -f "$PROBE_PATH" ]; then
+  PROBE_PATH="$HOME/.claude/scripts/signpost_checklist_probe.py"
+fi
+
+# Tell the probe which project it's actually running against — required whenever the
+# probe is not physically inside the repo it serves (the global-install case above).
+export SIGNPOST_REPO_DIR="$REPO_DIR"
+
 # 5s budget — measured 2026-09-07: 0.31s wall time, 50 MB RSS against the largest real
 # transcript on this host (13.4 MB, out of 72 files scanned), giving ~16x headroom against
 # the 5s bound.
 PROBE_EXIT=0
-timeout 5 "$REPO_DIR/scripts/signpost_checklist_probe.py" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
+timeout 5 "$PROBE_PATH" <"$STDIN_FILE" >"$STDOUT_FILE" 2>"$STDERR_FILE" || PROBE_EXIT=$?
 
 OUT="$(cat "$STDOUT_FILE")"
 

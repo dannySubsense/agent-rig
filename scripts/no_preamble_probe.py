@@ -33,7 +33,15 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hook_telemetry import write_telemetry_event  # noqa: E402
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Prefer NO_PREAMBLE_REPO_DIR (set by the wrapper to the invoking project's cwd) so a
+# globally-installed copy of this probe (~/.claude/scripts/) resolves against the
+# actual calling repo instead of two levels up from its own install location. Falls
+# back to the __file__-based computation, preserving agent-rig's own existing
+# repo-local behavior (and existing tests) exactly when the env var isn't set.
+REPO_ROOT = os.environ.get(
+    "NO_PREAMBLE_REPO_DIR",
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+)
 TRACK_RECORD_PATH = os.path.join(
     REPO_ROOT, "docs", "tooling", "no-preamble-no-meta-narration-track-record.jsonl"
 )
