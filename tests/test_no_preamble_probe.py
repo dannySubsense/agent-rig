@@ -2,11 +2,9 @@
 
 Spec: docs/tooling/no-preamble-no-meta-narration-hook/SPEC.md §13 (acceptance criteria).
 
-Loads the copy the Stop hook is documented to execute (scripts/), never the reference/
-mirror — per this repo's own precedent (test_first_turn_contract_probe.py's header note,
-test_session_queue_probe.py's drift guard) a suite that imports the wrong copy passes
-green against code nothing runs. A separate drift-guard test below confirms scripts/ and
-reference/ are byte-identical, per AC8.
+Loads the copy the Stop hook actually executes (scripts/no_preamble_probe.py) — the only
+copy that exists (the byte-parity reference/ mirror and its drift-guard test were retired,
+see DDR-013, docs/specs/agent-rig-ddrs/00-DDR-INDEX.md).
 
 Exercises the real entry point, probe.main() via stdin, against constructed fixture
 sentences drawn directly from SPEC.md's own worked examples (§13, §3, §5, §14) — never
