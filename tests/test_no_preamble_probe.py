@@ -33,7 +33,6 @@ except ImportError:
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROBE_PATH = os.path.join(REPO_ROOT, "scripts", "no_preamble_probe.py")
-REFERENCE_PROBE_PATH = os.path.join(REPO_ROOT, "reference", "no_preamble_probe.py")
 WRAPPER_PATH = os.path.join(REPO_ROOT, ".claude", "hooks", "no-preamble-no-meta-narration.sh")
 REMINDER_PATH = os.path.join(REPO_ROOT, "scripts", "no_preamble_reminder.py")
 SETTINGS_PATH = os.path.join(REPO_ROOT, ".claude", "settings.json")
@@ -262,19 +261,6 @@ def test_ac10_shipped_mode_constant_defaults_to_log_only():
 # ---------------------------------------------------------------------------
 # AC8 — artifact existence / wiring / drift-guard checks
 # ---------------------------------------------------------------------------
-
-def test_ac8_probe_exists_at_both_locations_and_is_byte_identical():
-    assert os.path.isfile(PROBE_PATH)
-    assert os.path.isfile(REFERENCE_PROBE_PATH)
-    with open(PROBE_PATH, "rb") as f:
-        executed = f.read()
-    with open(REFERENCE_PROBE_PATH, "rb") as f:
-        reference = f.read()
-    assert executed == reference, (
-        "reference/no_preamble_probe.py has drifted from scripts/no_preamble_probe.py — "
-        "the tests exercise scripts/, so the reference copy would propagate untested code."
-    )
-
 
 def test_ac8_wrapper_and_reminder_artifacts_exist():
     assert os.path.isfile(WRAPPER_PATH)

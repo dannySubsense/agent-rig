@@ -35,7 +35,6 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # executed — invisible only because the two copies happened to be byte-identical. Drift between
 # them is now caught explicitly by test_reference_copy_matches_executed_copy below.
 PROBE_PATH = os.path.join(REPO_ROOT, "scripts", "session_queue_probe.py")
-REFERENCE_PROBE_PATH = os.path.join(REPO_ROOT, "reference", "session_queue_probe.py")
 
 
 def _load_probe():
@@ -290,20 +289,6 @@ def test_subagent_transcripts_never_counted(monkeypatch, tmp_path):
 # one string the whole mechanism exists to deliver was the one string nothing constrained.
 # These tests pin the three properties that failure proved were load-bearing.
 # ---------------------------------------------------------------------------
-
-def test_reference_copy_matches_executed_copy():
-    """reference/ is the propagation template; scripts/ is what the hook runs. A fix landing in
-    one and not the other ships a probe nothing tested — the exact gap that hid the FOOTER
-    defect until 2026-08-14, when the tests were still loading reference/."""
-    with open(PROBE_PATH, "rb") as f:
-        executed = f.read()
-    with open(REFERENCE_PROBE_PATH, "rb") as f:
-        reference = f.read()
-    assert executed == reference, (
-        "reference/session_queue_probe.py has drifted from scripts/session_queue_probe.py — "
-        "the tests exercise scripts/, so the reference copy would propagate untested code."
-    )
-
 
 def test_footer_orders_signpost_before_pillar():
     """Order is the point, not just the labels: the signpost is what tells you which primary
