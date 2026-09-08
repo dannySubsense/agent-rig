@@ -6,7 +6,7 @@
 # docs/specs/signpost-checklist-redesign/02-ARCHITECTURE.md §8 — wrapper shape reused verbatim,
 # not redesigned).
 set -uo pipefail
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_DIR="$(pwd)"
 cd "$REPO_DIR" || exit 0
 
 STDIN_FILE="$(mktemp)"

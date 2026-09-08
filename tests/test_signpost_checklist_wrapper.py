@@ -44,7 +44,7 @@ def _isolated_track_record_env():
     return env, path
 
 
-def _run_wrapper(stdin_payload, wrapper_path=WRAPPER_PATH):
+def _run_wrapper(stdin_payload, wrapper_path=WRAPPER_PATH, cwd=REPO_ROOT):
     env, track_path = _isolated_track_record_env()
     try:
         return subprocess.run(
@@ -52,7 +52,7 @@ def _run_wrapper(stdin_payload, wrapper_path=WRAPPER_PATH):
             input=json.dumps(stdin_payload),
             capture_output=True,
             text=True,
-            cwd=REPO_ROOT,
+            cwd=cwd,
             timeout=15,
             env=env,
         )
@@ -129,23 +129,20 @@ def test_wrapper_fails_open_when_probe_script_missing(tmp_path=None):
     wrapper block or crash — it must exit 0 with no blocking output, matching repo convention
     (fail-open on every failure mode, per the wrapper's own header comment).
 
-    Isolated fixture, never touches the real live probe: the wrapper resolves
-    REPO_DIR as two directories up from its own BASH_SOURCE
-    (.claude/hooks/../.. -> repo root, see signpost-checklist.sh line 9), so a copy of the
-    wrapper placed at <tmp>/.claude/hooks/signpost-checklist.sh resolves REPO_DIR to <tmp> —
-    a throwaway directory where scripts/signpost_checklist_probe.py is simply never created.
-    This is structurally isolated: nothing here reads, moves, or deletes the real repo's
-    scripts/signpost_checklist_probe.py, so no failure mode (assertion, SIGKILL, SIGINT,
-    collection abort, parallel test runs) can leave the live probe absent.
+    Isolated fixture, never touches the real live probe: the wrapper resolves REPO_DIR from
+    the current working directory (`REPO_DIR="$(pwd)"`, see signpost-checklist.sh line 9 —
+    changed from BASH_SOURCE-based resolution so a globally-installed copy at
+    ~/.claude/hooks/ still resolves to whatever project invoked it, not the wrapper's own
+    install location). So invoking the real wrapper script with cwd=tmp_root resolves
+    REPO_DIR to tmp_root — a throwaway directory where scripts/signpost_checklist_probe.py is
+    simply never created. This is structurally isolated: nothing here reads, moves, or
+    deletes the real repo's scripts/signpost_checklist_probe.py, so no failure mode
+    (assertion, SIGKILL, SIGINT, collection abort, parallel test runs) can leave the live
+    probe absent.
     """
     own_tmp_dir = tmp_path is None
     tmp_root = tempfile.mkdtemp(prefix="signpost-wrapper-test-") if own_tmp_dir else str(tmp_path)
     try:
-        fixture_hooks_dir = os.path.join(tmp_root, ".claude", "hooks")
-        os.makedirs(fixture_hooks_dir, exist_ok=True)
-        fixture_wrapper_path = os.path.join(fixture_hooks_dir, "signpost-checklist.sh")
-        shutil.copy(WRAPPER_PATH, fixture_wrapper_path)
-        os.chmod(fixture_wrapper_path, 0o755)
         # Deliberately do NOT create tmp_root/scripts/ — the probe path the wrapper resolves
         # to (tmp_root/scripts/signpost_checklist_probe.py) is missing by construction.
 
@@ -155,7 +152,7 @@ def test_wrapper_fails_open_when_probe_script_missing(tmp_path=None):
             "transcript_path": "/nonexistent/does-not-matter.jsonl",
             "last_assistant_message": "irrelevant on this gate",
         }
-        result = _run_wrapper(payload, wrapper_path=fixture_wrapper_path)
+        result = _run_wrapper(payload, wrapper_path=WRAPPER_PATH, cwd=tmp_root)
         assert result.returncode == 0
         assert result.stdout.strip() == ""
     finally:
