@@ -29,9 +29,12 @@ write_probe_error() {
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
 repo_dir, stdin_path, cause = sys.argv[1], sys.argv[2], sys.argv[3]
+
+sys.path.insert(0, os.path.join(repo_dir, "scripts"))
+from hook_telemetry import write_telemetry_event
+
 track_record_path = os.environ.get(
     "SIGNPOST_TRACK_RECORD_PATH",
     os.path.join(repo_dir, "docs", "tooling", "signpost-checklist-track-record.jsonl"),
@@ -48,23 +51,19 @@ try:
 except Exception:
     pass
 
-entry = {
-    "timestamp": datetime.now(timezone.utc).isoformat(),
-    "session_id": session_id,
-    "stop_hook_active": stop_hook_active,
-    "queue_injected": False,
-    "first_turn": False,
-    "decision": "probe_error",
-    "violations": [],
-    "reason": None,
-    "probe_error": cause,
-}
-try:
-    os.makedirs(os.path.dirname(track_record_path), exist_ok=True)
-    with open(track_record_path, "a") as fh:
-        fh.write(json.dumps(entry) + "\n")
-except Exception:
-    pass
+write_telemetry_event(
+    hook_name="signpost-checklist",
+    jsonl_path=track_record_path,
+    session_id=session_id,
+    decision="probe_error",
+    reason=None,
+    probe_error=cause,
+    payload={
+        "stop_hook_active": stop_hook_active,
+        "queue_injected": False,
+        "first_turn": False,
+    },
+)
 PYEOF
 }
 

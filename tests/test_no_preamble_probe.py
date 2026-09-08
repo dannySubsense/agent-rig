@@ -77,9 +77,10 @@ def _decision(stdout_text):
 
 
 TRACK_RECORD_KEYS = {
-    "timestamp", "session_id", "stop_hook_active", "mode", "decision",
-    "flagged_clauses", "reason", "probe_error",
+    "hook_name", "timestamp", "session_id", "decision", "reason", "probe_error", "payload",
 }
+
+PAYLOAD_KEYS = {"stop_hook_active", "mode", "flagged_clauses"}
 
 
 def _stdin(message, session_id="s1", stop_hook_active=False):
@@ -102,8 +103,8 @@ def test_ac1_narration_with_no_concrete_noun_flags_and_allows(monkeypatch, tmp_p
     assert stdout_text == ""
     entry = entries[-1]
     assert entry["decision"] == "flagged"
-    assert entry["mode"] == "log_only"
-    assert len(entry["flagged_clauses"]) >= 1
+    assert entry["payload"]["mode"] == "log_only"
+    assert len(entry["payload"]["flagged_clauses"]) >= 1
     assert entry["reason"] is None
 
 
@@ -119,7 +120,7 @@ def test_ac2_narration_with_file_path_in_same_clause_allows_no_flag(monkeypatch,
     assert stdout_text == ""
     entry = entries[-1]
     assert entry["decision"] == "allow"
-    assert entry["flagged_clauses"] == []
+    assert entry["payload"]["flagged_clauses"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +143,7 @@ def test_ac3_excluded_past_tense_verbs_allow(monkeypatch, tmp_path):
         )
         assert stdout_text == "", f"excluded past-tense verb fixture[{i}] did not allow: {message!r}"
         assert entries[-1]["decision"] == "allow"
-        assert entries[-1]["flagged_clauses"] == []
+        assert entries[-1]["payload"]["flagged_clauses"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +161,7 @@ def test_ac4_halt_heading_exempts_narrating_clause_that_would_otherwise_flag(mon
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["flagged_clauses"] == []
+    assert entries[-1]["payload"]["flagged_clauses"] == []
 
 
 def test_ac4_negative_control_same_clause_without_heading_flags(monkeypatch, tmp_path):
@@ -171,7 +172,7 @@ def test_ac4_negative_control_same_clause_without_heading_flags(monkeypatch, tmp
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "flagged"
-    assert len(entries[-1]["flagged_clauses"]) >= 1
+    assert len(entries[-1]["payload"]["flagged_clauses"]) >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +193,8 @@ def test_ac5_stop_hook_active_allows_known_flaggable_message_on_second_call(monk
     stdout2, entries2 = _run_probe(monkeypatch, tmp_path, second_stdin, track_record_name="tr5.jsonl")
     assert stdout2 == ""
     assert entries2[-1]["decision"] == "allow"
-    assert entries2[-1]["stop_hook_active"] is True
-    assert entries2[-1]["flagged_clauses"] == []
+    assert entries2[-1]["payload"]["stop_hook_active"] is True
+    assert entries2[-1]["payload"]["flagged_clauses"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +227,7 @@ def test_ac6_probe_internal_exception_fails_open_and_records_probe_error(monkeyp
     assert stdout_text == ""  # never blocks on its own failure
     entry = entries[-1]
     assert entry["decision"] == "probe_error"
-    assert entry["flagged_clauses"] == []
+    assert entry["payload"]["flagged_clauses"] == []
     assert entry["reason"] is None
     assert isinstance(entry["probe_error"], str) and "RuntimeError" in entry["probe_error"]
     assert "injected fault" in entry["probe_error"]
@@ -247,7 +248,7 @@ def test_ac7_blocking_mode_emits_block_naming_flagged_clause_verbatim(monkeypatc
     assert decision["decision"] == "block"
     assert "Let me dig into this and see what's going on" in decision["reason"]
     assert entries[-1]["decision"] == "block"
-    assert entries[-1]["mode"] == "blocking"
+    assert entries[-1]["payload"]["mode"] == "blocking"
     assert entries[-1]["reason"] == decision["reason"]
 
 
@@ -352,9 +353,10 @@ def test_ac9_track_record_entry_matches_schema_on_flag_path(monkeypatch, tmp_pat
     _, entries = _run_probe(monkeypatch, tmp_path, stdin_data, track_record_name="tr9a.jsonl")
     entry = entries[-1]
     assert set(entry.keys()) == TRACK_RECORD_KEYS
+    assert set(entry["payload"].keys()) == PAYLOAD_KEYS
     assert entry["decision"] == "flagged"
-    assert isinstance(entry["flagged_clauses"], list) and len(entry["flagged_clauses"]) > 0
-    for clause in entry["flagged_clauses"]:
+    assert isinstance(entry["payload"]["flagged_clauses"], list) and len(entry["payload"]["flagged_clauses"]) > 0
+    for clause in entry["payload"]["flagged_clauses"]:
         assert set(clause.keys()) == {"text", "verb_matched"}
     assert entry["reason"] is None
     assert entry["probe_error"] is None
@@ -367,8 +369,9 @@ def test_ac9_track_record_entry_matches_schema_on_allow_path(monkeypatch, tmp_pa
     _, entries = _run_probe(monkeypatch, tmp_path, stdin_data, track_record_name="tr9b.jsonl")
     entry = entries[-1]
     assert set(entry.keys()) == TRACK_RECORD_KEYS
+    assert set(entry["payload"].keys()) == PAYLOAD_KEYS
     assert entry["decision"] == "allow"
-    assert entry["flagged_clauses"] == []
+    assert entry["payload"]["flagged_clauses"] == []
     assert entry["reason"] is None
     assert entry["probe_error"] is None
 
@@ -404,7 +407,7 @@ def test_known_false_positive_epistemic_verb_with_substantive_complement_flags(m
     assert stdout_text == ""
     entry = entries[-1]
     assert entry["decision"] == "flagged"
-    assert any(c["verb_matched"] == "I think" for c in entry["flagged_clauses"])
+    assert any(c["verb_matched"] == "I think" for c in entry["payload"]["flagged_clauses"])
 
 
 # ---------------------------------------------------------------------------
@@ -422,7 +425,7 @@ def test_regression_midword_period_in_file_path_does_not_split_clause(monkeypatc
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["flagged_clauses"] == []
+    assert entries[-1]["payload"]["flagged_clauses"] == []
 
     # Direct unit check on the clause-splitting function itself, isolating the mechanism:
     # the period in "config.yaml" must not appear as a boundary end-position.
@@ -448,7 +451,7 @@ def test_regression_contraction_apostrophes_do_not_falsely_neutralize_1(monkeypa
     assert stdout_text == ""
     entry = entries[-1]
     assert entry["decision"] == "flagged"
-    assert len(entry["flagged_clauses"]) >= 1
+    assert len(entry["payload"]["flagged_clauses"]) >= 1
 
 
 def test_regression_contraction_apostrophes_do_not_falsely_neutralize_2(monkeypatch, tmp_path):
@@ -460,7 +463,7 @@ def test_regression_contraction_apostrophes_do_not_falsely_neutralize_2(monkeypa
     assert stdout_text == ""
     entry = entries[-1]
     assert entry["decision"] == "flagged"
-    assert len(entry["flagged_clauses"]) >= 1
+    assert len(entry["payload"]["flagged_clauses"]) >= 1
 
 
 def test_regression_genuine_single_quoted_literal_still_neutralizes(monkeypatch, tmp_path):
@@ -471,7 +474,7 @@ def test_regression_genuine_single_quoted_literal_still_neutralizes(monkeypatch,
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["flagged_clauses"] == []
+    assert entries[-1]["payload"]["flagged_clauses"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +493,7 @@ def test_regression_genuine_file_path_token_still_neutralizes(monkeypatch, tmp_p
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["flagged_clauses"] == []
+    assert entries[-1]["payload"]["flagged_clauses"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -550,6 +553,45 @@ def _run_without_pytest():
     print(f"\n{passed}/{len(test_fns)} passed")
     if failures:
         sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# hook-telemetry-schema Slice 1 — write path migrated to write_telemetry_event().
+# Spec: docs/tooling/hook-telemetry-schema/SPEC.md §9. Confirms the call site, not the
+# probe's own decision logic (already covered above).
+# ---------------------------------------------------------------------------
+
+def test_write_track_record_calls_write_telemetry_event_with_expected_hook_name_and_payload():
+    calls = []
+
+    def _spy(**kwargs):
+        calls.append(kwargs)
+
+    original = probe.write_telemetry_event
+    probe.write_telemetry_event = _spy
+    try:
+        probe.write_track_record(
+            session_id="sess-spy",
+            stop_hook_active=False,
+            mode="blocking",
+            decision="flagged",
+            flagged_clauses=["c1"],
+            reason="because",
+            probe_error=None,
+        )
+    finally:
+        probe.write_telemetry_event = original
+
+    assert len(calls) == 1
+    call = calls[0]
+    assert call["hook_name"] == "no-preamble-no-meta-narration"
+    assert call["session_id"] == "sess-spy"
+    assert call["decision"] == "flagged"
+    assert call["payload"] == {
+        "stop_hook_active": False,
+        "mode": "blocking",
+        "flagged_clauses": ["c1"],
+    }
 
 
 if __name__ == "__main__":

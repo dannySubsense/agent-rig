@@ -160,7 +160,8 @@ def _assert_case(case, stdout_text, entries):
         "file_in_scope",
     ):
         if key in expect:
-            assert entry[key] == expect[key], f"{case['id']}: {key} mismatch (entry={entry})"
+            assert entry["payload"][key] == expect[key], \
+                f"{case['id']}: {key} mismatch (entry={entry})"
 
 
 if HAVE_PYTEST:

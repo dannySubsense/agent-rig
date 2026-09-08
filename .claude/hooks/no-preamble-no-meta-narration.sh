@@ -31,7 +31,6 @@ write_probe_error() {
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
 repo_dir, stdin_path, cause = sys.argv[1], sys.argv[2], sys.argv[3]
 track_record_path = os.path.join(
@@ -44,6 +43,7 @@ track_record_path = os.path.join(
 # function exists to record), fall back to an explicit unknown sentinel
 # instead of a silent guess.
 sys.path.insert(0, os.path.join(repo_dir, "scripts"))
+from hook_telemetry import write_telemetry_event
 try:
     from no_preamble_probe import MODE as probe_mode
 except Exception:
@@ -60,22 +60,18 @@ try:
 except Exception:
     pass
 
-entry = {
-    "timestamp": datetime.now(timezone.utc).isoformat(),
-    "session_id": session_id,
-    "stop_hook_active": stop_hook_active,
-    "mode": probe_mode,
-    "decision": "probe_error",
-    "flagged_clauses": [],
-    "reason": None,
-    "probe_error": cause,
-}
-try:
-    os.makedirs(os.path.dirname(track_record_path), exist_ok=True)
-    with open(track_record_path, "a") as fh:
-        fh.write(json.dumps(entry) + "\n")
-except Exception:
-    pass
+write_telemetry_event(
+    hook_name="no-preamble-no-meta-narration",
+    jsonl_path=track_record_path,
+    session_id=session_id,
+    decision="probe_error",
+    reason=None,
+    probe_error=cause,
+    payload={
+        "stop_hook_active": stop_hook_active,
+        "mode": probe_mode,
+    },
+)
 PYEOF
 }
 

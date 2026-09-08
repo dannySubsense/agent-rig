@@ -36,7 +36,9 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from hook_telemetry import write_telemetry_event  # noqa: E402
 
 TRACK_RECORD_RELATIVE_PATH = os.path.join(
     "docs", "tooling", "progress-proof-per-slice-track-record.jsonl"
@@ -466,14 +468,22 @@ def decide(old_string, new_string, allowlist, project_dir):
 
 def write_track_record(project_dir, entry):
     track_record_path = os.path.join(project_dir, TRACK_RECORD_RELATIVE_PATH)
-    try:
-        os.makedirs(os.path.dirname(track_record_path), exist_ok=True)
-        with open(track_record_path, "a") as fh:
-            fh.write(json.dumps(entry) + "\n")
-    except Exception:
-        # The track record is an audit trail, not a gate — a write failure here must not
-        # change or block the probe's decision to Claude Code.
-        pass
+    write_telemetry_event(
+        hook_name="progress-proof-per-slice",
+        jsonl_path=track_record_path,
+        session_id=entry.get("session_id"),
+        decision=entry.get("decision"),
+        reason=entry.get("reason"),
+        probe_error=entry.get("probe_error"),
+        payload={
+            "file_path": entry.get("file_path"),
+            "file_in_scope": entry.get("file_in_scope"),
+            "transitions_found": entry.get("transitions_found"),
+            "transitions_verified": entry.get("transitions_verified"),
+            "matched_by": entry.get("matched_by"),
+            "proof_status": entry.get("proof_status"),
+        },
+    )
 
 
 def build_track_record_entry(
@@ -489,7 +499,6 @@ def build_track_record_entry(
     probe_error,
 ):
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": session_id,
         "file_path": file_path,
         "file_in_scope": file_in_scope,

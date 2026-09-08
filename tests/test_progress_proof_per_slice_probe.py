@@ -44,8 +44,12 @@ def _load_probe():
 probe = _load_probe()
 
 TRACK_RECORD_KEYS = {
-    "timestamp", "session_id", "file_path", "file_in_scope", "transitions_found",
-    "transitions_verified", "matched_by", "proof_status", "decision", "reason", "probe_error",
+    "hook_name", "timestamp", "session_id", "decision", "reason", "probe_error", "payload",
+}
+
+PAYLOAD_KEYS = {
+    "file_path", "file_in_scope", "transitions_found", "transitions_verified", "matched_by",
+    "proof_status",
 }
 
 
@@ -150,7 +154,7 @@ def test_ac1_out_of_scope_filename_allows_with_file_in_scope_false(monkeypatch, 
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["file_in_scope"] is False
+    assert entries[-1]["payload"]["file_in_scope"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +171,7 @@ def test_ac2_no_candidate_lines_allows_with_transitions_found_zero(monkeypatch, 
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["transitions_found"] == 0
+    assert entries[-1]["payload"]["transitions_found"] == 0
 
 
 def test_ac2_candidates_with_no_matched_pair_allows(monkeypatch, tmp_path):
@@ -181,7 +185,7 @@ def test_ac2_candidates_with_no_matched_pair_allows(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["transitions_found"] == 0
+    assert entries[-1]["payload"]["transitions_found"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -198,8 +202,8 @@ def test_ac3_matched_transition_no_proof_marker_allows(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["transitions_found"] == 1
-    assert entries[-1]["proof_status"] is None
+    assert entries[-1]["payload"]["transitions_found"] == 1
+    assert entries[-1]["payload"]["proof_status"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +221,7 @@ def test_ac4_non_allowlisted_proof_command_allows_manual_unverified(monkeypatch,
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["proof_status"] == "manual_unverified"
+    assert entries[-1]["payload"]["proof_status"] == "manual_unverified"
 
 
 # ---------------------------------------------------------------------------
@@ -236,8 +240,8 @@ def test_ac5_allowlisted_passing_proof_allows_verified_pass(monkeypatch, tmp_pat
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["proof_status"] == "verified_pass"
-    assert entries[-1]["transitions_verified"] == 1
+    assert entries[-1]["payload"]["proof_status"] == "verified_pass"
+    assert entries[-1]["payload"]["transitions_verified"] == 1
 
 
 def test_ac6_allowlisted_failing_proof_denies_verified_fail(monkeypatch, tmp_path):
@@ -255,7 +259,7 @@ def test_ac6_allowlisted_failing_proof_denies_verified_fail(monkeypatch, tmp_pat
     assert "thing" in decision["reason"]
     assert cmd in decision["reason"]
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["proof_status"] == "verified_fail"
+    assert entries[-1]["payload"]["proof_status"] == "verified_fail"
 
 
 def test_ac6_allowlisted_timing_out_proof_denies_verified_timeout(monkeypatch, tmp_path):
@@ -272,7 +276,7 @@ def test_ac6_allowlisted_timing_out_proof_denies_verified_timeout(monkeypatch, t
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["proof_status"] == "verified_timeout"
+    assert entries[-1]["payload"]["proof_status"] == "verified_timeout"
 
 
 # ---------------------------------------------------------------------------
@@ -295,8 +299,8 @@ def test_ac7_line_count_mismatch_with_real_transition_still_detected(monkeypatch
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["transitions_found"] == 1
-    assert entries[-1]["proof_status"] == "verified_pass"
+    assert entries[-1]["payload"]["transitions_found"] == 1
+    assert entries[-1]["payload"]["proof_status"] == "verified_pass"
 
 
 def test_ac7_reordering_preserves_detection(monkeypatch, tmp_path):
@@ -316,9 +320,9 @@ def test_ac7_reordering_preserves_detection(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["transitions_found"] == 1
-    assert entries[-1]["matched_by"] == "description"
-    assert entries[-1]["proof_status"] == "verified_pass"
+    assert entries[-1]["payload"]["transitions_found"] == 1
+    assert entries[-1]["payload"]["matched_by"] == "description"
+    assert entries[-1]["payload"]["proof_status"] == "verified_pass"
 
 
 # ---------------------------------------------------------------------------
@@ -340,8 +344,8 @@ def test_ac7a_slice_id_match_survives_simultaneous_mutation(monkeypatch, tmp_pat
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["matched_by"] == "slice_id"
-    assert entries[-1]["proof_status"] == "verified_pass"
+    assert entries[-1]["payload"]["matched_by"] == "slice_id"
+    assert entries[-1]["payload"]["proof_status"] == "verified_pass"
 
 
 def test_ac7a_slice_id_match_never_produces_mutation_denied_on_fail(monkeypatch, tmp_path):
@@ -358,8 +362,8 @@ def test_ac7a_slice_id_match_never_produces_mutation_denied_on_fail(monkeypatch,
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["matched_by"] == "slice_id"
-    assert entries[-1]["proof_status"] == "verified_fail"
+    assert entries[-1]["payload"]["matched_by"] == "slice_id"
+    assert entries[-1]["payload"]["proof_status"] == "verified_fail"
 
 
 # ---------------------------------------------------------------------------
@@ -380,8 +384,8 @@ def test_ac7b_no_slice_id_falls_back_to_content_matching_regression(monkeypatch,
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["matched_by"] == "description"
-    assert entries[-1]["proof_status"] == "verified_pass"
+    assert entries[-1]["payload"]["matched_by"] == "description"
+    assert entries[-1]["payload"]["proof_status"] == "verified_pass"
 
 
 def test_ac7b_no_slice_id_simultaneous_mutation_is_allowed_as_unmatched_not_denied(
@@ -401,7 +405,7 @@ def test_ac7b_no_slice_id_simultaneous_mutation_is_allowed_as_unmatched_not_deni
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["transitions_found"] == 0
+    assert entries[-1]["payload"]["transitions_found"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -422,10 +426,10 @@ def test_proof_only_mutation_denies_matched_by_description(monkeypatch, tmp_path
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["proof_status"] == "mutation_denied"
-    assert entries[-1]["matched_by"] == "description"
+    assert entries[-1]["payload"]["proof_status"] == "mutation_denied"
+    assert entries[-1]["payload"]["matched_by"] == "description"
     # command never executed for a mutation-denied pair — no track-record verified count.
-    assert entries[-1]["transitions_verified"] == 0
+    assert entries[-1]["payload"]["transitions_verified"] == 0
 
 
 def test_proof_removed_on_completion_denies_matched_by_description(monkeypatch, tmp_path):
@@ -440,8 +444,8 @@ def test_proof_removed_on_completion_denies_matched_by_description(monkeypatch, 
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
-    assert entries[-1]["proof_status"] == "mutation_denied"
-    assert entries[-1]["matched_by"] == "description"
+    assert entries[-1]["payload"]["proof_status"] == "mutation_denied"
+    assert entries[-1]["payload"]["matched_by"] == "description"
 
 
 def test_description_only_mutation_denies_matched_by_proof_identity(monkeypatch, tmp_path):
@@ -457,8 +461,8 @@ def test_description_only_mutation_denies_matched_by_proof_identity(monkeypatch,
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["proof_status"] == "mutation_denied"
-    assert entries[-1]["matched_by"] == "proof_identity"
+    assert entries[-1]["payload"]["proof_status"] == "mutation_denied"
+    assert entries[-1]["payload"]["matched_by"] == "proof_identity"
 
 
 # ---------------------------------------------------------------------------
@@ -477,9 +481,9 @@ def test_adding_proof_on_completion_is_verified_not_silently_allowed(monkeypatch
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["matched_by"] == "description"
-    assert entries[-1]["proof_status"] == "verified_pass"
-    assert entries[-1]["transitions_verified"] == 1
+    assert entries[-1]["payload"]["matched_by"] == "description"
+    assert entries[-1]["payload"]["proof_status"] == "verified_pass"
+    assert entries[-1]["payload"]["transitions_verified"] == 1
 
 
 def test_adding_proof_on_completion_denies_when_added_command_fails(monkeypatch, tmp_path):
@@ -495,7 +499,7 @@ def test_adding_proof_on_completion_denies_when_added_command_fails(monkeypatch,
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["proof_status"] == "verified_fail"
+    assert entries[-1]["payload"]["proof_status"] == "verified_fail"
 
 
 # ---------------------------------------------------------------------------
@@ -514,8 +518,8 @@ def test_ambiguous_duplicate_description_denied(monkeypatch, tmp_path):
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["proof_status"] == "ambiguous_match_denied"
-    assert entries[-1]["matched_by"] is None
+    assert entries[-1]["payload"]["proof_status"] == "ambiguous_match_denied"
+    assert entries[-1]["payload"]["matched_by"] is None
 
 
 def test_duplicate_description_no_completion_allowed(monkeypatch, tmp_path):
@@ -534,7 +538,7 @@ def test_duplicate_description_no_completion_allowed(monkeypatch, tmp_path):
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["transitions_found"] == 0
+    assert entries[-1]["payload"]["transitions_found"] == 0
 
 
 def test_ambiguous_duplicate_slice_id_denied(monkeypatch, tmp_path):
@@ -549,8 +553,8 @@ def test_ambiguous_duplicate_slice_id_denied(monkeypatch, tmp_path):
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["proof_status"] == "ambiguous_match_denied"
-    assert entries[-1]["matched_by"] is None
+    assert entries[-1]["payload"]["proof_status"] == "ambiguous_match_denied"
+    assert entries[-1]["payload"]["matched_by"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -573,7 +577,7 @@ def test_inserted_completion_metadata_between_description_and_proof_is_verified(
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["proof_status"] == "verified_pass"
+    assert entries[-1]["payload"]["proof_status"] == "verified_pass"
 
 
 # ---------------------------------------------------------------------------
@@ -598,7 +602,7 @@ def test_multiple_transitions_mixed_outcomes_denies_whole_edit(monkeypatch, tmp_
     decision = _decision(stdout_text)
     assert decision is not None and decision["decision"] == "block"
     assert entries[-1]["decision"] == "deny"
-    assert entries[-1]["transitions_found"] == 2
+    assert entries[-1]["payload"]["transitions_found"] == 2
 
 
 # ---------------------------------------------------------------------------
@@ -615,7 +619,7 @@ def test_already_done_old_line_is_never_treated_as_old_open_candidate(monkeypatc
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["transitions_found"] == 0
+    assert entries[-1]["payload"]["transitions_found"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -633,7 +637,7 @@ def test_no_allowlist_present_always_allows_manual_unverified(monkeypatch, tmp_p
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["proof_status"] == "manual_unverified"
+    assert entries[-1]["payload"]["proof_status"] == "manual_unverified"
 
 
 def test_malformed_allowlist_json_allows_manual_unverified(monkeypatch, tmp_path):
@@ -648,7 +652,7 @@ def test_malformed_allowlist_json_allows_manual_unverified(monkeypatch, tmp_path
     stdout_text, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert stdout_text == ""
     assert entries[-1]["decision"] == "allow"
-    assert entries[-1]["proof_status"] == "manual_unverified"
+    assert entries[-1]["payload"]["proof_status"] == "manual_unverified"
 
 
 def test_probe_crash_allows_and_records_probe_error(monkeypatch, tmp_path):
@@ -747,7 +751,12 @@ def test_track_record_write_failure_does_not_change_decision(monkeypatch, tmp_pa
             raise OSError("disk full")
         return real_open(path, mode, *args, **kwargs)
 
-    monkeypatch.setattr(probe, "open", _boom_open, raising=False)
+    # The actual file write now happens inside hook_telemetry.write_telemetry_event()
+    # (imported into the probe module via sys.path shim), not in the probe module's own
+    # namespace, so the OSError must be injected on hook_telemetry's own `open`, not
+    # probe's, to reach the writer's real failure path.
+    hook_telemetry_module = sys.modules["hook_telemetry"]
+    monkeypatch.setattr(hook_telemetry_module, "open", _boom_open, raising=False)
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(stdin_data)))
     buf = io.StringIO()
@@ -765,6 +774,7 @@ def test_track_record_entry_schema_field_names_exact_per_spec_section_7(monkeypa
     )
     _, entries = _run_probe(monkeypatch, tmp_path, stdin_data)
     assert set(entries[-1].keys()) == TRACK_RECORD_KEYS
+    assert set(entries[-1]["payload"].keys()) == PAYLOAD_KEYS
 
 
 # ---------------------------------------------------------------------------
@@ -835,6 +845,52 @@ def _run_without_pytest():
     print(f"\n{passed}/{len(test_fns)} passed")
     if failures:
         sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# hook-telemetry-schema Slice 1 — write path migrated to write_telemetry_event().
+# Spec: docs/tooling/hook-telemetry-schema/SPEC.md §9. Confirms the call site, not the
+# probe's own decision logic (already covered above).
+# ---------------------------------------------------------------------------
+
+def test_write_track_record_calls_write_telemetry_event_with_expected_hook_name_and_payload(tmp_path):
+    calls = []
+
+    def _spy(**kwargs):
+        calls.append(kwargs)
+
+    original = probe.write_telemetry_event
+    probe.write_telemetry_event = _spy
+    try:
+        entry = {
+            "session_id": "sess-spy",
+            "file_path": "foo.py",
+            "file_in_scope": True,
+            "transitions_found": 1,
+            "transitions_verified": 1,
+            "matched_by": "grep",
+            "proof_status": "verified",
+            "decision": "allow",
+            "reason": None,
+            "probe_error": None,
+        }
+        probe.write_track_record(str(tmp_path), entry)
+    finally:
+        probe.write_telemetry_event = original
+
+    assert len(calls) == 1
+    call = calls[0]
+    assert call["hook_name"] == "progress-proof-per-slice"
+    assert call["session_id"] == "sess-spy"
+    assert call["decision"] == "allow"
+    assert call["payload"] == {
+        "file_path": "foo.py",
+        "file_in_scope": True,
+        "transitions_found": 1,
+        "transitions_verified": 1,
+        "matched_by": "grep",
+        "proof_status": "verified",
+    }
 
 
 if __name__ == "__main__":
