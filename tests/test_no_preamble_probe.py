@@ -4,7 +4,7 @@ Spec: docs/tooling/no-preamble-no-meta-narration-hook/SPEC.md §13 (acceptance c
 
 Loads the copy the Stop hook actually executes (scripts/no_preamble_probe.py) — the only
 copy that exists (the byte-parity reference/ mirror and its drift-guard test were retired,
-see DDR-013, docs/specs/agent-rig-ddrs/00-DDR-INDEX.md).
+see DDR-015, docs/specs/agent-rig-ddrs/00-DDR-INDEX.md).
 
 Exercises the real entry point, probe.main() via stdin, against constructed fixture
 sentences drawn directly from SPEC.md's own worked examples (§13, §3, §5, §14) — never

@@ -2,7 +2,7 @@
 FOOTER contract the injected text delivers to the reading agent.
 
 Loads the copy the hook EXECUTES (scripts/) — the only copy that exists (the byte-parity
-reference/ mirror and its drift-guard test were retired, see DDR-013,
+reference/ mirror and its drift-guard test were retired, see DDR-015,
 docs/specs/agent-rig-ddrs/00-DDR-INDEX.md).
 
 Spec: docs/tooling/session-queue-hardening.md §2b (three staleness cases) and §3 (writer-session-id
@@ -33,7 +33,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # "$REPO_DIR/scripts/session_queue_probe.py"). Until 2026-08-14 these tests loaded a byte-parity
 # reference/ mirror instead, so every green run validated a file the harness never executed —
 # invisible only because the two copies happened to be identical at the time. That mirror (and
-# its drift-guard test) has since been retired (DDR-013) rather than kept manually in sync.
+# its drift-guard test) has since been retired (DDR-015) rather than kept manually in sync.
 PROBE_PATH = os.path.join(REPO_ROOT, "scripts", "session_queue_probe.py")
 
 
